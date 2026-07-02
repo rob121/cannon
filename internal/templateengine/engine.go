@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,9 +18,14 @@ import (
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/hooks"
+	"github.com/rob121/cannon/internal/settings"
+	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/templatemeta"
+	"github.com/rob121/cannon/internal/themes"
+	"github.com/rob121/cannon/internal/user"
 )
 
-//go:embed default/*.html default/*.css default/*.svg default/controllers/*/*.html admin/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
+//go:embed default/*.html default/error/*.html default/mail/*.html default/partials/auth/*.html default/partials/blocks/*.html default/partials/content/*.html default/partials/error-page.html default/partials/offline-notice.html default/partials/page-header.html default/controllers/*/*.html default/*.css default/*.svg admin/*.html admin/error/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
 var coreFS embed.FS
 
 // BlockRenderer renders named template spaces via extensions.
@@ -29,13 +36,15 @@ type BlockLenRenderer func(name string) (int, error)
 
 // Engine resolves templates with site precedence and block support.
 type Engine struct {
-	site     *config.SiteConfig
-	funcs    template.FuncMap
-	blocks   BlockRenderer
-	hookCtx  context.Context
-	mu       sync.RWMutex
-	parsed   map[string]*template.Template
-	adminSet *template.Template
+	site      *config.SiteConfig
+	themes    themes.Selection
+	funcs     template.FuncMap
+	blocks    BlockRenderer
+	hookCtx   context.Context
+	mu        sync.RWMutex
+	parsed    map[string]*template.Template
+	adminSet  *template.Template
+	adminRoot string
 }
 
 // PageData is passed to layout templates.
@@ -47,17 +56,23 @@ type PageData struct {
 }
 
 // New creates a template engine for a site.
-func New(site *config.SiteConfig, blocks BlockRenderer, blockLen BlockLenRenderer, extra template.FuncMap) *Engine {
+func New(site *config.SiteConfig, sel themes.Selection, blocks BlockRenderer, blockLen BlockLenRenderer, extra template.FuncMap) *Engine {
 	funcs := FuncMap(blocks, blockLen)
 	for k, v := range extra {
 		funcs[k] = v
 	}
-	return &Engine{
+	sel = sel.Normalize()
+	eng := &Engine{
 		site:   site,
+		themes: sel,
 		funcs:  funcs,
 		blocks: blocks,
 		parsed: make(map[string]*template.Template),
 	}
+	if !themes.IsBuiltinAdmin(sel.Admin) && site != nil {
+		eng.adminRoot = themes.Root(site.TemplateDir, sel.Admin)
+	}
+	return eng
 }
 
 func asInt(v any) int {
@@ -78,8 +93,24 @@ func (e *Engine) SetHookContext(ctx context.Context) {
 	e.hookCtx = ctx
 }
 
+// HookContext returns the active render context, if any.
+func (e *Engine) HookContext() context.Context {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.hookCtx
+}
+
 // Render executes a template with layout wrapping.
 func (e *Engine) Render(w io.Writer, layout, page string, data any) error {
+	return e.render(w, layout, page, data, 0)
+}
+
+// RenderWithStatus renders a template and sets the HTTP status after render hooks run.
+func (e *Engine) RenderWithStatus(w io.Writer, status int, layout, page string, data any) error {
+	return e.render(w, layout, page, data, status)
+}
+
+func (e *Engine) render(w io.Writer, layout, page string, data any, status int) error {
 	if e.hookCtx != nil {
 		out, err := hooks.Fire(e.hookCtx, hooks.OnBeforeRender, map[string]any{
 			"layout": layout,
@@ -121,16 +152,56 @@ func (e *Engine) Render(w io.Writer, layout, page string, data any) error {
 			layoutData[k] = v
 		}
 	}
-	if err := e.renderLayout(w, layout, layoutData); err != nil {
+	if _, ok := layoutData["User"]; !ok && e.hookCtx != nil {
+		if userScope, ok := user.RequestUser(e.hookCtx); ok {
+			layoutData["User"] = userScope
+		}
+	}
+	if _, ok := layoutData["HomeURL"]; !ok && e.hookCtx != nil {
+		layoutData["HomeURL"] = sites.DefaultRoutePath(e.hookCtx)
+	}
+	if _, ok := layoutData["IsOffline"]; !ok && e.hookCtx != nil {
+		if offline, err := settings.SiteOffline(e.hookCtx); err == nil {
+			layoutData["IsOffline"] = offline
+		}
+	}
+	var rendered bytes.Buffer
+	if err := e.renderLayout(&rendered, layout, layoutData); err != nil {
 		return err
 	}
-	if e.hookCtx != nil {
-		_, _ = hooks.Fire(e.hookCtx, hooks.OnAfterRender, map[string]any{
-			"layout": layout,
-			"page":   page,
-		})
+	output := rendered.Bytes()
+
+	if rw, ok := w.(interface{ Header() http.Header }); ok {
+		if rw.Header().Get("Content-Type") == "" {
+			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
 	}
-	return nil
+	if e.hookCtx != nil {
+		out, err := hooks.Fire(e.hookCtx, hooks.OnAfterRender, map[string]any{
+			"layout":  layout,
+			"page":    page,
+			"headers": writerHeaders(w),
+			"body":    string(output),
+		})
+		if err != nil {
+			return err
+		}
+		applyHookHeaders(w, out)
+		if encoding, _ := out["body_encoding"].(string); strings.EqualFold(encoding, "base64") {
+			if encoded, _ := out["body_base64"].(string); encoded != "" {
+				decoded, err := base64.StdEncoding.DecodeString(encoded)
+				if err != nil {
+					return fmt.Errorf("decode onAfterRender body_base64: %w", err)
+				}
+				output = decoded
+			}
+		} else if v, ok := out["body"].(string); ok {
+			output = []byte(v)
+		}
+	}
+	writeResponseStatus(w, status)
+	_, err = w.Write(output)
+	return err
 }
 
 // RenderController renders default/controllers/{controller}/{action}.html inside the layout.
@@ -161,6 +232,44 @@ func AdminAsset(name string) ([]byte, error) {
 // SiteAsset returns embedded public site static files from default/.
 func SiteAsset(name string) ([]byte, error) {
 	return coreFS.ReadFile(filepath.Join("default", name))
+}
+
+// ThemeAsset reads a file from a theme assets directory, falling back to embedded default assets.
+func ThemeAsset(templateDir, theme, name string) ([]byte, string, error) {
+	name = filepath.Base(strings.TrimSpace(name))
+	if name == "" || name == "." {
+		return nil, "", fmt.Errorf("asset name is required")
+	}
+	if !themes.IsBuiltinFrontend(theme) && strings.TrimSpace(templateDir) != "" {
+		path := filepath.Join(themes.AssetsDir(templateDir, theme), name)
+		if raw, err := os.ReadFile(path); err == nil {
+			return raw, path, nil
+		}
+	}
+	raw, err := SiteAsset(name)
+	if err != nil {
+		return nil, "", err
+	}
+	return raw, "embed:default/" + name, nil
+}
+
+// AdminThemeAsset reads from the active admin theme assets directory or embedded admin files.
+func AdminThemeAsset(templateDir, theme, name string) ([]byte, string, error) {
+	name = filepath.Base(strings.TrimSpace(name))
+	if name == "" || name == "." {
+		return nil, "", fmt.Errorf("asset name is required")
+	}
+	if !themes.IsBuiltinAdmin(theme) && strings.TrimSpace(templateDir) != "" {
+		path := filepath.Join(themes.AssetsDir(templateDir, theme), name)
+		if raw, err := os.ReadFile(path); err == nil {
+			return raw, path, nil
+		}
+	}
+	raw, err := AdminAsset(name)
+	if err != nil {
+		return nil, "", err
+	}
+	return raw, "embed:admin/" + name, nil
 }
 
 // ReadBuiltin returns embedded HTML template source for admin/ or default/ paths.
@@ -213,7 +322,132 @@ func (e *Engine) renderLayout(w io.Writer, name string, data any) error {
 	if err != nil {
 		return err
 	}
-	return tmpl.Execute(w, data)
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+	out := buf.Bytes()
+	if isLayoutTemplate(name) && !bytes.Contains(out, []byte("site-offline-notice")) && layoutIsOffline(e, data) {
+		if notice, err := e.renderOfflineNotice(data); err == nil && notice != "" {
+			out = injectAfterBodyOpen(out, notice)
+		}
+	}
+	_, err = w.Write(out)
+	return err
+}
+
+func layoutIsOffline(e *Engine, data any) bool {
+	if m, ok := data.(map[string]any); ok {
+		if offline, ok := m["IsOffline"].(bool); ok && offline {
+			return true
+		}
+	}
+	if e.hookCtx == nil {
+		return false
+	}
+	offline, err := settings.SiteOffline(e.hookCtx)
+	return err == nil && offline
+}
+
+func isLayoutTemplate(name string) bool {
+	base := strings.ToLower(filepath.Base(name))
+	return base == "layout.html"
+}
+
+func (e *Engine) renderOfflineNotice(data any) (string, error) {
+	tmpl, err := e.parse("default/partials/offline-notice.html")
+	if err != nil {
+		return "", err
+	}
+	target := tmpl.Lookup("offlineNotice")
+	if target == nil {
+		target = tmpl
+	}
+	var buf bytes.Buffer
+	if err := target.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(buf.String()), nil
+}
+
+func injectAfterBodyOpen(html []byte, insert string) []byte {
+	lower := bytes.ToLower(html)
+	idx := bytes.Index(lower, []byte("<body"))
+	if idx < 0 {
+		return append(append([]byte(nil), insert...), html...)
+	}
+	gt := bytes.IndexByte(html[idx:], '>')
+	if gt < 0 {
+		return html
+	}
+	pos := idx + gt + 1
+	var out bytes.Buffer
+	out.Write(html[:pos])
+	out.WriteString(insert)
+	out.Write(html[pos:])
+	return out.Bytes()
+}
+
+func writerHeaders(w io.Writer) map[string][]string {
+	rw, ok := w.(interface{ Header() http.Header })
+	if !ok {
+		return nil
+	}
+	out := map[string][]string{}
+	for key, vals := range rw.Header() {
+		out[key] = append([]string(nil), vals...)
+	}
+	return out
+}
+
+func writeResponseStatus(w io.Writer, status int) {
+	if status <= 0 {
+		return
+	}
+	rw, ok := w.(http.ResponseWriter)
+	if !ok {
+		return
+	}
+	rw.WriteHeader(status)
+}
+
+func applyHookHeaders(w io.Writer, args map[string]any) {
+	rw, ok := w.(interface{ Header() http.Header })
+	if !ok {
+		return
+	}
+	for key, vals := range hookHeaderValues(args["headers"]) {
+		rw.Header().Del(key)
+		for _, val := range vals {
+			rw.Header().Add(key, val)
+		}
+	}
+}
+
+func hookHeaderValues(raw any) map[string][]string {
+	out := map[string][]string{}
+	switch headers := raw.(type) {
+	case map[string][]string:
+		for key, vals := range headers {
+			out[key] = append([]string(nil), vals...)
+		}
+	case map[string]any:
+		for key, val := range headers {
+			switch v := val.(type) {
+			case []string:
+				out[key] = append([]string(nil), v...)
+			case []any:
+				for _, item := range v {
+					if s, ok := item.(string); ok {
+						out[key] = append(out[key], s)
+					}
+				}
+			case string:
+				out[key] = []string{v}
+			}
+		}
+	}
+	return out
 }
 
 func (e *Engine) parse(name string) (*template.Template, error) {
@@ -240,6 +474,9 @@ func (e *Engine) parse(name string) (*template.Template, error) {
 	}
 
 	base := template.New(filepath.Base(name)).Funcs(e.funcs)
+	if err := e.attachPartials(base, name); err != nil {
+		return nil, err
+	}
 	tmpl, err := base.Parse(content)
 	if err != nil {
 		return nil, fmt.Errorf("parse template %s (%s): %w", name, src, err)
@@ -273,8 +510,8 @@ func (e *Engine) parseAdmin(name string) (*template.Template, error) {
 	if err := e.parseAdminEmbed(set); err != nil {
 		return nil, err
 	}
-	if e.site.TemplateDir != "" {
-		if err := e.parseAdminDir(set, e.site.TemplateDir); err != nil {
+	if !themes.IsBuiltinAdmin(e.themes.Admin) && e.adminRoot != "" {
+		if err := e.parseAdminThemeDir(set, e.adminRoot); err != nil {
 			return nil, err
 		}
 	}
@@ -288,38 +525,39 @@ func (e *Engine) parseAdmin(name string) (*template.Template, error) {
 }
 
 func (e *Engine) parseAdminEmbed(set *template.Template) error {
-	entries, err := coreFS.ReadDir("admin")
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".html") {
-			continue
-		}
-		raw, err := coreFS.ReadFile("admin/" + entry.Name())
+	return fs.WalkDir(coreFS, "admin", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if err := parseAdminFile(set, entry.Name(), string(raw)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (e *Engine) parseAdminDir(set *template.Template, dir string) error {
-	adminRoot := filepath.Join(dir, "admin")
-	if _, err := os.Stat(adminRoot); err != nil {
-		if os.IsNotExist(err) {
+		if entry.IsDir() {
+			if entry.Name() == "assets" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		return err
-	}
-	return filepath.WalkDir(adminRoot, func(path string, entry fs.DirEntry, err error) error {
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".html") {
+			return nil
+		}
+		raw, err := coreFS.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".html") {
+		return parseAdminFile(set, entry.Name(), string(raw))
+	})
+}
+
+func (e *Engine) parseAdminThemeDir(set *template.Template, dir string) error {
+	return filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "assets" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(strings.ToLower(entry.Name()), ".html") {
 			return nil
 		}
 		raw, err := os.ReadFile(path)
@@ -355,13 +593,50 @@ func parseAdminFile(set *template.Template, name, content string) error {
 }
 
 func (e *Engine) readTemplate(name string) (string, string, error) {
-	if e.site.TemplateDir != "" {
-		path := filepath.Join(e.site.TemplateDir, name)
-		if raw, err := os.ReadFile(path); err == nil {
-			return string(raw), path, nil
+	isAdmin := strings.HasPrefix(name, "admin/")
+	if isAdmin {
+		if themes.IsBuiltinAdmin(e.themes.Admin) {
+			return e.readEmbedded(name)
 		}
+		if disk, src, ok := e.readThemeDisk(name, true); ok {
+			return disk, src, nil
+		}
+		return e.readEmbedded(name)
 	}
 
+	if !themes.IsBuiltinFrontend(e.themes.Frontend) {
+		if disk, src, ok := e.readThemeDisk(name, false); ok {
+			return disk, src, nil
+		}
+	}
+	return e.readEmbedded(name)
+}
+
+func (e *Engine) readThemeDisk(name string, admin bool) (string, string, bool) {
+	if e.site == nil || strings.TrimSpace(e.site.TemplateDir) == "" {
+		return "", "", false
+	}
+	theme := e.themes.Frontend
+	themeRoot := themes.Root(e.site.TemplateDir, theme)
+	if admin {
+		theme = e.themes.Admin
+		themeRoot = themes.Root(e.site.TemplateDir, theme)
+	}
+	if themeRoot == "" || !templatemeta.OverridesEnabled(themeRoot) {
+		return "", "", false
+	}
+	diskPath := themes.DiskPathForLogical(e.site.TemplateDir, theme, name, admin)
+	if diskPath == "" {
+		return "", "", false
+	}
+	raw, err := os.ReadFile(diskPath)
+	if err != nil {
+		return "", "", false
+	}
+	return string(raw), diskPath, true
+}
+
+func (e *Engine) readEmbedded(name string) (string, string, error) {
 	corePath := name
 	if strings.HasPrefix(name, "admin/") || strings.HasPrefix(name, "default/") {
 		if raw, err := coreFS.ReadFile(corePath); err == nil {

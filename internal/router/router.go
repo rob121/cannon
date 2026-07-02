@@ -10,15 +10,18 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/paths"
 	"github.com/rob121/cannon/internal/routemeta"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
+	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -58,13 +61,15 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if offline, err := settings.SiteOffline(r.Context()); err == nil && offline {
-		d.renderMaintenance(w, r)
-		return
+		if !d.canBypassSiteOffline(ctx, r) {
+			d.renderOffline(w, r)
+			return
+		}
 	}
 
 	beforeArgs := hooks.RequestArgs(r)
 	if _, err := hooks.Fire(ctx, hooks.OnBeforeRoute, beforeArgs); err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+		d.renderFrontendError(w, r, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -83,10 +88,13 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if d.noViewableRoutes(ctx, db) {
 			d.renderNoRoutes(w, r, http.StatusNotFound)
 		} else {
-			http.NotFound(w, r)
+			d.renderFrontendError(w, r, http.StatusNotFound, "")
 		}
 		return
 	}
+
+	ctx = WithMatchedRoute(ctx, route)
+	r = r.WithContext(ctx)
 
 	afterArgs := hooks.RequestArgs(r)
 	for k, v := range routeHookArgs(route) {
@@ -101,7 +109,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case models.RouteTypeURL:
 		target := route.Target
 		if target == "" {
-			http.NotFound(w, r)
+			d.renderFrontendError(w, r, http.StatusNotFound, "")
 			return
 		}
 		http.Redirect(w, r, target, http.StatusFound)
@@ -184,11 +192,11 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		d.tpl.SetHookContext(ctx)
 		if err := controllers.Dispatch(w, r, route, d.tpl, viewerGroups); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			d.renderFrontendError(w, r, http.StatusInternalServerError, err.Error())
 		}
 		d.tpl.SetHookContext(nil)
 	default:
-		http.NotFound(w, r)
+		d.renderFrontendError(w, r, http.StatusNotFound, "")
 	}
 }
 
@@ -240,12 +248,79 @@ func (d *Dispatcher) noViewableRoutes(ctx context.Context, db *gorm.DB) bool {
 	return true
 }
 
-func (d *Dispatcher) renderMaintenance(w http.ResponseWriter, r *http.Request) {
+func (d *Dispatcher) canBypassSiteOffline(ctx context.Context, r *http.Request) bool {
+	if offlineAllowsRoute(r.URL.Path) {
+		return true
+	}
+	svc, err := user.FromContext(ctx)
+	if err != nil {
+		return false
+	}
+	userID, ok := svc.CurrentID()
+	if !ok {
+		return false
+	}
+	has, err := groups.HasBackendAccess(ctx, userID)
+	return err == nil && has
+}
+
+func offlineAllowsRoute(path string) bool {
+	switch path {
+	case paths.AuthLogin, paths.AuthLogout:
+		return true
+	}
+	if strings.HasPrefix(path, "/auth/oauth") {
+		return true
+	}
+	return false
+}
+
+func (d *Dispatcher) renderOffline(w http.ResponseWriter, r *http.Request) {
+	if d.tpl == nil {
+		http.Error(w, "Site is temporarily offline.", http.StatusServiceUnavailable)
+		return
+	}
+	loginData, err := auth.BuildLoginFormData(r.Context(), r, auth.LoginFormOptions{
+		Title: "Staff sign in",
+	})
+	if err != nil {
+		http.Error(w, "Site is temporarily offline.", http.StatusServiceUnavailable)
+		return
+	}
+	data := map[string]any{
+		"Title":    "Site Offline",
+		"Login":    loginData,
+		"AdminURL": "/admin",
+	}
+	d.tpl.SetHookContext(r.Context())
+	defer d.tpl.SetHookContext(nil)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	data := map[string]any{"Title": "Site Offline"}
-	if err := d.tpl.Render(w, "default/layout.html", "default/maintenance.html", data); err != nil {
+	if err := d.tpl.RenderFragment(w, "default/offline.html", data); err != nil {
 		http.Error(w, "Site is temporarily offline.", http.StatusServiceUnavailable)
+	}
+}
+
+func (d *Dispatcher) renderFrontendError(w http.ResponseWriter, r *http.Request, code int, message string) {
+	if d.tpl == nil {
+		if strings.TrimSpace(message) == "" {
+			message = templateengine.DefaultErrorMessage(code)
+		}
+		http.Error(w, message, code)
+		return
+	}
+	if strings.TrimSpace(message) == "" {
+		message = templateengine.DefaultErrorMessage(code)
+	}
+	d.tpl.SetHookContext(r.Context())
+	defer d.tpl.SetHookContext(nil)
+	if err := d.tpl.RenderError(w, code, map[string]any{
+		"Title":        templateengine.ErrorTitle(code),
+		"ErrorCode":    code,
+		"ErrorMessage": message,
+		"HomeURL":      sites.DefaultRoutePath(r.Context()),
+	}); err != nil {
+		http.Error(w, message, code)
 	}
 }
 
@@ -280,10 +355,14 @@ func matchPath(pattern, path string) (matchKind, int, bool) {
 type userContextKey struct{}
 
 func WithUserContext(ctx context.Context, data map[string]any) context.Context {
+	ctx = user.WithRequestUser(ctx, data)
 	return context.WithValue(ctx, userContextKey{}, data)
 }
 
 func UserContext(ctx context.Context) (map[string]any, bool) {
+	if v, ok := user.RequestUser(ctx); ok {
+		return v, true
+	}
 	v, ok := ctx.Value(userContextKey{}).(map[string]any)
 	return v, ok
 }
@@ -292,50 +371,11 @@ func userContext(ctx context.Context) (map[string]any, bool) {
 	return UserContext(ctx)
 }
 
-// MenuData loads menu items for template rendering.
-func MenuData(ctx context.Context, menuName string) ([]map[string]string, error) {
-	db, err := sites.DB(ctx)
-	if err != nil {
-		return nil, err
-	}
-	viewerGroups, err := groups.ViewerGroupIDs(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	menuName = strings.TrimSpace(menuName)
-	var menu models.Menu
-	if err := db.Preload("Items", func(db *gorm.DB) *gorm.DB {
-		return db.Order("sort asc, menu_item_id asc")
-	}).Preload("Items.Groups").Preload("Items.Route").
-		Where("LOWER(menu_name) = LOWER(?) AND status = ?", menuName, models.StatusActive).
-		First(&menu).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return []map[string]string{}, nil
-		}
-		return nil, err
-	}
-	out := make([]map[string]string, 0, len(menu.Items))
-	for _, item := range menu.Items {
-		if !groups.CanView(viewerGroups, item.Groups) {
-			continue
-		}
-		href := "#"
-		if item.Route != nil && item.Route.Status == models.StatusActive {
-			href = item.Route.Path
-		}
-		out = append(out, map[string]string{
-			"Name":   item.Name,
-			"Href":   href,
-			"Class":  item.Class,
-			"Target": item.Target,
-		})
-	}
-	return out, nil
-}
-
 // EnsureDefaultRoute seeds built-in controller routes when missing.
 func EnsureDefaultRoute(db *gorm.DB) error {
+	if err := migrateLegacyAuthPaths(db); err != nil {
+		return err
+	}
 	publicID, err := groups.PublicGroupID(db)
 	if err != nil {
 		return err
@@ -345,23 +385,7 @@ func EnsureDefaultRoute(db *gorm.DB) error {
 		return err
 	}
 
-	seeds := []models.Route{
-		{Name: "Home", Path: "/", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "index"},
-		{Name: "Content Category", Path: "/content/category/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "category"},
-		{Name: "Content Item", Path: "/content/item/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "item"},
-		{Name: "Content Tag", Path: "/content/tag/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "tag"},
-		{Name: "Content Author", Path: "/content/author/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "author"},
-		{Name: "Content Search", Path: "/content/search", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "search"},
-		{Name: "Content Feed", Path: "/content/feed/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "feed"},
-		{Name: "Content Create", Path: "/content/edit/new", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "edit-new"},
-		{Name: "Content Edit", Path: "/content/edit/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "edit"},
-		{Name: "Login", Path: "/login", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "login"},
-		{Name: "Logout", Path: "/logout", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "logout"},
-		{Name: "Verify Account", Path: "/account/verify/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "verify"},
-		{Name: "Verification Pending", Path: "/account/verify/resend", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "verify-resend"},
-		{Name: "Reset Password", Path: "/account/reset-password", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "reset-request"},
-		{Name: "Reset Password Submit", Path: "/account/reset-password/*", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "auth", ControllerAction: "reset-submit"},
-	}
+	seeds := BuiltinRouteModels()
 
 	for _, seed := range seeds {
 		var existing models.Route
@@ -388,7 +412,7 @@ func EnsureDefaultRoute(db *gorm.DB) error {
 			return err
 		}
 	}
-	return nil
+	return EnsureRouteDefault(db)
 }
 
 func NotFoundHandler() http.Handler {

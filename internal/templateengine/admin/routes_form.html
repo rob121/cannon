@@ -1,16 +1,19 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-header">
-    <div class="admin-form-card-heading">
-      <h2 class="admin-form-card-title">{{if .IsNew}}New Route{{else}}Edit Route{{end}}</h2>
-      <p class="admin-form-card-desc">Configure URL paths, dispatch type, and routing targets.</p>
-    </div>
-  </div>
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
-      <div class="row g-3">
+{{template "form_toolbar" (dict "FormID" "route-form" "BasePath" .BasePath "CancelURL" .CancelURL)}}
+<form method="post" id="route-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+  <div class="admin-form-split">
+    <div class="admin-form-split-main">
+      <div class="admin-form-card">
+        <div class="admin-form-card-header">
+          <div class="admin-form-card-heading">
+            <h2 class="admin-form-card-title">{{if .IsNew}}New Route{{else}}Edit Route{{end}}</h2>
+            <p class="admin-form-card-desc">Configure URL paths, dispatch type, and routing targets.</p>
+          </div>
+        </div>
+        <div class="admin-form-card-body">
+          <div class="row g-3">
         <div class="col-md-6">
           <label class="admin-form-label">Name</label>
           <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
@@ -30,14 +33,6 @@
             <option value="Controller" {{if eq .Row.Type "Controller"}}selected{{end}}>Controller</option>
           </select>
         </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Status</label>
-          <select class="admin-form-control" name="status">
-            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
-            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
-          </select>
-        </div>
-
         <div class="col-12 route-fields-target" id="route-fields-target"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File"))}} hidden{{end}}>
           <div class="admin-form-divider"></div>
           <label class="admin-form-label">Target</label>
@@ -184,12 +179,113 @@
               </select>
               <p class="admin-form-help">Templates resolve to <code class="admin-code">default/controllers/{controller}/{action}.html</code>.</p>
             </div>
+            <div class="col-md-12 route-controller-template-field" id="route-controller-template-field"{{if ne .Row.Type "Controller"}} hidden{{end}}>
+              <label class="admin-form-label" for="route-template-override">Template Override</label>
+              <select class="admin-form-control" name="template_override" id="route-template-override"{{if ne .Row.Type "Controller"}} disabled{{end}}>
+                <option value="">Default for selected action</option>
+                {{range .ControllerTemplateOptions}}
+                <option value="{{.Path}}" data-controller="{{.Controller}}" {{if eq $.TemplateOverride .Path}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Choose any controller template for this route. Options include built-in actions and theme overrides under <code class="admin-code">controllers/{controller}/</code>.</p>
+            </div>
+            {{range .ControllerOptions}}
+            {{$ctrlID := .ID}}
+            {{range .Actions}}
+            {{$actionID := .ID}}
+            {{range .ConfigFields}}
+            {{$fieldName := .Name}}
+            <div class="col-md-6 route-controller-config-field" data-controller-id="{{$ctrlID}}" data-action-id="{{$actionID}}" data-field-name="{{.Name}}"{{if eq $actionID "feed"}}{{if eq .Name "category_slug"}} data-feed-field="category"{{else if eq .Name "tag_slug"}} data-feed-field="tag"{{else if eq .Name "author_key"}} data-feed-field="author"{{end}}{{end}}{{if ne $.Row.Type "Controller"}} hidden{{end}}>
+              <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+              {{if eq .Type "category"}}
+              <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
+                <option value="">Select category</option>
+                {{range $.Categories}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "item"}}
+              <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
+                <option value="">Select item</option>
+                {{range $.Items}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Title}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "tag"}}
+              <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
+                <option value="">Select tag</option>
+                {{range $.Tags}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "author"}}
+              <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
+                <option value="">Select author</option>
+                {{range $.Users}}
+                <option value="{{.Username}}" {{if eq (index $.PageData $fieldName) .Username}}selected{{end}}>{{if .GivenName}}{{.GivenName}} {{.FamilyName}}{{else}}{{.Username}}{{end}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "select"}}
+              <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
+                <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
+                {{range .Options}}
+                <option value="{{.Value}}" {{if eq (index $.PageData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "number"}}
+              <input class="admin-form-control" name="controller_data_{{.Name}}" type="number" value="{{index $.PageData .Name}}" {{if .Required}}data-required="1"{{end}}>
+              {{else}}
+              <input class="admin-form-control" name="controller_data_{{.Name}}" value="{{index $.PageData .Name}}" {{if .Required}}data-required="1"{{end}}>
+              {{end}}
+              {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+            </div>
+            {{end}}
+            {{end}}
+            {{end}}
           </div>
         </div>
 
-        {{template "group_visibility_fields" .}}
+          </div>
+        </div>
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
+
+    <aside class="admin-form-split-sidebar" aria-label="Route settings">
+      <div class="admin-form-sidebar-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Route settings">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="settings">Settings</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">Access</button>
+        </div>
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="settings" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Status</label>
+              <select class="admin-form-control" name="status">
+                <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+                <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">Show Page Title</span>
+              {{template "form_toggle" (dict "Name" "show_title" "Checked" .Row.ShowTitle "OnLabel" "Show page title" "OffLabel" "Hide page title")}}
+              <p class="admin-form-help">Controls whether the frontend renders the page heading for this route.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Default route</label>
+              {{template "form_toggle" (dict "Name" "is_default" "Value" "1" "Checked" .Row.IsDefault "OnLabel" "Default" "OffLabel" "Not default")}}
+              <p class="admin-form-help">Used for home links and post-login redirects. Only one route can be default.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <p class="admin-form-help">Only members of the selected groups can access this route.</p>
+            {{template "group_access_toggles" .}}
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
-</div>
+</form>

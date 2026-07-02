@@ -1,24 +1,126 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post" enctype="multipart/form-data">
-      {{csrfField}}
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="admin-form-label">File</label>
-          <input class="admin-form-control" type="file" name="file" required>
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Folder</label>
-          <input class="admin-form-control" name="folder" value="content" placeholder="content">
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Alt Text</label>
-          <input class="admin-form-control" name="alt">
-        </div>
+<div class="admin-media-upload" data-turbo="false">
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Upload file</h2>
+        <p class="admin-form-card-desc">Choose a file, set its folder and alt text, then upload to the library.</p>
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
+    <div class="admin-form-card-body">
+      {{if not .NewFolderName}}{{template "error_alert" .}}{{end}}
+
+      <form method="post" action="{{.BasePath}}/upload" enctype="multipart/form-data" data-turbo="false" id="media-upload-form">
+        {{csrfField}}
+
+        <section class="admin-media-upload-section" aria-label="Upload file and preview">
+          <div class="admin-media-upload-file-grid">
+            <div class="admin-media-upload-panel">
+              <div class="admin-media-upload-panel-header" id="media-upload-file-heading">File</div>
+              <div class="admin-media-upload-panel-body">
+                <div class="admin-media-dropzone" id="media-dropzone">
+                  <input class="admin-media-file-input" type="file" name="file" id="media-file-input" required aria-label="Choose file to upload">
+                  <div class="admin-media-dropzone-empty" id="media-dropzone-empty">
+                    <i class="bi bi-cloud-arrow-up" aria-hidden="true"></i>
+                    <p class="admin-media-dropzone-title">Drop a file here or click to browse</p>
+                    <p class="admin-media-dropzone-desc">Allowed: {{if .ApprovedExtensions}}{{.ApprovedExtensions}}{{else}}all file types{{end}} · up to {{.MaxFileSizeMB}} MB</p>
+                  </div>
+                  <div class="admin-media-dropzone-selected hidden" id="media-dropzone-selected">
+                    <div class="admin-media-selected-icon" id="media-selected-icon">
+                      <i class="bi bi-file-earmark" aria-hidden="true"></i>
+                    </div>
+                    <div class="admin-media-selected-meta">
+                      <div class="admin-media-selected-name" id="media-selected-name"></div>
+                      <div class="admin-media-selected-size" id="media-selected-size"></div>
+                    </div>
+                    <button type="button" class="btn-admin-ghost btn-admin-sm" id="media-clear-file">Change file</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="admin-media-upload-panel">
+              <div class="admin-media-upload-panel-header">Preview</div>
+              <div class="admin-media-upload-panel-body admin-media-preview-body" id="media-preview-body">
+                <div class="admin-media-preview-empty" id="media-preview-empty">
+                  <i class="bi bi-image" aria-hidden="true"></i>
+                  <p>Select an image to see a preview before uploading.</p>
+                </div>
+                <img class="admin-media-preview-image hidden" id="media-preview-image" alt="">
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="admin-form-divider"></div>
+
+        <section class="admin-media-upload-section" aria-labelledby="media-upload-details-heading">
+          <h3 class="admin-media-upload-section-title" id="media-upload-details-heading">Details</h3>
+          <div class="admin-media-upload-details-grid">
+            <div class="admin-media-upload-field">
+              <label class="admin-form-label" for="media-folder">Folder</label>
+              <select class="admin-form-control" id="media-folder" name="folder">
+                {{range .FolderOptions}}
+                <option value="{{.Path}}" {{if eq $.DefaultFolder .Path}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Stored under <code class="admin-code">/assets/media/{folder}/</code>.</p>
+            </div>
+            <div class="admin-media-upload-field">
+              <label class="admin-form-label" for="media-alt">Alt text</label>
+              <input class="admin-form-control" id="media-alt" name="alt" placeholder="Describe the image for accessibility">
+              <p class="admin-form-help">Recommended for images. Leave blank for non-image files.</p>
+            </div>
+          </div>
+        </section>
+
+        <div class="admin-form-actions">
+          <button type="submit" class="btn-admin-primary" id="media-upload-submit" disabled>
+            <i class="bi bi-cloud-arrow-up"></i> Upload
+          </button>
+          <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
+        </div>
+      </form>
+    </div>
   </div>
+
+  <details class="admin-media-new-folder-details" data-media-new-folder-panel {{if .NewFolderName}}open{{end}}>
+    <summary class="admin-media-new-folder-summary">
+      <span class="admin-media-new-folder-summary-main">
+        <i class="bi bi-folder-plus" aria-hidden="true"></i>
+        <span>Create folder</span>
+      </span>
+      <span class="admin-media-new-folder-summary-hint">Optional — add a folder or subfolder before uploading</span>
+    </summary>
+    <div class="admin-media-new-folder-body">
+      {{if .NewFolderName}}{{template "error_alert" .}}{{end}}
+      <form method="post" action="{{.BasePath}}/folders" class="admin-media-new-folder-form" data-turbo="false">
+        {{csrfField}}
+        <input type="hidden" name="from" value="upload">
+        <input type="hidden" name="return" value="upload">
+        <div class="admin-media-new-folder-grid">
+          <div class="admin-media-new-folder-field">
+            <label class="admin-form-label" for="media-folder-parent">Parent folder</label>
+            <select class="admin-form-control" id="media-folder-parent" name="parent">
+              <option value="">Root level</option>
+              {{range .ParentFolderOptions}}
+              <option value="{{.Path}}" {{if eq $.NewFolderParent .Path}}selected{{else if and (not $.NewFolderParent) (eq $.DefaultFolder .Path)}}selected{{end}}>{{.Label}}</option>
+              {{end}}
+            </select>
+            <p class="admin-form-help">
+              <button type="button" class="admin-media-link-btn" id="media-add-subfolder-btn">Use upload folder as parent</button>
+            </p>
+          </div>
+          <div class="admin-media-new-folder-field">
+            <label class="admin-form-label" for="media-folder-name">Folder name</label>
+            <input class="admin-form-control" id="media-folder-name" name="name" value="{{.NewFolderName}}" placeholder="reports" required>
+          </div>
+          <div class="admin-media-new-folder-submit">
+            <button type="submit" class="btn-admin-outline">
+              <i class="bi bi-folder-plus"></i> Create folder
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </details>
 </div>

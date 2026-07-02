@@ -1,30 +1,136 @@
 {{template "page_header" .}}
-<div class="admin-data-card">
-  <div class="admin-table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
-          {{template "sort_th" (dict "Root" $ "Key" "path" "Label" "Path")}}
-          {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
-          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
-          <th class="admin-col-actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Rows}}
-        <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
-          <td><code class="admin-code">{{.Path}}</code></td>
-          <td>{{.Type}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .RouteID "Status" .Status)}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .RouteID)}}
-        </tr>
-        {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Records Found</div></td></tr>
-        {{end}}
-      </tbody>
-    </table>
+<div class="admin-data-card-stack">
+  <div class="admin-data-card">
+    <div class="admin-data-card-header">
+      <h2 class="admin-data-card-title">Site Routes</h2>
+      <p class="admin-data-card-desc">Custom URL paths for extensions, redirects, and alternate controller placements.</p>
+    </div>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+            {{template "sort_th" (dict "Root" $ "Key" "path" "Label" "Path")}}
+            {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
+            {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+            <th>Default</th>
+            <th>Page Title</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .RouteID "Label" .Name)}}</td>
+            <td><code class="admin-code">{{.Path}}</code></td>
+            <td>{{.Type}}</td>
+            <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .RouteID "Status" .Status)}}</td>
+            <td>
+              {{if .IsDefault}}
+              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Default</span>
+              {{else}}
+              <span class="admin-cell-muted">—</span>
+              {{end}}
+            </td>
+            <td>
+              {{if .ShowTitle}}
+              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Shown</span>
+              {{else}}
+              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Hidden</span>
+              {{end}}
+            </td>
+            {{template "row_actions" (dict "BasePath" $.BasePath "ID" .RouteID)}}
+          </tr>
+          {{else}}
+          <tr><td colspan="7" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-signpost-split" "Title" "No routes yet" "Message" "Map custom URLs to controllers, pages, or extensions." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{template "pagination" .}}
   </div>
-  {{template "pagination" .}}
+
+  <details class="admin-data-card admin-data-card-collapsible">
+    <summary class="admin-data-card-header admin-data-card-summary">
+      <div class="admin-data-card-summary-main">
+        <h2 class="admin-data-card-title">Built-in Controller Routes</h2>
+        <p class="admin-data-card-desc">Seeded routes for content, auth, and account controllers. The home page (<code>content</code> / <code>index</code>) is not built in — add it under Site Routes and mark it as default.</p>
+      </div>
+      <span class="admin-data-card-summary-count">{{len .BuiltinRouteRows}} routes</span>
+    </summary>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Prefix</th>
+            <th>Name</th>
+            <th>Path</th>
+            <th>Controller</th>
+            <th>Action</th>
+            <th>Methods</th>
+            <th>Page Title</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .BuiltinRouteRows}}
+          <tr>
+            <td><code class="admin-code">/{{.Prefix}}</code></td>
+            <td><span class="admin-cell-primary">{{.Name}}</span></td>
+            <td><code class="admin-code">{{.Path}}</code></td>
+            <td class="admin-cell-muted">{{.Controller}}</td>
+            <td class="admin-cell-muted">{{.ControllerAction}}</td>
+            <td class="admin-cell-muted">{{.Methods}}</td>
+            <td>
+              {{if .ShowTitle}}
+              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Shown</span>
+              {{else}}
+              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Hidden</span>
+              {{end}}
+            </td>
+            <td class="admin-col-actions">
+              {{if .RouteID}}
+              {{template "row_actions_edit_only" (dict "BasePath" $.BasePath "ID" .RouteID)}}
+              {{end}}
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="admin-data-card admin-data-card-collapsible">
+    <summary class="admin-data-card-header admin-data-card-summary">
+      <div class="admin-data-card-summary-main">
+        <h2 class="admin-data-card-title">Reserved Infrastructure Routes</h2>
+        <p class="admin-data-card-desc">These paths are handled by Cannon before the site route table. They cannot be assigned to custom routes.</p>
+      </div>
+      <span class="admin-data-card-summary-count">{{len .SystemRoutes}} routes</span>
+    </summary>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Path</th>
+            <th>Handler</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .SystemRoutes}}
+          <tr>
+            <td><span class="admin-cell-primary">{{.Name}}</span></td>
+            <td><code class="admin-code">{{.Path}}</code></td>
+            <td class="admin-cell-muted">{{.Handler}}</td>
+            <td>
+              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Reserved</span>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </details>
 </div>

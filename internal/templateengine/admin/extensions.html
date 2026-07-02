@@ -4,10 +4,11 @@
     <table class="admin-table">
       <thead>
         <tr>
-          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Extension")}}
+          <th>Description</th>
           <th>Version</th>
           {{template "sort_th" (dict "Root" $ "Key" "installed" "Label" "Installed")}}
-          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th>Order</th>
           <th>Process</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
@@ -16,16 +17,20 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>
+            {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ExtensionID "Label" .DisplayTitle)}}
+            {{if ne .DisplayTitle .Name}}<div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>{{end}}
+          </td>
+          <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
           <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
           <td>{{template "installed_badge" .Installed}}</td>
-          <td>{{.Sort}}</td>
+          <td>{{template "extension_sort_controls" (dict "Root" $ "Row" .)}}</td>
           <td>{{template "process_restart" (dict "BasePath" $.BasePath "ID" .ExtensionID "Running" .Running "Page" $.Page "Sort" $.Sort "Dir" $.Dir)}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .ExtensionID "Status" .Status)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
         </tr>
         {{else}}
-        <tr><td colspan="7"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="8" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-puzzle" "Title" "No extensions yet" "Message" "Install extension processes to add features and integrations.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

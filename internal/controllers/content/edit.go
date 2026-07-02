@@ -31,6 +31,14 @@ func (c *Controller) handleEditNew(ctx *controllers.Context) controllers.Result 
 		if err := ctx.Request.ParseForm(); err != nil {
 			return controllers.Error(http.StatusBadRequest, err.Error())
 		}
+		categoryID := formUintPtr(ctx.Request, "category_id")
+		ok, err := cms.CanCreateItemInCategory(ctx.GoContext(), user.UserID, categoryID)
+		if err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		}
+		if !ok {
+			return controllers.Error(http.StatusForbidden, "permission denied")
+		}
 		if err := saveFrontendItem(ctx, &item, true, canPublish); err != nil {
 			return renderEditForm(ctx, item, nil, nil, true, canPublish, err.Error())
 		}
@@ -40,7 +48,7 @@ func (c *Controller) handleEditNew(ctx *controllers.Context) controllers.Result 
 }
 
 func (c *Controller) handleEdit(ctx *controllers.Context) controllers.Result {
-	slug := strings.Trim(ctx.PathSuffix(), "/")
+	slug := routeContentSlug(ctx, "item_slug")
 	if slug == "" {
 		return controllers.Error(http.StatusNotFound, "item not found")
 	}
@@ -99,12 +107,58 @@ func saveFrontendItem(ctx *controllers.Context, item *models.Item, isNew, canPub
 	}
 	item.Image = strings.TrimSpace(ctx.Request.FormValue("image"))
 	item.CategoryID = formUintPtr(ctx.Request, "category_id")
-	status := strings.TrimSpace(ctx.Request.FormValue("status"))
-	if canPublish && status == string(models.ItemStatusPublished) {
-		item.Status = models.ItemStatusPublished
-	} else {
+	galleryJSON, embedsJSON, attachmentsJSON := cms.ItemMediaFromForm(ctx.Request)
+	item.GalleryJSON = galleryJSON
+	item.EmbedJSON = embedsJSON
+	item.AttachmentsJSON = attachmentsJSON
+	item.MetaTitle = strings.TrimSpace(ctx.Request.FormValue("meta_title"))
+	item.MetaDescription = ctx.Request.FormValue("meta_description")
+	item.MetaKeywords = strings.TrimSpace(ctx.Request.FormValue("meta_keywords"))
+	item.CanonicalURL = strings.TrimSpace(ctx.Request.FormValue("canonical_url"))
+	if canPublish {
+		item.Featured = cms.FormBool(ctx.Request, "featured")
+		item.PublishStart = cms.FormTimePtr(ctx.Request, "publish_start")
+		item.PublishEnd = cms.FormTimePtr(ctx.Request, "publish_end")
+		status := strings.TrimSpace(ctx.Request.FormValue("status"))
+		if status == string(models.ItemStatusPublished) {
+			item.Status = models.ItemStatusPublished
+		} else {
+			item.Status = models.ItemStatusDraft
+		}
+	} else if isNew {
 		item.Status = models.ItemStatusDraft
 	}
+
+	var cat *models.Category
+	if item.CategoryID != nil && *item.CategoryID > 0 {
+		var c models.Category
+		if db.First(&c, *item.CategoryID).Error == nil {
+			cat = &c
+		}
+	}
+	customFields, _ := cms.FieldsForCategory(ctx.GoContext(), cat)
+	if err := cms.ValidateRequiredCustomFields(customFields, ctx.Request); err != nil {
+		return err
+	}
+
+	if isNew {
+		ok, err := cms.CanCreateItemInCategory(ctx.GoContext(), *item.AuthorID, item.CategoryID)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return cms.ErrPermissionDenied
+		}
+	} else if item.AuthorID != nil {
+		ok, err := cms.CanEditItem(ctx.GoContext(), *item.AuthorID, item)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return cms.ErrPermissionDenied
+		}
+	}
+
 	beforeArgs := map[string]any{"item": item, "is_new": isNew, "form": ctx.Request.Form}
 	if _, err := hooks.Fire(ctx.GoContext(), hooks.OnItemBeforeSave, beforeArgs); err != nil {
 		return err
@@ -119,7 +173,7 @@ func saveFrontendItem(ctx *controllers.Context, item *models.Item, isNew, canPub
 	if err := replaceFrontendTags(db, item, ctx.Request); err != nil {
 		return err
 	}
-	if err := saveFrontendFieldValues(db, item, ctx.Request); err != nil {
+	if err := cms.SaveItemFieldValues(db, item.ItemID, customFields, ctx.Request); err != nil {
 		return err
 	}
 	afterArgs := map[string]any{"item_id": item.ItemID, "item": item}
@@ -135,39 +189,6 @@ func replaceFrontendTags(db *gorm.DB, item *models.Item, r *http.Request) error 
 		}
 	}
 	return db.Model(item).Association("Tags").Replace(tags)
-}
-
-func saveFrontendFieldValues(db *gorm.DB, item *models.Item, r *http.Request) error {
-	for key, vals := range r.Form {
-		if len(key) < 6 || key[:6] != "field_" {
-			continue
-		}
-		id, err := strconv.ParseUint(key[6:], 10, 64)
-		if err != nil || id == 0 {
-			continue
-		}
-		value := ""
-		if len(vals) > 0 {
-			value = vals[0]
-		}
-		fieldID := uint(id)
-		var existing models.ItemFieldValue
-		err = db.Where("item_id = ? AND field_id = ?", item.ItemID, fieldID).First(&existing).Error
-		if err == gorm.ErrRecordNotFound {
-			if err := db.Create(&models.ItemFieldValue{ItemID: item.ItemID, FieldID: fieldID, Value: value}).Error; err != nil {
-				return err
-			}
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		existing.Value = value
-		if err := db.Save(&existing).Error; err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func frontendCustomFields(ctx *controllers.Context, db *gorm.DB, item *models.Item) ([]models.ContentField, map[uint]string) {
@@ -226,6 +247,7 @@ func editFormData(item models.Item, categories []models.Category, tags []models.
 		"SelectedCategoryID": selectedCategoryID,
 		"CustomFields":       fields,
 		"FieldValues":        fieldValues,
+		"Gallery":            cms.ParseGalleryJSON(item.GalleryJSON),
 	}
 	if errMsg != "" {
 		data["Error"] = errMsg

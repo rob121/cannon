@@ -9,7 +9,6 @@ import (
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/hooks"
-	"github.com/rob121/cannon/internal/markdown"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 )
@@ -23,6 +22,7 @@ const (
 	ActionTag      = "tag"
 	ActionAuthor   = "author"
 	ActionSearch   = "search"
+	ActionFeatured = "featured"
 	ActionFeed     = "feed"
 	ActionEditNew  = "edit-new"
 	ActionEdit     = "edit"
@@ -39,14 +39,35 @@ func Definition() controllers.Definition {
 		Description: "Items, categories, tags, author listings, search, feeds, and frontend editing.",
 		Actions: []controllers.ActionDefinition{
 			{ID: ActionIndex, Title: "Home", Methods: []string{http.MethodGet}, DefaultPath: "/"},
-			{ID: ActionCategory, Title: "Category", Methods: []string{http.MethodGet}, DefaultPath: "/content/category/*"},
-			{ID: ActionItem, Title: "Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/item/*"},
-			{ID: ActionTag, Title: "Tag", Methods: []string{http.MethodGet}, DefaultPath: "/content/tag/*"},
-			{ID: ActionAuthor, Title: "Author", Methods: []string{http.MethodGet}, DefaultPath: "/content/author/*"},
+			{ID: ActionCategory, Title: "Category", Methods: []string{http.MethodGet}, DefaultPath: "/content/category/*", ConfigFields: []controllers.ConfigField{
+				{Name: "category_slug", Label: "Category", Type: "category", Required: true, Help: "Required when the route path has no wildcard slug segment."},
+			}},
+			{ID: ActionItem, Title: "Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/item/*", ConfigFields: []controllers.ConfigField{
+				{Name: "item_slug", Label: "Item", Type: "item", Required: true, Help: "Required when the route path has no wildcard slug segment."},
+			}},
+			{ID: ActionTag, Title: "Tag", Methods: []string{http.MethodGet}, DefaultPath: "/content/tag/*", ConfigFields: []controllers.ConfigField{
+				{Name: "tag_slug", Label: "Tag", Type: "tag", Required: true, Help: "Required when the route path has no wildcard slug segment."},
+			}},
+			{ID: ActionAuthor, Title: "Author", Methods: []string{http.MethodGet}, DefaultPath: "/content/author/*", ConfigFields: []controllers.ConfigField{
+				{Name: "author_key", Label: "Author", Type: "author", Required: true, Help: "Username or user ID. Required when the route path has no wildcard segment."},
+			}},
 			{ID: ActionSearch, Title: "Search", Methods: []string{http.MethodGet}, DefaultPath: "/content/search"},
-			{ID: ActionFeed, Title: "Feed", Methods: []string{http.MethodGet}, DefaultPath: "/content/feed/*"},
+			{ID: ActionFeatured, Title: "Featured", Methods: []string{http.MethodGet}, DefaultPath: "/content/featured"},
+			{ID: ActionFeed, Title: "Feed", Methods: []string{http.MethodGet}, DefaultPath: "/content/feed/*", ConfigFields: []controllers.ConfigField{
+				{Name: "feed_kind", Label: "Feed Target", Type: "select", Help: "Used for fixed feed paths without a wildcard segment.", Options: []controllers.ConfigFieldOption{
+					{Value: "global", Label: "Global"},
+					{Value: "category", Label: "Category"},
+					{Value: "tag", Label: "Tag"},
+					{Value: "author", Label: "Author"},
+				}},
+				{Name: "category_slug", Label: "Category", Type: "category", Help: "Used when feed target is Category."},
+				{Name: "tag_slug", Label: "Tag", Type: "tag", Help: "Used when feed target is Tag."},
+				{Name: "author_key", Label: "Author", Type: "author", Help: "Used when feed target is Author."},
+			}},
 			{ID: ActionEditNew, Title: "Create Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/edit/new", RequireAuth: true},
-			{ID: ActionEdit, Title: "Edit Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/edit/*", RequireAuth: true},
+			{ID: ActionEdit, Title: "Edit Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/edit/*", RequireAuth: true, ConfigFields: []controllers.ConfigField{
+				{Name: "item_slug", Label: "Item", Type: "item", Required: true, Help: "Required when the route path has no wildcard slug segment."},
+			}},
 		},
 	}
 }
@@ -65,6 +86,8 @@ func (c *Controller) Handle(ctx *controllers.Context, actionID string) controlle
 		return c.handleAuthor(ctx)
 	case ActionSearch:
 		return c.handleSearch(ctx)
+	case ActionFeatured:
+		return c.handleFeatured(ctx)
 	case ActionFeed:
 		return c.handleFeed(ctx)
 	case ActionEditNew:
@@ -100,7 +123,7 @@ func (c *Controller) handleIndex(ctx *controllers.Context) controllers.Result {
 }
 
 func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result {
-	slug := strings.Trim(ctx.PathSuffix(), "/")
+	slug := routeContentSlug(ctx, "category_slug")
 	if slug == "" {
 		return controllers.Error(http.StatusNotFound, "category not found")
 	}
@@ -108,22 +131,45 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 	if err != nil {
 		return controllers.Error(http.StatusNotFound, "category not found")
 	}
+	listSettings, err := cms.ResolveCategoryListingSettings(ctx.GoContext(), cat)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	categoryIDs, err := cms.CategoryDescendantIDs(ctx.GoContext(), cat.CategoryID)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
 	page := queryPage(ctx.Request)
-	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, cms.ListOptions{
-		CategoryID: cat.CategoryID,
-		Page:       page,
-		Limit:      20,
-	})
+	listOpts := cms.ListOptions{
+		CategoryIDs: categoryIDs,
+		Page:        page,
+		Limit:       listSettings.PageSize,
+	}
+	if !listSettings.Pagination {
+		listOpts.NoPagination = true
+		listOpts.Page = 1
+	}
+	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, listOpts)
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
 	categories, _ := cms.CategoryTree(ctx.GoContext())
+	showTitle, _ := cms.CategoryShowTitle(ctx.GoContext(), cat)
+	showDescription, _ := cms.CategoryShowDescription(ctx.GoContext(), cat)
 	data := map[string]any{
-		"Category":   cat,
-		"Items":      items,
-		"Total":      total,
-		"Page":       page,
-		"Categories": categories,
+		"Category":          cat,
+		"Items":             items,
+		"Total":             total,
+		"Page":              page,
+		"PageSize":          listSettings.PageSize,
+		"TotalPages":        cms.ListTotalPages(total, listSettings.PageSize),
+		"Pagination":        listSettings.Pagination,
+		"ListColumns":       listSettings.Columns,
+		"ItemColClass":      cms.CategoryItemColumnClass(listSettings.Columns),
+		"PaginationBaseURL": cms.CategoryURL(cat.Slug),
+		"Categories":        categories,
+		"ShowCategoryTitle":       showTitle,
+		"ShowCategoryDescription": showDescription,
 	}
 	if tpl, err := cms.CategoryTemplate(ctx.GoContext(), cat); err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
@@ -134,7 +180,7 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 }
 
 func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
-	slug := strings.Trim(ctx.PathSuffix(), "/")
+	slug := routeContentSlug(ctx, "item_slug")
 	if slug == "" {
 		return controllers.Error(http.StatusNotFound, "item not found")
 	}
@@ -145,19 +191,26 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 	if err != nil {
 		return controllers.Error(http.StatusNotFound, "item not found")
 	}
-	fields, _ := cms.ItemFieldMap(ctx.GoContext(), item.ItemID)
-	comments, _ := cms.ApprovedComments(ctx.GoContext(), item.ItemID)
-	related, _ := cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
-	commentCount, _ := cms.CommentCount(ctx.GoContext(), item.ItemID)
+	fieldDisplays, _ := cms.ItemFieldDisplays(ctx.GoContext(), item)
 	settings, _ := cms.LoadSettings(ctx.GoContext())
-	bodyHTML, _ := markdown.ToHTML(item.Body)
-	introHTML, _ := markdown.ToHTML(item.Intro)
+	var comments []models.Comment
+	var commentCount int64
+	if settings.ShowComments {
+		comments, _ = cms.ApprovedComments(ctx.GoContext(), item.ItemID)
+		commentCount, _ = cms.CommentCount(ctx.GoContext(), item.ItemID)
+	}
+	related, _ := cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
+	bodyHTML, _ := cms.RichTextToHTML(item.Body)
+	introHTML, _ := cms.RichTextToHTML(item.Intro)
+	gallery := cms.ParseGalleryJSON(item.GalleryJSON)
+	embeds := cms.ParseEmbedsJSON(item.EmbedJSON)
+	attachments := cms.ParseAttachmentsJSON(item.AttachmentsJSON)
 	renderArgs := map[string]any{
-		"item":      item,
-		"fields":    fields,
-		"comments":  comments,
-		"BodyHTML":  bodyHTML,
-		"IntroHTML": introHTML,
+		"item":           item,
+		"field_displays": fieldDisplays,
+		"comments":       comments,
+		"BodyHTML":       bodyHTML,
+		"IntroHTML":      introHTML,
 	}
 	if _, err := hooks.Fire(ctx.GoContext(), hooks.OnItemBeforeRender, renderArgs); err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
@@ -168,16 +221,21 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 			canEdit, _ = cms.CanEditItem(ctx.GoContext(), user.UserID, item)
 		}
 	}
+	displaySettings := settings
 	data := map[string]any{
-		"Item":           item,
-		"Fields":         fields,
-		"Comments":       comments,
-		"Related":        related,
-		"CommentCount":   commentCount,
+		"Item":            item,
+		"FieldDisplays":   fieldDisplays,
+		"Comments":        comments,
+		"Related":         related,
+		"CommentCount":    commentCount,
 		"CommentSettings": settings,
-		"CanEdit":        canEdit,
-		"BodyHTML":       template.HTML(bodyHTML),
-		"IntroHTML":      template.HTML(introHTML),
+		"ContentSettings": displaySettings,
+		"CanEdit":         canEdit,
+		"BodyHTML":        template.HTML(bodyHTML),
+		"IntroHTML":       template.HTML(introHTML),
+		"Gallery":         gallery,
+		"Embeds":          embeds,
+		"Attachments":     attachments,
 	}
 	applyItemSEO(data, item, ctx)
 	return controllers.HTML(item.Title, data)
@@ -188,8 +246,18 @@ func (c *Controller) handleItemComment(ctx *controllers.Context, slug string) co
 	if err != nil {
 		return controllers.Error(http.StatusNotFound, "item not found")
 	}
+	settings, err := cms.LoadSettings(ctx.GoContext())
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	if !settings.ShowComments || !settings.AllowComments {
+		return controllers.Error(http.StatusForbidden, "comments are disabled")
+	}
 	if err := ctx.Request.ParseForm(); err != nil {
 		return controllers.Error(http.StatusBadRequest, err.Error())
+	}
+	if err := cms.ValidateCommentSpam(ctx.Request, clientIP(ctx.Request)); err != nil {
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(slug)+"?comment_error=spam#comments")
 	}
 	var userID *uint
 	if ctx.Authenticated() {
@@ -213,7 +281,7 @@ func (c *Controller) handleItemComment(ctx *controllers.Context, slug string) co
 }
 
 func (c *Controller) handleTag(ctx *controllers.Context) controllers.Result {
-	slug := strings.Trim(ctx.PathSuffix(), "/")
+	slug := routeContentSlug(ctx, "tag_slug")
 	if slug == "" {
 		return controllers.Error(http.StatusNotFound, "tag not found")
 	}
@@ -239,7 +307,7 @@ func (c *Controller) handleTag(ctx *controllers.Context) controllers.Result {
 }
 
 func (c *Controller) handleAuthor(ctx *controllers.Context) controllers.Result {
-	key := strings.Trim(ctx.PathSuffix(), "/")
+	key := routeContentSlug(ctx, "author_key")
 	if key == "" {
 		return controllers.Error(http.StatusNotFound, "author not found")
 	}
@@ -257,11 +325,31 @@ func (c *Controller) handleAuthor(ctx *controllers.Context) controllers.Result {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
 	name := authorDisplayName(author)
+	profile, _ := cms.LoadAuthorProfile(ctx.GoContext(), author.UserID)
 	return controllers.HTML(name, map[string]any{
-		"Author": author,
-		"Items":  items,
-		"Total":  total,
-		"Page":   page,
+		"Author":        author,
+		"AuthorProfile": profile,
+		"Items":         items,
+		"Total":         total,
+		"Page":          page,
+	})
+}
+
+func (c *Controller) handleFeatured(ctx *controllers.Context) controllers.Result {
+	page := queryPage(ctx.Request)
+	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, cms.ListOptions{
+		Featured: true,
+		Page:     page,
+		Limit:    20,
+		Sort:     "sort",
+	})
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	return controllers.HTML("Featured", map[string]any{
+		"Items": items,
+		"Total": total,
+		"Page":  page,
 	})
 }
 
@@ -287,6 +375,7 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 	}
 	categories, _ := cms.CategoryTree(ctx.GoContext())
 	tags, _ := cms.ListTags(ctx.GoContext())
+	authors, _ := cms.ListAuthorsWithItems(ctx.GoContext(), ctx.ViewerGroups)
 	title := "Search"
 	if query != "" {
 		title = "Search: " + query
@@ -298,6 +387,7 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 		"Page":       page,
 		"Categories": categories,
 		"Tags":       tags,
+		"Authors":    authors,
 		"CategoryID": categoryID,
 		"TagID":      tagID,
 		"AuthorID":   authorID,
@@ -313,6 +403,10 @@ func (c *Controller) handleFeed(ctx *controllers.Context) controllers.Result {
 	feedLink := siteURL + "/content/feed"
 	feedDesc := "Latest content from " + siteName
 	opts := cms.ListOptions{Page: 1, Limit: 25}
+
+	if suffix == "" {
+		suffix = feedSuffixFromMeta(ctx)
+	}
 
 	parts := strings.Split(suffix, "/")
 	switch {
@@ -449,4 +543,33 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr[:idx]
 	}
 	return r.RemoteAddr
+}
+
+func routeContentSlug(ctx *controllers.Context, metaKey string) string {
+	if slug := strings.Trim(ctx.PathSuffix(), "/"); slug != "" {
+		return slug
+	}
+	return strings.Trim(ctx.RouteMeta(metaKey), "/")
+}
+
+func feedSuffixFromMeta(ctx *controllers.Context) string {
+	kind := strings.TrimSpace(ctx.RouteMeta("feed_kind"))
+	if kind == "" {
+		kind = "global"
+	}
+	switch kind {
+	case "category":
+		if slug := strings.Trim(ctx.RouteMeta("category_slug"), "/"); slug != "" {
+			return "category/" + slug
+		}
+	case "tag":
+		if slug := strings.Trim(ctx.RouteMeta("tag_slug"), "/"); slug != "" {
+			return "tag/" + slug
+		}
+	case "author":
+		if key := strings.Trim(ctx.RouteMeta("author_key"), "/"); key != "" {
+			return "author/" + key
+		}
+	}
+	return "global"
 }

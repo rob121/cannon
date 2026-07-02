@@ -6,7 +6,7 @@
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
           {{template "sort_th" (dict "Root" $ "Key" "slug" "Label" "Slug")}}
-          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th>Order</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
         </tr>
@@ -14,14 +14,14 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery "Label" .Name)}}</td>
           <td><code class="admin-code">{{.Slug}}</code></td>
-          <td>{{.Sort}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .CategoryID "Status" .Status)}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .CategoryID)}}
+          <td>{{template "sort_controls" (dict "Root" $ "ID" .CategoryID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .CategoryID "Status" .Status "ListQuery" $.ListQuery)}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery)}}
         </tr>
         {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Categories Found</div></td></tr>
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-folder2" "Title" "No categories yet" "Message" "Organize your content into categories for easier browsing." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

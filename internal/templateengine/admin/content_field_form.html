@@ -2,8 +2,9 @@
 <div class="admin-form-card">
   <div class="admin-form-card-body">
     {{template "error_alert" .}}
-    <form method="post">
+    <form method="post" action="{{.BasePath}}/{{.GroupID}}/fields/{{if .IsNew}}new{{else}}{{.Row.FieldID}}{{end}}">
       {{csrfField}}
+      <input type="hidden" name="field_group_id" value="{{.GroupID}}">
       <div class="row g-3">
         <div class="col-md-6">
           <label class="admin-form-label">Name</label>
@@ -45,16 +46,15 @@
           </select>
         </div>
         <div class="col-12">
-          <label class="admin-form-check">
-            <input type="checkbox" name="required" {{if .Row.Required}}checked{{end}}> Required
-          </label>
+          <label class="admin-form-label">Required</label>
+          {{template "form_toggle" (dict "Name" "required" "Checked" .Row.Required "OnLabel" "Required" "OffLabel" "Optional")}}
         </div>
         <div class="col-12">
           <label class="admin-form-label">Configuration (JSON)</label>
           <textarea class="admin-form-control" name="configuration" rows="4">{{.Row.Configuration}}</textarea>
         </div>
       </div>
-      {{template "form_actions" .}}
+      {{template "form_actions" (dict "BasePath" (printf "%s/%d" .BasePath .GroupID) "CancelURL" (printf "%s/%d" .BasePath .GroupID))}}
     </form>
   </div>
 </div>

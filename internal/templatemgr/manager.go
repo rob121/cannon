@@ -3,6 +3,7 @@ package templatemgr
 import (
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,7 +23,7 @@ type File struct {
 	Size    int64
 }
 
-// List returns HTML template files under root, excluding the versions mirror tree.
+// List returns HTML template files under root, excluding versions, extension, and assets trees.
 func List(root string) ([]File, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
@@ -38,7 +39,8 @@ func List(root string) ([]File, error) {
 			return err
 		}
 		if entry.IsDir() {
-			if entry.Name() == VersionsDir {
+			switch entry.Name() {
+			case VersionsDir, "extension", "assets":
 				return filepath.SkipDir
 			}
 			return nil
@@ -68,13 +70,21 @@ func List(root string) ([]File, error) {
 	return files, nil
 }
 
-// CleanRelPath strips query fragments accidentally appended to template paths.
+// CleanRelPath strips query fragments and decodes URL-encoded template paths.
 func CleanRelPath(rel string) string {
 	rel = strings.TrimSpace(rel)
 	if idx := strings.IndexAny(rel, "?&"); idx >= 0 {
 		rel = rel[:idx]
 	}
-	return filepath.ToSlash(strings.TrimSpace(rel))
+	rel = filepath.ToSlash(strings.TrimSpace(rel))
+	for {
+		decoded, err := url.QueryUnescape(rel)
+		if err != nil || decoded == rel {
+			break
+		}
+		rel = decoded
+	}
+	return rel
 }
 
 // ValidateRelPath ensures a template path stays within the template root.

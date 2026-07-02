@@ -34,7 +34,7 @@ func (h *Handler) sites(w http.ResponseWriter, r *http.Request, path string) {
 func (h *Handler) siteList(w http.ResponseWriter, r *http.Request) {
 	cfg := h.chain.Sites.Config()
 	sites := append([]config.SiteConfig(nil), cfg.Sites...)
-	data := listPage(1, int64(len(sites)), sitesBase,
+	data := listPage(r, 1, int64(len(sites)), sitesBase,
 		"Multi-site configuration and host mappings.",
 		"Add Site", map[string]any{"ActiveNav": "sites"})
 	col, dir, _ := parseSort(r, map[string]string{
@@ -74,7 +74,7 @@ func (h *Handler) siteForm(w http.ResponseWriter, r *http.Request, siteID string
 			}
 		}
 		if !found {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -218,7 +218,7 @@ func (h *Handler) siteDelete(w http.ResponseWriter, r *http.Request, siteID stri
 		next = append(next, s)
 	}
 	if !found {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	cfg.Sites = next

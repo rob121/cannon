@@ -34,6 +34,18 @@
         "type": "boolean",
         "title": "Use TLS",
         "default": true
+      },
+      "use_html": {
+        "type": "boolean",
+        "title": "Use HTML Mail",
+        "default": false,
+        "description": "Send HTML email when a mail template is configured."
+      },
+      "html_template": {
+        "type": "string",
+        "title": "HTML Mail Template",
+        "default": "default/mail/default.html",
+        "description": "Theme template path for HTML messages. The built-in default is default/mail/default.html — override it under Admin → Templates → default → mail/default.html."
       }
     }
   },
@@ -46,7 +58,9 @@
       {"type": "Control", "scope": "#/properties/smtp_password", "options": {"format": "password"}},
       {"type": "Control", "scope": "#/properties/from_email"},
       {"type": "Control", "scope": "#/properties/from_name"},
-      {"type": "Control", "scope": "#/properties/use_tls"}
+      {"type": "Control", "scope": "#/properties/use_tls"},
+      {"type": "Control", "scope": "#/properties/use_html"},
+      {"type": "Control", "scope": "#/properties/html_template"}
     ]
   }
 }

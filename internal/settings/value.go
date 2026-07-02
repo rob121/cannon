@@ -10,6 +10,7 @@ import (
 const (
 	SectionGeneral = "general"
 	SectionMail    = "mail"
+	SectionMedia   = "media"
 	SectionSEO     = "seo"
 )
 
@@ -92,12 +93,59 @@ func SiteOffline(ctx context.Context) (bool, error) {
 
 // DefaultListLimit returns the admin table page size.
 func DefaultListLimit(ctx context.Context) (int, error) {
-	return GlobalIntDefault(ctx, SectionGeneral, "default_list_limit", 20)
+	limit, err := GlobalIntDefault(ctx, SectionGeneral, "default_list_limit", 25)
+	if err != nil {
+		return 25, err
+	}
+	return NormalizeListLimit(limit), nil
+}
+
+// NormalizeListLimit clamps list limits to supported admin page sizes.
+func NormalizeListLimit(limit int) int {
+	for _, allowed := range []int{25, 50, 75, 100, 200, 500} {
+		if limit == allowed {
+			return allowed
+		}
+	}
+	if limit < 25 {
+		return 25
+	}
+	if limit > 500 {
+		return 500
+	}
+	return 25
+}
+
+// LogLevel returns the configured application log level name.
+func LogLevel(ctx context.Context) (string, error) {
+	level, err := GlobalString(ctx, SectionGeneral, "log_level")
+	if err != nil || strings.TrimSpace(level) == "" {
+		return "info", err
+	}
+	return strings.ToLower(strings.TrimSpace(level)), nil
 }
 
 // SiteMetaDescription returns the global default meta description.
 func SiteMetaDescription(ctx context.Context) (string, error) {
 	return GlobalString(ctx, SectionGeneral, "site_meta_description")
+}
+
+// FrontendTheme returns the active public site theme id.
+func FrontendTheme(ctx context.Context) (string, error) {
+	theme, err := GlobalString(ctx, SectionGeneral, "frontend_theme")
+	if err != nil || strings.TrimSpace(theme) == "" {
+		return "default", err
+	}
+	return strings.TrimSpace(theme), nil
+}
+
+// AdminTheme returns the active admin UI theme id.
+func AdminTheme(ctx context.Context) (string, error) {
+	theme, err := GlobalString(ctx, SectionGeneral, "admin_theme")
+	if err != nil || strings.TrimSpace(theme) == "" {
+		return "admin", err
+	}
+	return strings.TrimSpace(theme), nil
 }
 
 // RobotsTXT returns custom robots.txt body or empty for default generation.

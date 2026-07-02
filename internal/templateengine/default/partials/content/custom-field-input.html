@@ -1,0 +1,50 @@
+{{define "customFieldInput"}}
+{{$field := .Field}}
+{{$value := .Value}}
+{{$id := printf "field-%d" $field.FieldID}}
+{{if eq $field.Type "textarea" "rich_text"}}
+<textarea class="form-control" id="{{$id}}" name="field_{{$field.FieldID}}" rows="{{if eq $field.Type "rich_text"}}8{{else}}4{{end}}" {{if eq $field.Type "rich_text"}}data-ckeditor="field-{{$field.FieldID}}"{{end}}>{{$value}}</textarea>
+{{else if eq $field.Type "boolean"}}
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" id="{{$id}}" name="field_{{$field.FieldID}}" value="1" {{if eq $value "1"}}checked{{end}}>
+  <label class="form-check-label" for="{{$id}}">Yes</label>
+</div>
+{{else if eq $field.Type "select"}}
+<select class="form-select" id="{{$id}}" name="field_{{$field.FieldID}}">
+  <option value="">—</option>
+  {{range fieldOptions $field.Configuration}}
+  <option value="{{.Value}}" {{if eq $value .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+  {{end}}
+</select>
+{{else if eq $field.Type "multi_select"}}
+<select class="form-select" id="{{$id}}" name="field_{{$field.FieldID}}" multiple size="4">
+  {{range fieldOptions $field.Configuration}}
+  <option value="{{.Value}}" {{if fieldValueContains $value .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+  {{end}}
+</select>
+{{else if eq $field.Type "radio"}}
+{{range fieldOptions $field.Configuration}}
+<div class="form-check">
+  <input class="form-check-input" type="radio" name="field_{{$field.FieldID}}" id="{{$id}}-{{.Value}}" value="{{.Value}}" {{if eq $value .Value}}checked{{end}}>
+  <label class="form-check-label" for="{{$id}}-{{.Value}}">{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</label>
+</div>
+{{end}}
+{{else if eq $field.Type "checkbox"}}
+{{range fieldOptions $field.Configuration}}
+<div class="form-check">
+  <input class="form-check-input" type="checkbox" name="field_{{$field.FieldID}}" id="{{$id}}-{{.Value}}" value="{{.Value}}" {{if fieldValueContains $value .Value}}checked{{end}}>
+  <label class="form-check-label" for="{{$id}}-{{.Value}}">{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</label>
+</div>
+{{end}}
+{{else if eq $field.Type "number"}}
+<input class="form-control" type="number" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "url" "image" "file"}}
+<input class="form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="https:// or /assets/media/...">
+{{else if eq $field.Type "date"}}
+<input class="form-control" type="date" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "datetime"}}
+<input class="form-control" type="datetime-local" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else}}
+<input class="form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{end}}
+{{end}}

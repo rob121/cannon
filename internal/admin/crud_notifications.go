@@ -26,7 +26,7 @@ func (h *Handler) notifications(w http.ResponseWriter, r *http.Request, path str
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.notificationForm(w, r, id)
@@ -38,14 +38,14 @@ func (h *Handler) notificationList(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	var total int64
 	db.Model(&models.Notification{}).Count(&total)
-	data := listPage(page, total, notificationsBase,
+	data := listPage(r, page, total, notificationsBase,
 		"Send alerts via shoutrrr when user lifecycle hooks fire.",
 		"Add Notification", map[string]any{"ActiveNav": "notifications"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
 	}, "name")
 	var rows []models.Notification
-	db.Preload("Events").Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	db.Preload("Events").Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Notifications", "admin/notifications.html", data)
 }
@@ -56,7 +56,7 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 	var row models.Notification
 	if !isNew {
 		if err := db.Preload("Events").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	} else {
@@ -147,7 +147,7 @@ func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idS
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

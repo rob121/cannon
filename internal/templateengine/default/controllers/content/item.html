@@ -1,58 +1,104 @@
-<article class="site-page site-item-detail">
-  <header class="site-hero">
-    <h1 class="site-title">{{.Item.Title}}</h1>
-    {{if .Item.Category}}<p class="site-subtitle"><a href="{{categoryURL .Item.Category.Slug}}">{{.Item.Category.Name}}</a></p>{{end}}
-    {{if .CanEdit}}<p class="site-subtitle"><a href="/content/edit/{{.Item.Slug}}">Edit this item</a></p>{{end}}
-  </header>
-  {{if .Item.Image}}<figure class="site-item-image"><img src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
-  {{if .IntroHTML}}<div class="site-item-intro">{{.IntroHTML}}</div>{{end}}
-  <div class="site-content">{{.BodyHTML}}</div>
-  {{if .Fields}}
-  <section class="site-section">
-    <h2 class="site-section-title">Details</h2>
-    <dl class="site-field-list">
-      {{range $k, $v := .Fields}}
-      <dt>{{$k}}</dt><dd>{{$v}}</dd>
-      {{end}}
-    </dl>
+<article class="mb-4 site-item-detail">
+  {{if .ContentSettings.ShowTitle}}
+  {{template "pageHeader" (dict "Title" .Item.Title)}}
+  {{end}}
+
+  {{if or .ContentSettings.ShowAuthor .ContentSettings.ShowPublishedDate}}
+  <p class="text-muted small mb-3">
+    {{if and .ContentSettings.ShowAuthor .Item.Author}}
+    <span>By <a href="{{authorURL .Item.Author.Username}}">{{if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></span>
+    {{end}}
+    {{if and .ContentSettings.ShowPublishedDate (not .Item.CreatedAt.IsZero)}}
+    {{if and .ContentSettings.ShowAuthor .Item.Author}} · {{end}}
+    <time datetime="{{.Item.CreatedAt.Format "2006-01-02"}}">{{if .Item.PublishStart}}{{.Item.PublishStart.Format "January 2, 2006"}}{{else}}{{.Item.CreatedAt.Format "January 2, 2006"}}{{end}}</time>
+    {{end}}
+  </p>
+  {{end}}
+
+  {{if .Item.Category}}<p class="mb-3"><a class="badge text-bg-light border text-decoration-none" href="{{categoryURL .Item.Category.Slug}}">{{.Item.Category.Name}}</a></p>{{end}}
+  {{if .CanEdit}}<p class="mb-3"><a class="btn btn-sm btn-outline-secondary" href="/content/edit/{{.Item.Slug}}">Edit this item</a></p>{{end}}
+
+  {{if .Item.Image}}<figure class="figure mb-4"><img class="figure-img img-fluid rounded" src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
+  {{if .IntroHTML}}<div class="lead mb-4">{{.IntroHTML}}</div>{{end}}
+  {{template "itemMedia" .}}
+  <div class="site-content mb-4">{{.BodyHTML}}</div>
+
+  {{if and .ContentSettings.ShowAuthorBio .Item.Author}}
+  <section class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 card-title">About the author</h2>
+      <p class="mb-0"><a href="{{authorURL .Item.Author.Username}}">{{if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></p>
+    </div>
   </section>
   {{end}}
+
+  {{if .FieldDisplays}}
+  <section class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h5 card-title">Details</h2>
+      <dl class="row mb-0">
+        {{range .FieldDisplays}}
+        <dt class="col-sm-3">{{.Label}}</dt><dd class="col-sm-9">{{safeHTML .HTML}}</dd>
+        {{end}}
+      </dl>
+    </div>
+  </section>
+  {{end}}
+
   {{if .Related}}
-  <section class="site-section">
-    <h2 class="site-section-title">Related</h2>
-    <ul class="site-link-list">
+  <section class="mb-4">
+    <h2 class="h5 mb-3">Related</h2>
+    <ul class="list-group list-group-flush">
       {{range .Related}}
-      <li><a href="{{itemURL .Slug}}">{{.Title}}</a></li>
+      <li class="list-group-item px-0"><a href="{{itemURL .Slug}}">{{.Title}}</a></li>
       {{end}}
     </ul>
   </section>
   {{end}}
-  <section class="site-section" id="comments">
-    <h2 class="site-section-title">Comments {{if .CommentCount}}({{.CommentCount}}){{end}}</h2>
-    {{if .CommentSettings.AllowComments}}
-      {{if .Comments}}
-      {{range .Comments}}
-      <article class="site-comment">
-        <p class="site-comment-author">{{if .AuthorName}}{{.AuthorName}}{{else}}Guest{{end}}</p>
-        <p>{{.Body}}</p>
-      </article>
-      {{end}}
-      {{end}}
-      <form method="post" action="{{itemURL .Item.Slug}}" class="site-comment-form">
-        {{csrfField}}
-        {{if and (not .CommentSettings.RequireLogin) .CommentSettings.AllowAnonymous}}
-        <div class="site-form-row">
-          <label>Name <input type="text" name="author_name" class="site-form-control"></label>
-          <label>Email <input type="email" name="author_email" class="site-form-control"></label>
+
+  {{if .ContentSettings.ShowComments}}
+  <section class="card shadow-sm" id="comments">
+    <div class="card-body">
+      <h2 class="h5 card-title">Comments {{if .CommentCount}}<span class="badge text-bg-secondary">{{.CommentCount}}</span>{{end}}</h2>
+      {{if .CommentSettings.AllowComments}}
+        {{if .Comments}}
+        <div class="vstack gap-3 mb-4">
+        {{range .Comments}}
+        <article class="border rounded p-3 bg-body-tertiary">
+          <p class="fw-semibold mb-1">{{if .AuthorName}}{{.AuthorName}}{{else}}Guest{{end}}</p>
+          <p class="mb-0">{{.Body}}</p>
+        </article>
+        {{end}}
         </div>
         {{end}}
-        <label>Comment
-          <textarea name="body" rows="4" class="site-form-control" required></textarea>
-        </label>
-        <button type="submit" class="site-btn">Post Comment</button>
-      </form>
-    {{else}}
-      <p>Comments are closed.</p>
-    {{end}}
+        <form method="post" action="{{itemURL .Item.Slug}}">
+          {{csrfField}}
+          <div class="visually-hidden" aria-hidden="true">
+            <label for="comment-website">Website</label>
+            <input type="text" tabindex="-1" autocomplete="off" id="comment-website" name="website">
+          </div>
+          {{if and (not .CommentSettings.RequireLogin) .CommentSettings.AllowAnonymous}}
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="author_name">Name</label>
+              <input type="text" class="form-control" id="author_name" name="author_name">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="author_email">Email</label>
+              <input type="email" class="form-control" id="author_email" name="author_email">
+            </div>
+          </div>
+          {{end}}
+          <div class="mb-3">
+            <label class="form-label" for="comment-body">Comment</label>
+            <textarea class="form-control" id="comment-body" name="body" rows="4" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary">Post Comment</button>
+        </form>
+      {{else}}
+        <p class="text-muted mb-0">Comments are closed.</p>
+      {{end}}
+    </div>
   </section>
+  {{end}}
 </article>

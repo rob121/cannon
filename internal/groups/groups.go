@@ -19,6 +19,46 @@ const (
 	WriterGroupName         = "Writer"
 )
 
+// UserGroupIDs returns the active group ids assigned to a user, including public.
+func UserGroupIDs(ctx context.Context, userID uint) ([]uint, error) {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	publicID, err := PublicGroupID(db)
+	if err != nil {
+		return nil, err
+	}
+	if userID == 0 {
+		return []uint{publicID}, nil
+	}
+	var ids []uint
+	err = db.Model(&models.User{}).
+		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
+		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
+		Where("users.user_id = ? AND users.status = ? AND groups.status = ?",
+			userID, models.StatusActive, models.StatusActive).
+		Pluck("groups.group_id", &ids).Error
+	if err != nil {
+		return nil, err
+	}
+	return ensureContains(ids, publicID), nil
+}
+
+// UserInAnyGroup reports whether userID belongs to at least one active group in allowed.
+// An empty allowed list means no extra restriction.
+func UserInAnyGroup(ctx context.Context, userID uint, allowed []models.Group) (bool, error) {
+	active := activeGroups(allowed)
+	if len(active) == 0 {
+		return true, nil
+	}
+	userGroupIDs, err := UserGroupIDs(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return viewerMatchesGroups(userGroupIDs, groupIDs(active)), nil
+}
+
 // ViewerGroupIDs returns the active group ids that apply to the current request viewer.
 // Anonymous visitors receive only the public group. Signed-in users receive their
 // assigned groups plus public.
@@ -55,12 +95,27 @@ func ViewerGroupIDs(ctx context.Context) ([]uint, error) {
 }
 
 // CanView reports whether content assigned to contentGroups is visible to viewerGroupIDs.
+// Empty or inactive group assignments deny access — use CanViewContent for items and
+// categories where no group restriction means public visibility.
 func CanView(viewerGroupIDs []uint, contentGroups []models.Group) bool {
 	active := activeGroups(contentGroups)
 	if len(active) == 0 {
 		return false
 	}
-	contentIDs := groupIDs(active)
+	return viewerMatchesGroups(viewerGroupIDs, groupIDs(active))
+}
+
+// CanViewContent reports visibility for items and categories. Unrestricted content
+// (no active group assignments) is visible to everyone, matching list queries.
+func CanViewContent(viewerGroupIDs []uint, contentGroups []models.Group) bool {
+	active := activeGroups(contentGroups)
+	if len(active) == 0 {
+		return true
+	}
+	return viewerMatchesGroups(viewerGroupIDs, groupIDs(active))
+}
+
+func viewerMatchesGroups(viewerGroupIDs, contentIDs []uint) bool {
 	for _, viewerID := range viewerGroupIDs {
 		for _, contentID := range contentIDs {
 			if viewerID == contentID {
@@ -194,6 +249,16 @@ func ensureContentPublicDefaults(db *gorm.DB, public models.Group) error {
 			return err
 		}
 	}
+
+	var categories []models.Category
+	if err := db.Find(&categories).Error; err != nil {
+		return err
+	}
+	for _, row := range categories {
+		if err := ensureRowPublicGroup(db, "category_groups", "category_category_id", row.CategoryID, public, &row); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -267,4 +332,20 @@ func ensureContains(ids []uint, id uint) []uint {
 		}
 	}
 	return append(ids, id)
+}
+
+// HasBackendAccess reports whether a user belongs to an active backend group.
+func HasBackendAccess(ctx context.Context, userID uint) (bool, error) {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return false, err
+	}
+	var count int64
+	err = db.Model(&models.User{}).
+		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
+		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
+		Where("users.user_id = ? AND users.status = ? AND groups.status = ? AND groups.kind = ?",
+			userID, models.StatusActive, models.StatusActive, models.GroupKindBackend).
+		Count(&count).Error
+	return count > 0, err
 }

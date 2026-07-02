@@ -26,6 +26,36 @@
         "title": "Auto-Approve Comments",
         "default": false,
         "description": "Publish new comments immediately without moderation."
+      },
+      "show_title": {
+        "type": "boolean",
+        "title": "Show Item Title",
+        "default": true,
+        "description": "Display the item title in the page header on item views."
+      },
+      "show_author": {
+        "type": "boolean",
+        "title": "Show Author",
+        "default": true,
+        "description": "Display the author name on item pages."
+      },
+      "show_published_date": {
+        "type": "boolean",
+        "title": "Show Published Date",
+        "default": true,
+        "description": "Display the publish date on item pages."
+      },
+      "show_author_bio": {
+        "type": "boolean",
+        "title": "Show Author Bio",
+        "default": true,
+        "description": "Display author profile information when available."
+      },
+      "show_comments": {
+        "type": "boolean",
+        "title": "Show Comments",
+        "default": true,
+        "description": "Display the comments section on item pages."
       }
     }
   },
@@ -35,7 +65,12 @@
       {"type": "Control", "scope": "#/properties/allow_comments"},
       {"type": "Control", "scope": "#/properties/require_login"},
       {"type": "Control", "scope": "#/properties/allow_anonymous"},
-      {"type": "Control", "scope": "#/properties/auto_approve"}
+      {"type": "Control", "scope": "#/properties/auto_approve"},
+      {"type": "Control", "scope": "#/properties/show_title"},
+      {"type": "Control", "scope": "#/properties/show_author"},
+      {"type": "Control", "scope": "#/properties/show_published_date"},
+      {"type": "Control", "scope": "#/properties/show_author_bio"},
+      {"type": "Control", "scope": "#/properties/show_comments"}
     ]
   }
 }

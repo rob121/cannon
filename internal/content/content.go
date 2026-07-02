@@ -55,16 +55,73 @@ func UniqueItemSlug(ctx context.Context, base string, excludeID uint) (string, e
 
 // UniqueCategorySlug returns a slug unused by other categories.
 func UniqueCategorySlug(ctx context.Context, base string, excludeID uint) (string, error) {
+	return ResolveCategorySlug(ctx, base, "", nil, excludeID)
+}
+
+// ResolveCategorySlug builds a unique category slug, prefixing with the parent path when set.
+func ResolveCategorySlug(ctx context.Context, name, manualSlug string, parentID *uint, excludeID uint) (string, error) {
+	base := strings.TrimSpace(manualSlug)
+	if base == "" {
+		var err error
+		base, err = CategorySlugBase(ctx, name, parentID)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		base = NormalizeCategorySlug(base)
+	}
+	return uniquifyCategorySlug(ctx, base, excludeID)
+}
+
+// CategorySlugBase returns the preferred slug path for a category name and optional parent.
+func CategorySlugBase(ctx context.Context, name string, parentID *uint) (string, error) {
+	leaf := Slugify(name)
+	if parentID == nil || *parentID == 0 {
+		return leaf, nil
+	}
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return "", err
 	}
-	slug := Slugify(base)
-	for i := 0; i < 100; i++ {
-		candidate := slug
-		if i > 0 {
-			candidate = slug + "-" + strconv.Itoa(i)
+	var parent models.Category
+	if err := db.Select("slug").First(&parent, *parentID).Error; err != nil {
+		return leaf, nil
+	}
+	parentSlug := strings.Trim(strings.TrimSpace(parent.Slug), "/")
+	if parentSlug == "" {
+		return leaf, nil
+	}
+	return parentSlug + "/" + leaf, nil
+}
+
+// NormalizeCategorySlug cleans a user-provided category slug path.
+func NormalizeCategorySlug(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.Trim(raw, "/")
+	if raw == "" {
+		return "category"
+	}
+	parts := strings.Split(raw, "/")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = Slugify(part)
+		if part != "" {
+			out = append(out, part)
 		}
+	}
+	if len(out) == 0 {
+		return "category"
+	}
+	return strings.Join(out, "/")
+}
+
+func uniquifyCategorySlug(ctx context.Context, base string, excludeID uint) (string, error) {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return "", err
+	}
+	for i := 0; i < 100; i++ {
+		candidate := categorySlugWithSuffix(base, i)
 		var count int64
 		q := db.Model(&models.Category{}).Where("slug = ?", candidate)
 		if excludeID > 0 {
@@ -77,7 +134,18 @@ func UniqueCategorySlug(ctx context.Context, base string, excludeID uint) (strin
 			return candidate, nil
 		}
 	}
-	return slug + "-" + strconv.FormatInt(time.Now().Unix(), 10), nil
+	return categorySlugWithSuffix(base, int(time.Now().Unix()%1000)), nil
+}
+
+func categorySlugWithSuffix(path string, n int) string {
+	if n == 0 {
+		return path
+	}
+	suffix := "-" + strconv.Itoa(n)
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		return path[:idx+1] + path[idx+1:] + suffix
+	}
+	return path + suffix
 }
 
 // UniqueTagSlug returns a slug unused by other tags.
@@ -149,7 +217,9 @@ func ListItems(ctx context.Context, viewerGroups []uint, opts ListOptions) ([]mo
 	if err != nil {
 		return nil, 0, err
 	}
-	if opts.CategoryID > 0 {
+	if len(opts.CategoryIDs) > 0 {
+		q = q.Where("category_id IN ?", opts.CategoryIDs)
+	} else if opts.CategoryID > 0 {
 		q = q.Where("category_id = ?", opts.CategoryID)
 	}
 	if opts.AuthorID > 0 {
@@ -181,32 +251,45 @@ func ListItems(ctx context.Context, viewerGroups []uint, opts ListOptions) ([]mo
 		if opts.Dir == "desc" {
 			order = "sort DESC, created_at DESC"
 		}
+	case "featured":
+		order = "featured DESC, created_at DESC"
+	case "popular":
+		order = "(SELECT COUNT(*) FROM comments WHERE comments.item_id = items.item_id AND comments.approved = 1) DESC, created_at DESC"
 	}
 	page := opts.Page
 	if page < 1 {
 		page = 1
 	}
 	limit := opts.Limit
-	if limit <= 0 {
+	if !opts.NoPagination && limit <= 0 {
 		limit = 20
 	}
 	var rows []models.Item
-	if err := q.Order(order).Offset((page - 1) * limit).Limit(limit).Find(&rows).Error; err != nil {
-		return nil, 0, err
+	q = q.Order(order)
+	if opts.NoPagination {
+		if err := q.Find(&rows).Error; err != nil {
+			return nil, 0, err
+		}
+	} else {
+		if err := q.Offset((page - 1) * limit).Limit(limit).Find(&rows).Error; err != nil {
+			return nil, 0, err
+		}
 	}
 	return rows, total, nil
 }
 
 type ListOptions struct {
-	CategoryID uint
-	AuthorID   uint
-	TagID      uint
-	Query      string
-	Featured   bool
-	Sort       string
-	Dir        string
-	Page       int
-	Limit      int
+	CategoryID     uint
+	CategoryIDs    []uint
+	AuthorID       uint
+	TagID          uint
+	Query          string
+	Featured       bool
+	Sort           string
+	Dir            string
+	Page           int
+	Limit          int
+	NoPagination   bool
 }
 
 // ItemBySlug loads a published item by slug.
@@ -219,7 +302,7 @@ func ItemBySlug(ctx context.Context, slug string, viewerGroups []uint) (*models.
 	if err := q.Where("slug = ?", slug).First(&item).Error; err != nil {
 		return nil, err
 	}
-	if !groups.CanView(viewerGroups, item.Groups) {
+	if !groups.CanViewContent(viewerGroups, item.Groups) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	return &item, nil
@@ -235,7 +318,7 @@ func CategoryBySlug(ctx context.Context, slug string, viewerGroups []uint) (*mod
 	if err := db.Preload("Groups").Where("slug = ? AND status = ?", slug, models.StatusActive).First(&cat).Error; err != nil {
 		return nil, err
 	}
-	if !groups.CanView(viewerGroups, cat.Groups) {
+	if !groups.CanViewContent(viewerGroups, cat.Groups) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	return &cat, nil
@@ -267,9 +350,13 @@ func CategoryTree(ctx context.Context) ([]models.Category, error) {
 	return rows, nil
 }
 
-// FieldsForCategory returns active custom fields for a category's field group.
+// FieldsForCategory returns active custom fields for a category's effective field group.
 func FieldsForCategory(ctx context.Context, cat *models.Category) ([]models.ContentField, error) {
-	if cat == nil || cat.FieldGroupID == nil || *cat.FieldGroupID == 0 {
+	groupID, err := FieldGroupForCategory(ctx, cat)
+	if err != nil {
+		return nil, err
+	}
+	if groupID == nil || *groupID == 0 {
 		return nil, nil
 	}
 	db, err := sites.DB(ctx)
@@ -277,7 +364,7 @@ func FieldsForCategory(ctx context.Context, cat *models.Category) ([]models.Cont
 		return nil, err
 	}
 	var fields []models.ContentField
-	if err := db.Where("field_group_id = ? AND status = ?", *cat.FieldGroupID, models.StatusActive).
+	if err := db.Where("field_group_id = ? AND status = ?", *groupID, models.StatusActive).
 		Order("sort ASC, label ASC").Find(&fields).Error; err != nil {
 		return nil, err
 	}
@@ -314,6 +401,44 @@ func ItemFieldMap(ctx context.Context, itemID uint) (map[string]string, error) {
 		if name, ok := byID[v.FieldID]; ok {
 			out[name] = v.Value
 		}
+	}
+	return out, nil
+}
+
+// ItemFieldDisplays returns labeled custom fields with formatted HTML for item pages.
+func ItemFieldDisplays(ctx context.Context, item *models.Item) ([]FieldDisplay, error) {
+	if item == nil || item.ItemID == 0 {
+		return nil, nil
+	}
+	var cat *models.Category
+	if item.CategoryID != nil && *item.CategoryID > 0 {
+		cat = item.Category
+	}
+	fields, err := FieldsForCategory(ctx, cat)
+	if err != nil || len(fields) == 0 {
+		return nil, err
+	}
+	values, err := ItemFieldMap(ctx, item.ItemID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FieldDisplay, 0, len(fields))
+	for _, field := range fields {
+		value := values[field.Name]
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		label := strings.TrimSpace(field.Label)
+		if label == "" {
+			label = field.Name
+		}
+		out = append(out, FieldDisplay{
+			Name:  field.Name,
+			Label: label,
+			Type:  field.Type,
+			Value: value,
+			HTML:  FormatFieldDisplayHTML(field, value),
+		})
 	}
 	return out, nil
 }

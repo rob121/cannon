@@ -46,3 +46,8 @@ func SearchURL(query string) string {
 	}
 	return fmt.Sprintf("/content/search?q=%s", url.QueryEscape(query))
 }
+
+// FeaturedURL returns the frontend path for the featured items listing.
+func FeaturedURL() string {
+	return "/content/featured"
+}

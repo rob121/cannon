@@ -1,62 +1,175 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">{{if .IsNew}}Create Item{{else}}Edit Item{{end}}</h1>
-  </header>
+<article class="mb-4">
+  {{if .IsNew}}
+  {{template "pageHeader" (dict "Title" "Create Item")}}
+  {{else}}
+  {{template "pageHeader" (dict "Title" "Edit Item")}}
+  {{end}}
 
-  {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
+  {{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
 
-  <form method="post" class="site-form">
-    {{csrfField}}
-    <label>Title
-      <input type="text" name="title" value="{{.Item.Title}}" class="site-form-control" required>
-    </label>
-    <label>Slug
-      <input type="text" name="slug" value="{{.Item.Slug}}" class="site-form-control" placeholder="auto-generated if empty">
-    </label>
-    <label>Intro
-      <textarea name="intro" rows="3" class="site-form-control">{{.Item.Intro}}</textarea>
-    </label>
-    <label>Body
-      <textarea name="body" rows="12" class="site-form-control">{{.Item.Body}}</textarea>
-    </label>
-    <label>Featured Image URL
-      <input type="text" name="image" value="{{.Item.Image}}" class="site-form-control">
-    </label>
-    <label>Category
-      <select name="category_id" class="site-form-control">
-        <option value="">None</option>
-        {{range .Categories}}
-        <option value="{{.CategoryID}}" {{if eq $.SelectedCategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+  <form method="post" class="card shadow-sm" id="frontend-item-form">
+    <div class="card-body vstack gap-4">
+      {{csrfField}}
+      <div>
+        <label class="form-label" for="item-title">Title</label>
+        <input type="text" class="form-control" id="item-title" name="title" value="{{.Item.Title}}" required>
+      </div>
+      <div>
+        <label class="form-label" for="item-slug">Slug</label>
+        <input type="text" class="form-control" id="item-slug" name="slug" value="{{.Item.Slug}}" placeholder="auto-generated if empty">
+      </div>
+      <div>
+        <label class="form-label" for="item-intro">Intro</label>
+        <textarea class="form-control" id="item-intro" name="intro" rows="3" data-ckeditor="intro">{{.Item.Intro}}</textarea>
+      </div>
+      <div>
+        <label class="form-label" for="item-body">Body</label>
+        <textarea class="form-control" id="item-body" name="body" rows="12" data-ckeditor="body">{{.Item.Body}}</textarea>
+      </div>
+      <div>
+        <label class="form-label" for="item-image">Featured Image URL</label>
+        <input type="url" class="form-control" id="item-image" name="image" value="{{.Item.Image}}" placeholder="/assets/media/content/photo.jpg">
+      </div>
+      <div>
+        <label class="form-label" for="item-category">Category</label>
+        <select class="form-select" id="item-category" name="category_id">
+          <option value="">None</option>
+          {{range .Categories}}
+          <option value="{{.CategoryID}}" {{if eq $.SelectedCategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+          {{end}}
+        </select>
+      </div>
+      {{if .Tags}}
+      <fieldset>
+        <legend class="form-label fs-6">Tags</legend>
+        <div class="d-flex flex-wrap gap-3">
+          {{range .Tags}}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="tag_ids" value="{{.TagID}}" id="tag-{{.TagID}}" {{if inUint $.SelectedTagIDs .TagID}}checked{{end}}>
+            <label class="form-check-label" for="tag-{{.TagID}}">{{.Name}}</label>
+          </div>
+          {{end}}
+        </div>
+      </fieldset>
+      {{end}}
+
+      <fieldset>
+        <legend class="form-label fs-6">Gallery</legend>
+        <div class="vstack gap-2" id="gallery-rows">
+          {{range .Gallery}}
+          <div class="row g-2 gallery-row">
+            <div class="col-md-7"><input type="url" class="form-control" name="gallery_url" value="{{.URL}}" placeholder="Image URL"></div>
+            <div class="col-md-4"><input type="text" class="form-control" name="gallery_alt" value="{{.Alt}}" placeholder="Alt text"></div>
+            <div class="col-md-1"><button type="button" class="btn btn-outline-secondary w-100 gallery-remove" aria-label="Remove">&times;</button></div>
+          </div>
+          {{else}}
+          <div class="row g-2 gallery-row">
+            <div class="col-md-7"><input type="url" class="form-control" name="gallery_url" value="" placeholder="Image URL"></div>
+            <div class="col-md-4"><input type="text" class="form-control" name="gallery_alt" value="" placeholder="Alt text"></div>
+            <div class="col-md-1"><button type="button" class="btn btn-outline-secondary w-100 gallery-remove" aria-label="Remove">&times;</button></div>
+          </div>
+          {{end}}
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="gallery-add">Add image</button>
+      </fieldset>
+
+      {{if .CustomFields}}
+      <fieldset>
+        <legend class="form-label fs-6">Custom Fields</legend>
+        {{range .CustomFields}}
+        <div class="mb-3">
+          <label class="form-label" for="field-{{.FieldID}}">{{.Label}}{{if .Required}} *{{end}}</label>
+          {{template "customFieldInput" (dict "Field" . "Value" (index $.FieldValues .FieldID))}}
+        </div>
         {{end}}
-      </select>
-    </label>
-    <fieldset class="site-fieldset">
-      <legend>Tags</legend>
-      {{range .Tags}}
-      <label class="site-check-label">
-        <input type="checkbox" name="tag_ids" value="{{.TagID}}" {{if inUint $.SelectedTagIDs .TagID}}checked{{end}}> {{.Name}}
-      </label>
+      </fieldset>
       {{end}}
-    </fieldset>
-    {{if .CustomFields}}
-    <fieldset class="site-fieldset">
-      <legend>Custom Fields</legend>
-      {{range .CustomFields}}
-      <label>{{.Label}}
-        <input type="text" name="field_{{.FieldID}}" value="{{index $.FieldValues .FieldID}}" class="site-form-control">
-      </label>
+
+      <fieldset>
+        <legend class="form-label fs-6">SEO</legend>
+        <div class="mb-3">
+          <label class="form-label" for="item-meta-title">Meta Title</label>
+          <input type="text" class="form-control" id="item-meta-title" name="meta_title" value="{{.Item.MetaTitle}}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="item-meta-description">Meta Description</label>
+          <textarea class="form-control" id="item-meta-description" name="meta_description" rows="2">{{.Item.MetaDescription}}</textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="item-meta-keywords">Meta Keywords</label>
+          <input type="text" class="form-control" id="item-meta-keywords" name="meta_keywords" value="{{.Item.MetaKeywords}}">
+        </div>
+        <div class="mb-0">
+          <label class="form-label" for="item-canonical">Canonical URL</label>
+          <input type="url" class="form-control" id="item-canonical" name="canonical_url" value="{{.Item.CanonicalURL}}">
+        </div>
+      </fieldset>
+
+      {{if .CanPublish}}
+      <fieldset>
+        <legend class="form-label fs-6">Publishing</legend>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="item-status">Status</label>
+            <select class="form-select" id="item-status" name="status">
+              <option value="draft" {{if eq .Item.Status "draft"}}selected{{end}}>Draft</option>
+              <option value="published" {{if eq .Item.Status "published"}}selected{{end}}>Published</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="item-publish-start">Publish Start</label>
+            <input type="datetime-local" class="form-control" id="item-publish-start" name="publish_start" value="{{formatDateTimeLocal .Item.PublishStart}}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="item-publish-end">Publish End</label>
+            <input type="datetime-local" class="form-control" id="item-publish-end" name="publish_end" value="{{formatDateTimeLocal .Item.PublishEnd}}">
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="featured" value="1" id="item-featured" {{if .Item.Featured}}checked{{end}}>
+              <label class="form-check-label" for="item-featured">Featured item</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
       {{end}}
-    </fieldset>
-    {{end}}
-    {{if .CanPublish}}
-    <label>Status
-      <select name="status" class="site-form-control">
-        <option value="draft" {{if eq .Item.Status "draft"}}selected{{end}}>Draft</option>
-        <option value="published" {{if eq .Item.Status "published"}}selected{{end}}>Published</option>
-      </select>
-    </label>
-    {{end}}
-    <button type="submit" class="site-btn">{{if .IsNew}}Create{{else}}Save{{end}}</button>
-    {{if not .IsNew}}<a href="{{itemURL .Item.Slug}}" class="site-btn site-btn-ghost">View item</a>{{end}}
+
+      <div class="d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+        {{if not .IsNew}}<a href="{{itemURL .Item.Slug}}" class="btn btn-outline-secondary">View item</a>{{end}}
+      </div>
+    </div>
   </form>
 </article>
+
+<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+<script>
+(function () {
+  var fields = document.querySelectorAll('[data-ckeditor]');
+  fields.forEach(function (el) {
+    if (window.ClassicEditor) {
+      ClassicEditor.create(el).catch(function () {});
+    }
+  });
+  var list = document.getElementById('gallery-rows');
+  var addBtn = document.getElementById('gallery-add');
+  if (list && addBtn) {
+    addBtn.addEventListener('click', function () {
+      var row = list.querySelector('.gallery-row');
+      if (!row) return;
+      list.appendChild(row.cloneNode(true));
+    });
+    list.addEventListener('click', function (e) {
+      var btn = e.target.closest('.gallery-remove');
+      if (!btn) return;
+      var rows = list.querySelectorAll('.gallery-row');
+      var row = btn.closest('.gallery-row');
+      if (rows.length <= 1) {
+        row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+        return;
+      }
+      row.remove();
+    });
+  }
+})();
+</script>

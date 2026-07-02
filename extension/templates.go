@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -66,6 +67,64 @@ func TemplateOverridePath(local string) (string, error) {
 	return templateOverridePrefix + local, nil
 }
 
+// List returns the embedded HTML templates available for site overrides.
+func (t *Templates) List() ([]TemplateDefinition, error) {
+	root := t.root
+	if root == "" {
+		root = "."
+	}
+	var out []TemplateDefinition
+	err := fs.WalkDir(t.embed, root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel := path
+		if t.root != "" && t.root != "." {
+			var relErr error
+			rel, relErr = filepath.Rel(t.root, path)
+			if relErr != nil {
+				return relErr
+			}
+		}
+		rel = normalizeTemplatePath(rel)
+		if rel == "" {
+			return nil
+		}
+		override, err := TemplateOverridePath(rel)
+		if err != nil {
+			return nil
+		}
+		def := TemplateDefinition{Path: rel, OverridePath: override}
+		if info, err := entry.Info(); err == nil {
+			def.Size = info.Size()
+		}
+		out = append(out, def)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out, nil
+}
+
+// ReadEmbedded loads the embedded default template source, ignoring site overrides.
+func (t *Templates) ReadEmbedded(name string) (content string, source string, err error) {
+	name = normalizeTemplatePath(name)
+	if name == "" {
+		return "", "", fmt.Errorf("template path is required")
+	}
+	embedPath := t.embedPath(name)
+	raw, err := fs.ReadFile(t.embed, embedPath)
+	if err != nil {
+		return "", "", fmt.Errorf("template not found: %s", name)
+	}
+	return string(raw), "embed:" + embedPath, nil
+}
+
 // Read loads template source, preferring a site override when present.
 func (t *Templates) Read(name string) (content string, source string, err error) {
 	name = normalizeTemplatePath(name)
@@ -88,12 +147,7 @@ func (t *Templates) Read(name string) (content string, source string, err error)
 		}
 	}
 
-	embedPath := t.embedPath(name)
-	raw, err := fs.ReadFile(t.embed, embedPath)
-	if err != nil {
-		return "", "", fmt.Errorf("template not found: %s", name)
-	}
-	return string(raw), "embed:" + embedPath, nil
+	return t.ReadEmbedded(name)
 }
 
 // Execute renders a template with data.

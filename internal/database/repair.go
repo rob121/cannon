@@ -47,8 +47,8 @@ func RepairRoutesSchema(db *gorm.DB) error {
 
 	return repairSQLiteTable(db, repairTableSpec{
 		name:    "routes",
-		columns: `route_id, name, path, type, status, target, extension_name, extension_page_id, extension_endpoint_id, metadata, controller, controller_action`,
-		copySQL: `route_id, name, path, type, status, target, extension_name, extension_page_id, extension_endpoint_id, metadata, controller, controller_action`,
+		columns: `route_id, name, path, type, status, target, extension_name, extension_page_id, extension_endpoint_id, metadata, controller, controller_action, is_default`,
+		copySQL: `route_id, name, path, type, status, target, extension_name, extension_page_id, extension_endpoint_id, metadata, controller, controller_action, 0`,
 		indexes: []string{
 			`CREATE UNIQUE INDEX IF NOT EXISTS idx_routes_path ON routes(path)`,
 		},
@@ -120,7 +120,8 @@ func repairColumnsDDL(table string) string {
 				extension_endpoint_id TEXT,
 				metadata TEXT,
 				controller TEXT,
-				controller_action TEXT`
+				controller_action TEXT,
+				is_default INTEGER NOT NULL DEFAULT 0`
 	default:
 		return ""
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/routemeta"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 	"github.com/rob121/cannon/internal/user"
@@ -68,6 +69,11 @@ func (c *Context) CanView(contentGroups []models.Group) bool {
 // PathSuffix returns the wildcard segment after a route pattern ending in /*.
 func (c *Context) PathSuffix() string {
 	return PathSuffix(c.Route.Path, c.Request.URL.Path)
+}
+
+// RouteMeta returns a string value from the route placement metadata.
+func (c *Context) RouteMeta(key string) string {
+	return routemeta.MetadataString(c.Route.Metadata, key)
 }
 
 // PathSuffix extracts the trailing segment for wildcard controller routes.

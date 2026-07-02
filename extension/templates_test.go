@@ -1,6 +1,9 @@
 package extension_test
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,5 +71,74 @@ func TestTemplatesSiteOverride(t *testing.T) {
 	}
 	if body != "<p>Override</p>" {
 		t.Fatalf("body: got %q", body)
+	}
+}
+
+func TestTemplatesListEmitsOverridePaths(t *testing.T) {
+	embed := fstest.MapFS{
+		"templates/contact/form.html":  {Data: []byte("<p>Default</p>")},
+		"templates/contact/admin.html": {Data: []byte("<p>Admin</p>")},
+		"templates/contact/readme.txt": {Data: []byte("ignored")},
+	}
+	tpl := extension.NewTemplates(embed, "templates")
+
+	got, err := tpl.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected two html templates, got %#v", got)
+	}
+	want := map[string]string{
+		"contact/admin.html": "extension/contact/admin.html",
+		"contact/form.html":  "extension/contact/form.html",
+	}
+	for _, tmpl := range got {
+		if tmpl.OverridePath != want[tmpl.Path] {
+			t.Fatalf("template %q override path: got %q want %q", tmpl.Path, tmpl.OverridePath, want[tmpl.Path])
+		}
+	}
+}
+
+func TestServerTemplatesCapabilityListsOverridableFiles(t *testing.T) {
+	s := extension.New(extension.Info{Name: "template-test", Version: "1"})
+	s.EmbedTemplates(fstest.MapFS{
+		"templates/contact/form.html": {Data: []byte("<p>Default</p>")},
+	}, "templates")
+	h := s.Handler()
+
+	req := httptest.NewRequest(http.MethodGet, "/capabilities", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var caps struct {
+		Capabilities map[string]string `json:"capabilities"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&caps); err != nil {
+		t.Fatalf("decode capabilities: %v", err)
+	}
+	if caps.Capabilities["templates"] != "/templates" {
+		t.Fatalf("templates capability: got %#v", caps.Capabilities)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/templates", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var list extension.TemplateListResponse
+	if err := json.NewDecoder(rec.Body).Decode(&list); err != nil {
+		t.Fatalf("decode list: %v", err)
+	}
+	if len(list.Templates) != 1 || list.Templates[0].Path != "contact/form.html" || list.Templates[0].OverridePath != "extension/contact/form.html" {
+		t.Fatalf("unexpected templates list: %#v", list.Templates)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/templates/contact/form.html", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	var source extension.TemplateSourceResponse
+	if err := json.NewDecoder(rec.Body).Decode(&source); err != nil {
+		t.Fatalf("decode source: %v", err)
+	}
+	if source.Path != "contact/form.html" || source.OverridePath != "extension/contact/form.html" || source.Content != "<p>Default</p>" {
+		t.Fatalf("unexpected source: %+v", source)
 	}
 }

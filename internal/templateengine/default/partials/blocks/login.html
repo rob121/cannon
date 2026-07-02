@@ -1,0 +1,5 @@
+{{$login := .Login}}
+<div class="site-login-block" id="site-login-block-{{$login.BlockID}}">
+  {{if $login.Title}}<h3 class="h5 mb-3">{{$login.Title}}</h3>{{end}}
+  {{template "loginForm" $login}}
+</div>

@@ -1,0 +1,45 @@
+{{define "menu-horizontal-link-attrs"}}
+{{if .Target}} target="{{.Target}}"{{if eq .Target "_blank"}} rel="noopener noreferrer"{{end}}{{end}}
+{{end}}
+
+{{define "menu-horizontal-node"}}
+{{$item := .Item}}
+{{$depth := .Depth}}
+{{$children := $item.Children}}
+{{$hasChildren := and $children (lt $depth 3)}}
+{{if $hasChildren}}
+<li class="nav-item dropdown{{if gt $depth 1}} dropend{{end}}">
+  <a class="nav-link dropdown-toggle {{$item.Class}}" href="{{$item.Href}}" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-horizontal-link-attrs" $item}}>{{$item.Name}}</a>
+  <ul class="dropdown-menu">
+    {{range $children}}{{template "menu-horizontal-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
+  </ul>
+</li>
+{{else}}
+<li class="nav-item">
+  <a class="nav-link {{$item.Class}}" href="{{$item.Href}}"{{template "menu-horizontal-link-attrs" $item}}>{{$item.Name}}</a>
+</li>
+{{end}}
+{{end}}
+
+{{define "menu-horizontal-dropdown-node"}}
+{{$item := .Item}}
+{{$depth := .Depth}}
+{{$children := $item.Children}}
+{{$hasChildren := and $children (lt $depth 3)}}
+{{if $hasChildren}}
+<li class="dropend">
+  <a class="dropdown-item dropdown-toggle {{$item.Class}}" href="{{$item.Href}}" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-horizontal-link-attrs" $item}}>{{$item.Name}}</a>
+  <ul class="dropdown-menu">
+    {{range $children}}{{template "menu-horizontal-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
+  </ul>
+</li>
+{{else}}
+<li><a class="dropdown-item {{$item.Class}}" href="{{$item.Href}}"{{template "menu-horizontal-link-attrs" $item}}>{{$item.Name}}</a></li>
+{{end}}
+{{end}}
+
+<nav class="site-menu-horizontal{{if .Class}} {{.Class}}{{end}}" aria-label="Menu">
+  <ul class="nav flex-wrap">
+    {{range .Items}}{{template "menu-horizontal-node" (dict "Item" . "Depth" 1)}}{{end}}
+  </ul>
+</nav>

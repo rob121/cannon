@@ -1,26 +1,25 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">Reset Password</h1>
-  </header>
-  <div class="site-content">
-    {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
-    {{if .Token}}
-    <form class="site-form" method="post" action="/account/reset-password/{{.Token}}">
-      {{csrfField}}
-      <div class="site-form-field">
-        <label for="password">New Password</label>
-        <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
-      </div>
-      <div class="site-form-field">
-        <label for="password_confirm">Confirm Password</label>
-        <input id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
-      </div>
-      <div class="site-form-actions">
-        <button type="submit" class="site-btn site-btn-primary">Update Password</button>
-      </div>
-    </form>
-    {{else}}
-    <p class="site-alert site-alert-error">Reset link is invalid or expired.</p>
-    {{end}}
+<article class="mb-4">
+  {{template "pageHeader" (dict "Title" "Reset Password")}}
+  <div class="card shadow-sm site-login-block">
+    <div class="card-body">
+      {{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
+      {{if .Token}}
+      <form method="post" action="{{controllerURLFor "auth" "reset-submit" .Token}}">
+        {{csrfField}}
+        <div class="mb-3">
+          <label class="form-label" for="password">New Password</label>
+          <input class="form-control" id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="password_confirm">Confirm Password</label>
+          <input class="form-control" id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Password</button>
+      </form>
+      {{else}}
+      <div class="alert alert-danger mb-3" role="alert">Reset link is invalid or expired.</div>
+      <a class="btn btn-outline-secondary" href="{{controllerURL "auth" "reset-request"}}">Request a new reset link</a>
+      {{end}}
+    </div>
   </div>
 </article>

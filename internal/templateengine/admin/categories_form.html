@@ -1,69 +1,150 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="admin-form-label">Name</label>
-          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+{{template "form_toolbar" (dict "FormID" "category-form" "BasePath" .BasePath "CancelURL" .CancelURL)}}
+<form method="post" id="category-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+  <div class="admin-form-split">
+    <div class="admin-form-split-main">
+      <div class="admin-form-card">
+        <div class="admin-form-card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Name</label>
+              <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Slug</label>
+              <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Parent Category</label>
+              <select class="admin-form-control" name="parent_id">
+                <option value="">None</option>
+                {{range .AllCategories}}
+                {{if ne .CategoryID $.Row.CategoryID}}
+                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.ParentID .CategoryID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Field Group</label>
+              <select class="admin-form-control" name="field_group_id">
+                <option value="">None</option>
+                {{range .FieldGroups}}
+                <option value="{{.FieldGroupID}}" {{if uintPtrEq $.Row.FieldGroupID .FieldGroupID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="admin-form-label" for="category-description">Description</label>
+              <div class="admin-richtext-field admin-richtext-intro">
+                <textarea class="admin-form-control" id="category-description" name="description" rows="6" data-ckeditor="description">{{.Row.Description}}</textarea>
+              </div>
+              <p class="admin-form-help mb-0">Rich text shown on the category page when &ldquo;Show Description&rdquo; is enabled.</p>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Image URL</label>
+              <input class="admin-form-control" name="image" value="{{.Row.Image}}">
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Template Override</label>
+              <input class="admin-form-control" name="template" value="{{.Row.Template}}" placeholder="default/controllers/content/category.html">
+            </div>
+          </div>
         </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Slug</label>
-          <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Parent Category</label>
-          <select class="admin-form-control" name="parent_id">
-            <option value="">None</option>
-            {{range .AllCategories}}
-            {{if ne .CategoryID $.Row.CategoryID}}
-            <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.ParentID .CategoryID}}selected{{end}}>{{.Name}}</option>
-            {{end}}
-            {{end}}
-          </select>
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Field Group</label>
-          <select class="admin-form-control" name="field_group_id">
-            <option value="">None</option>
-            {{range .FieldGroups}}
-            <option value="{{.FieldGroupID}}" {{if uintPtrEq $.Row.FieldGroupID .FieldGroupID}}selected{{end}}>{{.Name}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Description</label>
-          <textarea class="admin-form-control" name="description" rows="4">{{.Row.Description}}</textarea>
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Image URL</label>
-          <input class="admin-form-control" name="image" value="{{.Row.Image}}">
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Template Override</label>
-          <input class="admin-form-control" name="template" value="{{.Row.Template}}" placeholder="default/controllers/content/category.html">
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Sort</label>
-          <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Status</label>
-          <select class="admin-form-control" name="status">
-            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
-            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-check mt-4">
-            <input type="checkbox" name="inherit_settings" {{if .Row.InheritSettings}}checked{{end}}> Inherit Settings From Parent
-          </label>
-        </div>
-        {{template "group_visibility_fields" .}}
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
+
+    <aside class="admin-form-split-sidebar" aria-label="Category settings">
+      <div class="admin-form-sidebar-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Category settings">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="settings">Settings</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">Access</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="permissions">Permissions</button>
+        </div>
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="settings" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Sort</label>
+              <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Status</label>
+              <select class="admin-form-control" name="status">
+                <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+                <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Inherit Settings</label>
+              {{template "form_toggle" (dict "Name" "inherit_settings" "Checked" .Row.InheritSettings "OnLabel" "Inherit from parent" "OffLabel" "Custom settings")}}
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Title</label>
+              {{template "form_toggle" (dict "Name" "show_title" "Checked" .Row.ShowTitle "OnLabel" "Show category title" "OffLabel" "Hide category title")}}
+              <p class="admin-form-help mb-0">When inherit is enabled, the parent category&rsquo;s setting applies.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Description</label>
+              {{template "form_toggle" (dict "Name" "show_description" "Checked" .Row.ShowDescription "OnLabel" "Show description on page" "OffLabel" "Hide description on page")}}
+              <p class="admin-form-help mb-0">When inherit is enabled, the parent category&rsquo;s setting applies.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Columns Per Row</label>
+              <select class="admin-form-control" name="list_columns">
+                <option value="1" {{if eq .Row.ListColumns 1}}selected{{end}}>1 column</option>
+                <option value="2" {{if eq .Row.ListColumns 2}}selected{{end}}>2 columns</option>
+                <option value="3" {{if or (eq .Row.ListColumns 3) (eq .Row.ListColumns 0)}}selected{{end}}>3 columns</option>
+                <option value="4" {{if eq .Row.ListColumns 4}}selected{{end}}>4 columns</option>
+              </select>
+              <p class="admin-form-help mb-0">How many item cards appear on each row.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Pagination</label>
+              {{template "form_toggle" (dict "Name" "list_pagination" "Checked" .Row.ListPagination "OnLabel" "Paginate items" "OffLabel" "Show all items")}}
+              <p class="admin-form-help mb-0">When disabled, every item in the category is shown on one page.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Items Per Page</label>
+              <select class="admin-form-control" name="list_page_size">
+                <option value="6" {{if eq .Row.ListPageSize 6}}selected{{end}}>6 items</option>
+                <option value="9" {{if eq .Row.ListPageSize 9}}selected{{end}}>9 items</option>
+                <option value="12" {{if eq .Row.ListPageSize 12}}selected{{end}}>12 items</option>
+                <option value="18" {{if eq .Row.ListPageSize 18}}selected{{end}}>18 items</option>
+                <option value="20" {{if or (eq .Row.ListPageSize 20) (eq .Row.ListPageSize 0)}}selected{{end}}>20 items</option>
+                <option value="24" {{if eq .Row.ListPageSize 24}}selected{{end}}>24 items</option>
+                <option value="30" {{if eq .Row.ListPageSize 30}}selected{{end}}>30 items</option>
+                <option value="50" {{if eq .Row.ListPageSize 50}}selected{{end}}>50 items</option>
+              </select>
+              <p class="admin-form-help mb-0">Used when pagination is enabled.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
+            <div class="admin-sidebar-fields">
+            <p class="admin-form-help">Only members of the selected groups can view this category.</p>
+            {{template "group_access_toggles" .}}
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="permissions" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Create Items</label>
+              <p class="admin-form-help">Limit which groups may create items in this category. Leave empty to allow anyone with global create permission.</p>
+              {{template "group_permission_toggles" (dict "AllGroups" .AllGroups "FieldName" "create_group_ids" "SelectedIDs" .CreateGroupIDs)}}
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Edit Items</label>
+              <p class="admin-form-help">Limit which groups may edit items in this category. Leave empty to use global edit permissions only.</p>
+              {{template "group_permission_toggles" (dict "AllGroups" .AllGroups "FieldName" "edit_group_ids" "SelectedIDs" .EditGroupIDs)}}
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
-</div>
+</form>

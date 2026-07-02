@@ -1,9 +1,8 @@
 package admin
 
 import (
-	"errors"
 	"net/http"
-	"net/url"
+	"sort"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/hooks"
@@ -18,6 +17,8 @@ type itemListRow struct {
 	models.Item
 	CategoryName string
 	AuthorName   string
+	CanMoveUp    bool
+	CanMoveDown  bool
 }
 
 func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
@@ -31,10 +32,14 @@ func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
 		h.itemBulk(w, r)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.itemDelete(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "move-up":
+		h.itemMoveSort(w, r, parts[0], -1)
+	case len(parts) == 2 && parts[1] == "move-down":
+		h.itemMoveSort(w, r, parts[0], 1)
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.itemForm(w, r, id)
@@ -64,7 +69,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	var total int64
 	q.Count(&total)
 
-	data := listPage(page, total, itemsBase,
+	data := listPage(r, page, total, itemsBase,
 		"Create and manage structured content items.",
 		"Add Item", map[string]any{"ActiveNav": "items"})
 	order := applyListSort(r, data, map[string]string{
@@ -86,7 +91,11 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	}
 	var rows []models.Item
 	listQ.Preload("Category").Preload("Author").
-		Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+		Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
+
+	var ordered []models.Item
+	db.Select("item_id", "category_id", "sort").Order("sort asc, item_id asc").Find(&ordered)
+	sortPos := itemSortPositions(ordered)
 
 	listRows := make([]itemListRow, 0, len(rows))
 	for _, row := range rows {
@@ -96,6 +105,10 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		}
 		if row.Author != nil {
 			lr.AuthorName = row.Author.Username
+		}
+		if pos, ok := sortPos[row.ItemID]; ok {
+			lr.CanMoveUp = pos.canMoveUp
+			lr.CanMoveDown = pos.canMoveDown
 		}
 		listRows = append(listRows, lr)
 	}
@@ -116,25 +129,8 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	data["SearchQuery"] = query
 	data["Categories"] = categories
 	data["AllTags"] = allTags
-	data["ListQuery"] = itemListQuery(statusFilter, categoryFilter, query)
+	data["ListQuery"] = listQueryFromData(data)
 	h.render(w, r, "Items", "admin/items.html", data)
-}
-
-func itemListQuery(status, category, query string) string {
-	v := url.Values{}
-	if status != "" {
-		v.Set("status", status)
-	}
-	if category != "" {
-		v.Set("category", category)
-	}
-	if query != "" {
-		v.Set("q", query)
-	}
-	if s := v.Encode(); s != "" {
-		return "?" + s
-	}
-	return ""
 }
 
 func (h *Handler) itemForm(w http.ResponseWriter, r *http.Request, id uint) {
@@ -143,7 +139,7 @@ func (h *Handler) itemForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.Item
 	if !isNew {
 		if err := db.Preload("Groups").Preload("Tags").Preload("Category").Preload("Author").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r, "This item could not be found.")
 			return
 		}
 	} else {
@@ -167,7 +163,7 @@ func (h *Handler) itemForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderItemForm(w, r, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, err.Error())
 			return
 		}
-		redirectList(w, r, itemsBase+itemListQuery(r.URL.Query().Get("status"), r.URL.Query().Get("category"), r.URL.Query().Get("q")))
+		redirectList(w, r, itemsBase+listRedirectQuery(r))
 		return
 	}
 	h.renderItemForm(w, r, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, "")
@@ -189,9 +185,10 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 	row.Featured = formBool(r, "featured")
 	row.Sort = formInt(r, "sort", 0)
 	row.Image = formString(r, "image")
-	row.GalleryJSON = r.FormValue("gallery_json")
-	row.EmbedJSON = r.FormValue("embed_json")
-	row.AttachmentsJSON = r.FormValue("attachments_json")
+	galleryJSON, embedsJSON, attachmentsJSON := content.ItemMediaFromForm(r)
+	row.GalleryJSON = galleryJSON
+	row.EmbedJSON = embedsJSON
+	row.AttachmentsJSON = attachmentsJSON
 	row.MetaTitle = formString(r, "meta_title")
 	row.MetaDescription = r.FormValue("meta_description")
 	row.MetaKeywords = formString(r, "meta_keywords")
@@ -200,6 +197,18 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 	row.AuthorID = formUintPtr(r, "author_id")
 	row.PublishStart = formTimePtr(r, "publish_start")
 	row.PublishEnd = formTimePtr(r, "publish_end")
+
+	var cat *models.Category
+	if row.CategoryID != nil && *row.CategoryID > 0 {
+		var c models.Category
+		if err := db.First(&c, *row.CategoryID).Error; err == nil {
+			cat = &c
+		}
+	}
+	customFields, _ := content.FieldsForCategory(r.Context(), cat)
+	if err := content.ValidateRequiredCustomFields(customFields, r); err != nil {
+		return err
+	}
 
 	beforeArgs := map[string]any{
 		"item":   row,
@@ -225,7 +234,7 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 	if err := replaceItemTags(db, row, r); err != nil {
 		return err
 	}
-	if err := saveItemFieldValues(db, row, r); err != nil {
+	if err := saveItemFieldValues(db, row, customFields, r); err != nil {
 		return err
 	}
 	afterArgs := map[string]any{"item_id": row.ItemID, "item": row}
@@ -243,37 +252,8 @@ func replaceItemTags(db *gorm.DB, row *models.Item, r *http.Request) error {
 	return db.Model(row).Association("Tags").Replace(tags)
 }
 
-func saveItemFieldValues(db *gorm.DB, row *models.Item, r *http.Request) error {
-	for key, vals := range r.Form {
-		if len(key) < 6 || key[:6] != "field_" {
-			continue
-		}
-		fieldIDStr := key[6:]
-		id, ok := parseID(fieldIDStr)
-		if !ok {
-			continue
-		}
-		value := ""
-		if len(vals) > 0 {
-			value = vals[0]
-		}
-		var existing models.ItemFieldValue
-		err := db.Where("item_id = ? AND field_id = ?", row.ItemID, id).First(&existing).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if err := db.Create(&models.ItemFieldValue{ItemID: row.ItemID, FieldID: id, Value: value}).Error; err != nil {
-				return err
-			}
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		existing.Value = value
-		if err := db.Save(&existing).Error; err != nil {
-			return err
-		}
-	}
-	return nil
+func saveItemFieldValues(db *gorm.DB, row *models.Item, fields []models.ContentField, r *http.Request) error {
+	return content.SaveItemFieldValues(db, row.ItemID, fields, r)
 }
 
 func itemCustomFields(r *http.Request, db *gorm.DB, row *models.Item) ([]models.ContentField, map[uint]string) {
@@ -321,6 +301,9 @@ func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, row mod
 		"Users":         users,
 		"CustomFields":  customFields,
 		"FieldValues":   fieldValues,
+		"Gallery":       content.ParseGalleryJSON(row.GalleryJSON),
+		"Embeds":        content.ParseEmbedsJSON(row.EmbedJSON),
+		"Attachments":   content.ParseAttachmentsJSON(row.AttachmentsJSON),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
@@ -335,7 +318,7 @@ func (h *Handler) itemDelete(w http.ResponseWriter, r *http.Request, idStr strin
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
@@ -403,4 +386,103 @@ func (h *Handler) itemBulk(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	redirectList(w, r, itemsBase+listRedirectQuery(r))
+}
+
+type itemSortPosition struct {
+	canMoveUp   bool
+	canMoveDown bool
+}
+
+func itemCategoryKey(categoryID *uint) uint {
+	if categoryID == nil || *categoryID == 0 {
+		return 0
+	}
+	return *categoryID
+}
+
+func itemSortPositions(items []models.Item) map[uint]itemSortPosition {
+	byCategory := make(map[uint][]models.Item)
+	for _, row := range items {
+		key := itemCategoryKey(row.CategoryID)
+		byCategory[key] = append(byCategory[key], row)
+	}
+	out := make(map[uint]itemSortPosition, len(items))
+	for _, group := range byCategory {
+		sort.Slice(group, func(i, j int) bool {
+			if group[i].Sort != group[j].Sort {
+				return group[i].Sort < group[j].Sort
+			}
+			return group[i].ItemID < group[j].ItemID
+		})
+		last := len(group) - 1
+		for i, row := range group {
+			out[row.ItemID] = itemSortPosition{
+				canMoveUp:   i > 0,
+				canMoveDown: i < last,
+			}
+		}
+	}
+	return out
+}
+
+func (h *Handler) itemMoveSort(w http.ResponseWriter, r *http.Request, idStr string, direction int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	if err := itemReorder(db, id, direction); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, itemsBase+listRedirectQuery(r))
+}
+
+func itemReorder(db *gorm.DB, id uint, direction int) error {
+	if direction == 0 {
+		return nil
+	}
+	var row models.Item
+	if err := db.First(&row, id).Error; err != nil {
+		return err
+	}
+	var siblings []models.Item
+	q := db.Model(&models.Item{})
+	if row.CategoryID == nil || *row.CategoryID == 0 {
+		q = q.Where("category_id IS NULL OR category_id = 0")
+	} else {
+		q = q.Where("category_id = ?", *row.CategoryID)
+	}
+	if err := q.Order("sort asc, item_id asc").Find(&siblings).Error; err != nil {
+		return err
+	}
+	idx := -1
+	for i, item := range siblings {
+		if item.ItemID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return gorm.ErrRecordNotFound
+	}
+	target := idx + direction
+	if target < 0 || target >= len(siblings) {
+		return nil
+	}
+	siblings[idx], siblings[target] = siblings[target], siblings[idx]
+	for i, item := range siblings {
+		if item.Sort == i {
+			continue
+		}
+		if err := db.Model(&models.Item{}).Where("item_id = ?", item.ItemID).Update("sort", i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

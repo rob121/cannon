@@ -39,8 +39,47 @@ Capabilities map a role to an HTTP path on the extension socket:
 | `block` | When a template space is bound to this extension |
 | `admin` | When the extension admin UI is opened under `/admin/extension-apps/{name}` |
 | `help` | Help articles aggregated into `/admin/help` |
+| `templates` | Lists embedded extension templates that can be copied into site overrides |
 
 Register handlers with `HandleRequest`, `HandlePage`, `RegisterPage`, `HandleData`, `RegisterEndpoint`, `RegisterBlock`, `HandleAdmin`, `OnHook`, and `OnConfiguration`. Paths default to `/request`, `/page`, `/data`, `/endpoint`, `/block`, `/hooks`, and `/admin` but can be customized.
+
+### Template overrides
+
+Extensions that call `EmbedTemplates(fsys, "templates")` automatically expose a `templates` capability at `/templates`. Cannon uses it to show embedded extension templates in the admin and copy default template source into the site's override folder.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/templates` | GET | List embedded HTML templates |
+| `/templates/{path}` | GET | Return embedded default source for one template |
+
+**GET /templates**
+
+```json
+{
+  "templates": [
+    {
+      "path": "contact/form.html",
+      "override_path": "extension/contact/form.html",
+      "size": 1234
+    }
+  ]
+}
+```
+
+**GET /templates/contact/form.html**
+
+```json
+{
+  "path": "contact/form.html",
+  "override_path": "extension/contact/form.html",
+  "content": "<form>...</form>"
+}
+```
+
+- `path` is the extension-local embedded template path.
+- `override_path` is the site-template-relative path Cannon writes when the admin chooses Override.
+- Override files live under `{template_dir}/extension/...`; for example `contact/form.html` is overridden by `{template_dir}/extension/contact/form.html`.
+- Use namespaced local template paths such as `contact/form.html` or `calendar/page.html` to avoid collisions with other extensions.
 
 ### Pages
 
@@ -430,6 +469,8 @@ Hook dispatches use `POST /hooks` with the normal wire fields plus `event` and `
 Respond with optional `arguments` updates and `stop: true` to halt further listeners. Use `extension.HookOK`, `extension.HookStop`, and `extension.HookAbort`.
 
 Core code can register in-process listeners with `github.com/rob121/cannon/internal/hooks`.Register and fire them with `hooks.Fire(ctx, event, args)` (context is wired per request by middleware).
+
+`onAfterRender` is the final template-render hook. Cannon fires it after the page/layout has rendered and before writing bytes to the client. Arguments include `layout`, `page`, `headers`, and `body`. Returning `body` replaces the rendered text body. Returning `body_base64` with `body_encoding: "base64"` replaces the body with binary bytes, which lets hook extensions emit compressed payloads such as gzip. Returning `headers` merges those headers into the outgoing response.
 
 #### Admin example: greet the signed-in user
 

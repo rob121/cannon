@@ -26,6 +26,16 @@
           <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
         </div>
         <div class="col-md-6">
+          <label class="admin-form-label">Parent Item</label>
+          <select class="admin-form-control" name="parent_id" id="menu-item-parent"{{if not .IsNew}} data-menu-id="{{.Row.MenuID}}"{{end}}>
+            <option value="">— Top level —</option>
+            {{range .ParentOptions}}
+            <option value="{{.MenuItemID}}" data-menu-id="{{.MenuID}}" {{if uintPtrEq $.Row.ParentID .MenuItemID}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+          <p class="admin-form-help">Optional. Nest this item under another item in the same menu.</p>
+        </div>
+        <div class="col-md-6">
           <label class="admin-form-label">Route</label>
           <select class="admin-form-control" name="route_id">
             <option value="">— None —</option>
@@ -52,3 +62,37 @@
     </form>
   </div>
 </div>
+
+{{if .MenuItemRows}}
+<div class="admin-data-card mt-4">
+  <div class="admin-data-card-header">
+    <div class="admin-data-card-summary-main">
+      <h2 class="admin-data-card-title">Menu Structure</h2>
+      <p class="admin-data-card-desc">Items in <strong>{{if .MenuName}}{{.MenuName}}{{else}}this menu{{end}}</strong>. Child items are indented under their parent.</p>
+    </div>
+    <a class="btn btn-admin-outline btn-sm" href="{{.MenuItemsURL}}">View all items</a>
+  </div>
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Parent</th>
+          <th>Route</th>
+          <th>Sort</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .MenuItemRows}}
+        <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
+          <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" .IsCurrent)}}</td>
+          <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
+          <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
+          <td>{{.Item.Sort}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

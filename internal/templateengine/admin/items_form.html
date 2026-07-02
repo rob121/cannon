@@ -1,77 +1,81 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
-      <div class="row g-3">
-        <div class="col-md-8">
-          <label class="admin-form-label">Title</label>
-          <input class="admin-form-control" name="title" value="{{.Row.Title}}" required>
+{{template "form_toolbar" (dict "FormID" "item-form" "BasePath" .BasePath "CancelURL" .CancelURL)}}
+<form method="post" class="admin-item-form" id="item-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+
+  <div class="admin-form-split">
+    <div class="admin-form-split-main">
+      <div class="admin-form-tabbed-card" id="item-form-tabs">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Item content">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="content">
+            <i class="bi bi-file-earmark-text"></i> Content
+          </button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="tags">
+            <i class="bi bi-tags"></i> Tags
+          </button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="media">
+            <i class="bi bi-images"></i> Media
+          </button>
+          {{if .CustomFields}}
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="fields">
+            <i class="bi bi-ui-checks"></i> Custom Fields
+          </button>
+          {{end}}
         </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Slug</label>
-          <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="content" role="tabpanel">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="admin-form-label" for="item-title">Title</label>
+              <input class="admin-form-control" id="item-title" name="title" value="{{.Row.Title}}" required>
+            </div>
+            <div class="col-md-4">
+              <label class="admin-form-label" for="item-slug">Slug</label>
+              <input class="admin-form-control" id="item-slug" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
+            </div>
+            <div class="col-12">
+              <label class="admin-form-label">Featured Image</label>
+              <div class="admin-media-field">
+                <div class="admin-media-field-preview{{if not .Row.Image}} is-empty{{end}}" id="item-image-preview">
+                  {{if .Row.Image}}
+                  <img src="{{.Row.Image}}" alt="Featured image preview">
+                  {{else}}
+                  <span class="admin-media-field-placeholder"><i class="bi bi-image"></i> No image selected</span>
+                  {{end}}
+                </div>
+                <div class="admin-media-field-controls">
+                  <input class="admin-form-control" type="url" name="image" id="item-image" value="{{.Row.Image}}" placeholder="/assets/media/content/photo.jpg">
+                  <div class="admin-media-field-actions">
+                    <button type="button" class="btn-admin-outline btn-admin-sm" data-media-picker-open>
+                      <i class="bi bi-images"></i> Choose From Media
+                    </button>
+                    <button type="button" class="btn-admin-ghost btn-admin-sm" data-media-picker-clear>
+                      Clear
+                    </button>
+                  </div>
+                  <p class="admin-form-help">Pick from the library or paste a URL.</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="admin-form-label" for="item-intro">Intro / Excerpt</label>
+              <div class="admin-richtext-field admin-richtext-intro">
+                <textarea class="admin-form-control" id="item-intro" name="intro" rows="3" data-ckeditor="intro">{{.Row.Intro}}</textarea>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="admin-form-label" for="item-body">Body</label>
+              <div class="admin-richtext-field admin-richtext-body">
+                <textarea class="admin-form-control" id="item-body" name="body" rows="14" data-ckeditor="body">{{.Row.Body}}</textarea>
+              </div>
+              <p class="admin-form-help">Rich text editor. Existing Markdown content is still supported.</p>
+            </div>
+          </div>
         </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Status</label>
-          <select class="admin-form-control" name="status">
-            <option value="draft" {{if eq .Row.Status "draft"}}selected{{end}}>Draft</option>
-            <option value="published" {{if eq .Row.Status "published"}}selected{{end}}>Published</option>
-            <option value="archived" {{if eq .Row.Status "archived"}}selected{{end}}>Archived</option>
-            <option value="trashed" {{if eq .Row.Status "trashed"}}selected{{end}}>Trashed</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Category</label>
-          <select class="admin-form-control" name="category_id">
-            <option value="">None</option>
-            {{range .Categories}}
-            <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.CategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Author</label>
-          <select class="admin-form-control" name="author_id">
-            <option value="">None</option>
-            {{range .Users}}
-            <option value="{{.UserID}}" {{if uintPtrEq $.Row.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Intro / Excerpt</label>
-          <textarea class="admin-form-control" name="intro" rows="3">{{.Row.Intro}}</textarea>
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Body</label>
-          <textarea class="admin-form-control admin-template-editor" name="body" rows="12">{{.Row.Body}}</textarea>
-          <p class="admin-form-help">Markdown supported.</p>
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-check mt-4">
-            <input type="checkbox" name="featured" {{if .Row.Featured}}checked{{end}}> Featured
-          </label>
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-label">Sort Order</label>
-          <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-label">Publish Start</label>
-          <input class="admin-form-control" type="datetime-local" name="publish_start" value="{{if .Row.PublishStart}}{{.Row.PublishStart.Format "2006-01-02T15:04"}}{{end}}">
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-label">Publish End</label>
-          <input class="admin-form-control" type="datetime-local" name="publish_end" value="{{if .Row.PublishEnd}}{{.Row.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Featured Image URL</label>
-          <input class="admin-form-control" name="image" value="{{.Row.Image}}">
-        </div>
-        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">Tags</h3></div>
-        <div class="col-12">
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="tags" role="tabpanel">
+          <p class="admin-form-panel-intro">Select tags to help visitors find related content.</p>
           <div class="admin-checkbox-grid">
             {{range .AllTags}}
             <label class="admin-form-check">
@@ -79,47 +83,194 @@
               {{.Name}}
             </label>
             {{else}}
-            <p class="admin-cell-muted">No tags yet. <a href="/admin/tags/new">Create a tag</a>.</p>
+            <p class="admin-cell-muted mb-0">No tags yet. <a href="/admin/tags/new" data-turbo-frame="_top">Create a tag</a>.</p>
             {{end}}
           </div>
         </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="media" role="tabpanel">
+          <p class="admin-form-panel-intro">Gallery images, embedded media, and downloadable attachments shown on the item page.</p>
+          <div class="admin-repeat-section mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="admin-form-label mb-0">Image Gallery</label>
+              <button type="button" class="btn-admin-outline btn-admin-sm" data-repeat-add="gallery">Add image</button>
+            </div>
+            <div class="admin-repeat-list" data-repeat-list="gallery">
+              {{range .Gallery}}
+              <div class="admin-repeat-row" data-repeat-row="gallery">
+                <input class="admin-form-control" type="url" name="gallery_url" value="{{.URL}}" placeholder="Image URL">
+                <input class="admin-form-control" type="text" name="gallery_alt" value="{{.Alt}}" placeholder="Alt text">
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{else}}
+              <div class="admin-repeat-row" data-repeat-row="gallery">
+                <input class="admin-form-control" type="url" name="gallery_url" value="" placeholder="Image URL">
+                <input class="admin-form-control" type="text" name="gallery_alt" value="" placeholder="Alt text">
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{end}}
+            </div>
+          </div>
+          <div class="admin-repeat-section mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="admin-form-label mb-0">Embedded Media</label>
+              <button type="button" class="btn-admin-outline btn-admin-sm" data-repeat-add="embed">Add embed</button>
+            </div>
+            <div class="admin-repeat-list" data-repeat-list="embed">
+              {{range .Embeds}}
+              <div class="admin-repeat-row" data-repeat-row="embed">
+                <input class="admin-form-control" type="url" name="embed_url" value="{{.URL}}" placeholder="Media URL">
+                <input class="admin-form-control" type="text" name="embed_title" value="{{.Title}}" placeholder="Title (optional)">
+                <select class="admin-form-control" name="embed_kind">
+                  <option value="iframe" {{if or (eq .Kind "") (eq .Kind "iframe")}}selected{{end}}>Embed (iframe)</option>
+                  <option value="video" {{if eq .Kind "video"}}selected{{end}}>Video</option>
+                  <option value="audio" {{if eq .Kind "audio"}}selected{{end}}>Audio</option>
+                </select>
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{else}}
+              <div class="admin-repeat-row" data-repeat-row="embed">
+                <input class="admin-form-control" type="url" name="embed_url" value="" placeholder="Media URL">
+                <input class="admin-form-control" type="text" name="embed_title" value="" placeholder="Title (optional)">
+                <select class="admin-form-control" name="embed_kind">
+                  <option value="iframe" selected>Embed (iframe)</option>
+                  <option value="video">Video</option>
+                  <option value="audio">Audio</option>
+                </select>
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{end}}
+            </div>
+          </div>
+          <div class="admin-repeat-section">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="admin-form-label mb-0">Attachments</label>
+              <button type="button" class="btn-admin-outline btn-admin-sm" data-repeat-add="attachment">Add attachment</button>
+            </div>
+            <div class="admin-repeat-list" data-repeat-list="attachment">
+              {{range .Attachments}}
+              <div class="admin-repeat-row" data-repeat-row="attachment">
+                <input class="admin-form-control" type="url" name="attachment_url" value="{{.URL}}" placeholder="File URL">
+                <input class="admin-form-control" type="text" name="attachment_label" value="{{.Label}}" placeholder="Label">
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{else}}
+              <div class="admin-repeat-row" data-repeat-row="attachment">
+                <input class="admin-form-control" type="url" name="attachment_url" value="" placeholder="File URL">
+                <input class="admin-form-control" type="text" name="attachment_label" value="" placeholder="Label">
+                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+              </div>
+              {{end}}
+            </div>
+          </div>
+        </div>
+
         {{if .CustomFields}}
-        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">Custom Fields</h3></div>
-        {{range .CustomFields}}
-        <div class="col-md-6">
-          <label class="admin-form-label">{{.Label}}{{if .Required}} *{{end}}</label>
-          {{if eq .Type "textarea"}}
-          <textarea class="admin-form-control" name="field_{{.FieldID}}" rows="4">{{index $.FieldValues .FieldID}}</textarea>
-          {{else if eq .Type "boolean"}}
-          <label class="admin-form-check">
-            <input type="checkbox" name="field_{{.FieldID}}" value="1" {{if eq (index $.FieldValues .FieldID) "1"}}checked{{end}}> Yes
-          </label>
-          {{else}}
-          <input class="admin-form-control" name="field_{{.FieldID}}" value="{{index $.FieldValues .FieldID}}">
-          {{end}}
+        <div class="admin-sidebar-panel" data-sidebar-panel="fields" role="tabpanel">
+          <p class="admin-form-panel-intro">Custom fields assigned to this item's category or field group.</p>
+          <div class="row g-3">
+            {{range .CustomFields}}
+            <div class="col-md-6">
+              <label class="admin-form-label">{{.Label}}{{if .Required}} *{{end}}</label>
+              {{template "custom_field_input" (dict "Field" . "Value" (index $.FieldValues .FieldID))}}
+            </div>
+            {{end}}
+          </div>
         </div>
         {{end}}
-        {{end}}
-        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">SEO</h3></div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Meta Title</label>
-          <input class="admin-form-control" name="meta_title" value="{{.Row.MetaTitle}}">
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Meta Keywords</label>
-          <input class="admin-form-control" name="meta_keywords" value="{{.Row.MetaKeywords}}">
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Meta Description</label>
-          <textarea class="admin-form-control" name="meta_description" rows="2">{{.Row.MetaDescription}}</textarea>
-        </div>
-        <div class="col-12">
-          <label class="admin-form-label">Canonical URL</label>
-          <input class="admin-form-control" name="canonical_url" value="{{.Row.CanonicalURL}}">
-        </div>
-        {{template "group_visibility_fields" .}}
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
+
+    <aside class="admin-form-split-sidebar" aria-label="Item settings">
+      <div class="admin-form-sidebar-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Item settings">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="publish">Publish</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">Access</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="seo">SEO</button>
+        </div>
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="publish" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-status">Status</label>
+              <select class="admin-form-control" id="item-status" name="status">
+                <option value="draft" {{if eq .Row.Status "draft"}}selected{{end}}>Draft</option>
+                <option value="published" {{if eq .Row.Status "published"}}selected{{end}}>Published</option>
+                <option value="archived" {{if eq .Row.Status "archived"}}selected{{end}}>Archived</option>
+                <option value="trashed" {{if eq .Row.Status "trashed"}}selected{{end}}>Trashed</option>
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-category">Category</label>
+              <select class="admin-form-control" id="item-category" name="category_id">
+                <option value="">None</option>
+                {{range .Categories}}
+                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.CategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-author">Author</label>
+              <select class="admin-form-control" id="item-author" name="author_id">
+                <option value="">None</option>
+                {{range .Users}}
+                <option value="{{.UserID}}" {{if uintPtrEq $.Row.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">Featured</span>
+              {{template "form_toggle" (dict "Name" "featured" "Checked" .Row.Featured "OnLabel" "Featured" "OffLabel" "Not featured")}}
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-sort">Sort Order</label>
+              <input class="admin-form-control" id="item-sort" type="number" name="sort" value="{{.Row.Sort}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-publish-start">Publish Start</label>
+              <input class="admin-form-control" id="item-publish-start" type="datetime-local" name="publish_start" value="{{if .Row.PublishStart}}{{.Row.PublishStart.Format "2006-01-02T15:04"}}{{end}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-publish-end">Publish End</label>
+              <input class="admin-form-control" id="item-publish-end" type="datetime-local" name="publish_end" value="{{if .Row.PublishEnd}}{{.Row.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <p class="admin-form-help">Only members of the selected groups can view this item.</p>
+            {{template "group_access_toggles" .}}
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="seo" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-meta-title">Meta Title</label>
+              <input class="admin-form-control" id="item-meta-title" name="meta_title" value="{{.Row.MetaTitle}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-meta-keywords">Meta Keywords</label>
+              <input class="admin-form-control" id="item-meta-keywords" name="meta_keywords" value="{{.Row.MetaKeywords}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-meta-description">Meta Description</label>
+              <textarea class="admin-form-control" id="item-meta-description" name="meta_description" rows="3">{{.Row.MetaDescription}}</textarea>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-canonical">Canonical URL</label>
+              <input class="admin-form-control" id="item-canonical" name="canonical_url" value="{{.Row.CanonicalURL}}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
-</div>
+</form>
+
+<dialog class="admin-media-picker-dialog" id="media-picker-dialog">
+  <turbo-frame id="media-picker-frame"></turbo-frame>
+</dialog>

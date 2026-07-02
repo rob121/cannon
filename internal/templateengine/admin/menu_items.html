@@ -1,30 +1,47 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
+  {{if .AllMenus}}
+  <div class="admin-table-toolbar">
+    <form method="get" class="admin-table-filter">
+      {{template "sort_preserve_fields" .}}
+      <label class="admin-form-label mb-0" for="menu-filter">Menu</label>
+      <select class="admin-form-control" id="menu-filter" name="menu_id" onchange="this.form.submit()">
+        <option value="">All menus</option>
+        {{range .AllMenus}}
+        <option value="{{.MenuID}}" {{if and $.HasMenuFilter (eq $.MenuFilter .MenuID)}}selected{{end}}>{{.MenuName}}</option>
+        {{end}}
+      </select>
+    </form>
+  </div>
+  {{end}}
   <div class="admin-table-scroll">
     <table class="admin-table">
       <thead>
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
-          <th>Menu</th>
+          {{template "sort_th" (dict "Root" $ "Key" "menu" "Label" "Menu")}}
+          <th>Parent</th>
           <th>Route</th>
-          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th>Order</th>
           <th class="admin-col-actions"></th>
         </tr>
       </thead>
       <tbody>
         {{range .Rows}}
-        <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
-          <td>{{if index $.MenuNames .MenuID}}{{index $.MenuNames .MenuID}}{{else}}—{{end}}</td>
-          <td>{{if .Route}}{{.Route.Name}} <span class="admin-cell-muted">({{.Route.Path}})</span>{{else}}—{{end}}</td>
-          <td>{{.Sort}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .MenuItemID)}}
+        <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
+          <td>
+            {{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" false)}}
+          </td>
+          <td>{{if index $.MenuNames .Item.MenuID}}{{index $.MenuNames .Item.MenuID}}{{else}}—{{end}}</td>
+          <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
+          <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
+          <td>{{template "sort_controls" (dict "Root" $ "ID" .Item.MenuItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery)}}
         </tr>
         {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add links and pages to build this menu's structure." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>
   </div>
-  {{template "pagination" .}}
 </div>

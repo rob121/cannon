@@ -19,7 +19,7 @@ func (h *Handler) languages(w http.ResponseWriter, r *http.Request, path string)
 	case len(parts) == 1:
 		h.languageFile(w, r, parts[0])
 	default:
-		http.NotFound(w, r)
+		h.notFound(w, r)
 	}
 }
 
@@ -38,7 +38,7 @@ func (h *Handler) languageList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	files := mgr.Files()
-	data := listPage(1, int64(len(files)), languagesBase,
+	data := listPage(r, 1, int64(len(files)), languagesBase,
 		"Manage locale translation files and strings.",
 		"", map[string]any{"ActiveNav": "languages"})
 	col, dir, _ := parseSort(r, map[string]string{
@@ -73,7 +73,7 @@ func (h *Handler) languageFile(w http.ResponseWriter, r *http.Request, scope str
 		return
 	}
 	if !mgr.ScopeExists(scope) {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 

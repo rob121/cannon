@@ -1,10 +1,12 @@
 package admin
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 const menusBase = "/admin/menus"
@@ -23,7 +25,7 @@ func (h *Handler) menus(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.menuForm(w, r, id)
@@ -36,13 +38,13 @@ func (h *Handler) menuList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Menu
 	var total int64
 	db.Model(&models.Menu{}).Count(&total)
-	data := listPage(page, total, menusBase,
+	data := listPage(r, page, total, menusBase,
 		"Manage navigation menu definitions.",
 		"Add Menu", map[string]any{"ActiveNav": "menus"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "menu_name", "status": "status",
 	}, "name")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Preload("Items").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Items").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Menus", "admin/menus.html", data)
 }
@@ -52,8 +54,10 @@ func (h *Handler) menuForm(w http.ResponseWriter, r *http.Request, id uint) {
 	isNew := id == 0
 	var row models.Menu
 	if !isNew {
-		if err := db.First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+		if err := db.Preload("Items", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort asc, menu_item_id asc")
+		}).Preload("Items.Route").First(&row, id).Error; err != nil {
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -87,7 +91,13 @@ func (h *Handler) renderMenuForm(w http.ResponseWriter, r *http.Request, row mod
 		title = "Edit Menu"
 		subtitle = "Update the menu name and visibility status."
 	}
-	h.render(w, r, title, "admin/menus_form.html", h.menuFormData(row, isNew, subtitle, errMsg))
+	data := h.menuFormData(row, isNew, subtitle, errMsg)
+	if !isNew {
+		data["ItemRows"] = buildMenuItemListRows(row.Items, 0)
+		data["MenuItemsURL"] = fmt.Sprintf("%s?menu_id=%d", menuItemsBase, row.MenuID)
+		data["AddMenuItemURL"] = fmt.Sprintf("%s/new?menu_id=%d", menuItemsBase, row.MenuID)
+	}
+	h.render(w, r, title, "admin/menus_form.html", data)
 }
 
 func (h *Handler) menuFormData(row models.Menu, isNew bool, subtitle, errMsg string) map[string]any {
@@ -111,7 +121,7 @@ func (h *Handler) menuDelete(w http.ResponseWriter, r *http.Request, idStr strin
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

@@ -25,7 +25,7 @@ func (h *Handler) fieldGroups(w http.ResponseWriter, r *http.Request, path strin
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.fieldGroupForm(w, r, id)
@@ -37,12 +37,12 @@ func (h *Handler) fieldGroupList(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	var total int64
 	db.Model(&models.ContentFieldGroup{}).Count(&total)
-	data := listPage(page, total, fieldGroupsBase,
+	data := listPage(r, page, total, fieldGroupsBase,
 		"Custom field groups assignable to categories.",
 		"Add Field Group", map[string]any{"ActiveNav": "field_groups"})
 	order := applyListSort(r, data, map[string]string{"name": "name"}, "name")
 	var rows []models.ContentFieldGroup
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Preload("Fields").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Fields").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Field Groups", "admin/field_groups.html", data)
 }
@@ -53,7 +53,7 @@ func (h *Handler) fieldGroupForm(w http.ResponseWriter, r *http.Request, id uint
 	var row models.ContentFieldGroup
 	if !isNew {
 		if err := db.Preload("Fields").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		sort.Slice(row.Fields, func(i, j int) bool { return row.Fields[i].Sort < row.Fields[j].Sort })
@@ -91,7 +91,7 @@ func (h *Handler) fieldGroupForm(w http.ResponseWriter, r *http.Request, id uint
 func (h *Handler) contentFieldAction(w http.ResponseWriter, r *http.Request, parts []string) {
 	groupID, ok := parseID(parts[0])
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
@@ -101,7 +101,7 @@ func (h *Handler) contentFieldAction(w http.ResponseWriter, r *http.Request, par
 	}
 	fieldID, ok := parseID(parts[2])
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	if len(parts) == 4 && parts[3] == "delete" {
@@ -126,7 +126,7 @@ func (h *Handler) contentFieldForm(w http.ResponseWriter, r *http.Request, group
 	var row models.ContentField
 	if !isNew {
 		if err := db.First(&row, fieldID).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	} else {
@@ -137,6 +137,17 @@ func (h *Handler) contentFieldForm(w http.ResponseWriter, r *http.Request, group
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		row.FieldGroupID = groupID
+		if postedGroup, ok := parseID(r.FormValue("field_group_id")); ok && postedGroup > 0 {
+			row.FieldGroupID = postedGroup
+		}
+		if row.FieldGroupID != groupID {
+			h.render(w, r, "Field", "admin/content_field_form.html", formData(map[string]any{
+				"ActiveNav": "field_groups", "Error": "field group mismatch", "Row": row, "IsNew": isNew,
+				"BasePath": fieldGroupsBase, "GroupID": groupID,
+			}))
 			return
 		}
 		row.Name = formString(r, "name")
@@ -178,7 +189,7 @@ func (h *Handler) fieldGroupDelete(w http.ResponseWriter, r *http.Request, idStr
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

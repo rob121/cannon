@@ -62,6 +62,9 @@ type ProfileUserFieldValue struct {
 type Extension struct {
 	ExtensionID uint   `gorm:"primaryKey"`
 	Name        string `gorm:"size:128;uniqueIndex;not null"`
+	Title       string `gorm:"size:256"`
+	Description string `gorm:"type:text"`
+	Version     string `gorm:"size:64"`
 	MenuName    string `gorm:"size:128"`
 	Socket      string `gorm:"size:512;not null"`
 	Sort        int    `gorm:"not null;default:0"`
@@ -92,6 +95,8 @@ type Route struct {
 	Metadata              string    `gorm:"type:text"`
 	Controller            string    `gorm:"size:128"`
 	ControllerAction      string    `gorm:"size:128"`
+	IsDefault             bool      `gorm:"not null;default:false;index"`
+	ShowTitle             bool      `gorm:"not null;default:true"`
 	Groups                []Group   `gorm:"many2many:route_groups;"`
 }
 
@@ -105,6 +110,9 @@ type Menu struct {
 type MenuItem struct {
 	MenuItemID uint   `gorm:"primaryKey"`
 	MenuID     uint   `gorm:"index;not null"`
+	ParentID   *uint  `gorm:"index"`
+	Parent     *MenuItem `gorm:"foreignKey:ParentID;references:MenuItemID;constraint:-"`
+	Children   []MenuItem `gorm:"foreignKey:ParentID;constraint:-"`
 	Name       string `gorm:"size:128;not null"`
 	RouteID    *uint  `gorm:"index"`
 	Route      *Route `gorm:"foreignKey:RouteID;references:RouteID;constraint:-"`
@@ -156,7 +164,10 @@ const (
 	BlockTypeHTML      BlockType = "html"
 	BlockTypeMarkdown  BlockType = "markdown"
 	BlockTypeExtension BlockType = "extension"
-	BlockTypeContent   BlockType = "content"
+	BlockTypeContent        BlockType = "content"
+	BlockTypeLogin          BlockType = "login"
+	BlockTypeMenuVertical   BlockType = "menu-vertical"
+	BlockTypeMenuHorizontal BlockType = "menu-horizontal"
 )
 
 // Block assigns content to a template space for {{space "space"}} rendering.

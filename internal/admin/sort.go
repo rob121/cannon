@@ -18,6 +18,9 @@ func parseSort(r *http.Request, allowed map[string]string, defaultCol string) (c
 	if !ok {
 		col = defaultCol
 		dbCol = allowed[defaultCol]
+		if dbCol == "" {
+			dbCol = defaultCol
+		}
 		dir = "asc"
 	}
 	return col, dir, dbCol + " " + dir
@@ -28,6 +31,20 @@ func applyListSort(r *http.Request, data map[string]any, allowed map[string]stri
 	data["Sort"] = col
 	data["Dir"] = dir
 	return orderBy
+}
+
+// applyListSortDesc applies sorting defaulting to descending order when no sort query is present.
+func applyListSortDesc(r *http.Request, data map[string]any, allowed map[string]string, defaultCol string) string {
+	if strings.TrimSpace(r.URL.Query().Get("sort")) == "" {
+		dbCol := allowed[defaultCol]
+		if dbCol == "" {
+			dbCol = defaultCol
+		}
+		data["Sort"] = defaultCol
+		data["Dir"] = "desc"
+		return dbCol + " desc"
+	}
+	return applyListSort(r, data, allowed, defaultCol)
 }
 
 func listQuery(page int, sort, dir string) string {
@@ -72,6 +89,43 @@ func listQueryValues(page int, sort, dir string) url.Values {
 		v.Set("dir", dir)
 	}
 	return v
+}
+
+// listExtraFromData collects active list filter query params from template data.
+func listExtraFromData(data map[string]any) url.Values {
+	v := url.Values{}
+	setStringParam(v, "space", data["SpaceFilter"])
+	setStringParam(v, "folder", data["FolderFilter"])
+	setStringParam(v, "status", data["StatusFilter"])
+	setStringParam(v, "category", data["CategoryFilter"])
+	setStringParam(v, "q", data["SearchQuery"])
+	setStringParam(v, "filter", data["Filter"])
+	if has, _ := data["HasMenuFilter"].(bool); has {
+		if menuID, ok := data["MenuFilter"].(uint); ok && menuID != 0 {
+			v.Set("menu_id", strconv.FormatUint(uint64(menuID), 10))
+		}
+	}
+	return v
+}
+
+func setStringParam(v url.Values, key string, raw any) {
+	s, ok := raw.(string)
+	if !ok {
+		return
+	}
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return
+	}
+	v.Set(key, s)
+}
+
+// listQueryFromData builds a list query string including sort, pagination, and filters.
+func listQueryFromData(data map[string]any) string {
+	page, _ := data["Page"].(int)
+	sort, _ := data["Sort"].(string)
+	dir, _ := data["Dir"].(string)
+	return listQueryExtra(page, sort, dir, listExtraFromData(data))
 }
 
 func sortLink(basePath string, page int, currentSort, currentDir, col string) string {

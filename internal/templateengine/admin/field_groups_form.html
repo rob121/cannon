@@ -45,7 +45,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="6"><div class="admin-empty">No Fields Defined</div></td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No fields defined" "Message" "Add custom fields to collect extra data on items in this group.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

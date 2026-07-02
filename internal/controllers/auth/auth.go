@@ -3,11 +3,15 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
+	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/paths"
+	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
@@ -19,6 +23,7 @@ const ControllerID = "auth"
 const (
 	ActionLogin         = "login"
 	ActionLogout        = "logout"
+	ActionOAuth         = "oauth"
 	ActionVerify        = "verify"
 	ActionVerifyResend  = "verify-resend"
 	ActionResetRequest  = "reset-request"
@@ -35,12 +40,13 @@ func Definition() controllers.Definition {
 		Title:       "Authentication",
 		Description: "Login, logout, account verification, and password reset.",
 		Actions: []controllers.ActionDefinition{
-			{ID: ActionLogin, Title: "Login", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/login", RequireGuest: true, AllowUnverified: true},
-			{ID: ActionLogout, Title: "Logout", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/logout", AllowUnverified: true},
-			{ID: ActionVerify, Title: "Verify Account", Methods: []string{http.MethodGet}, DefaultPath: "/account/verify/*", AllowUnverified: true},
-			{ID: ActionVerifyResend, Title: "Verification Pending", Methods: []string{http.MethodGet}, DefaultPath: "/account/verify/resend", AllowUnverified: true},
-			{ID: ActionResetRequest, Title: "Reset Password Request", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/account/reset-password", AllowUnverified: true},
-			{ID: ActionResetSubmit, Title: "Reset Password Submit", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/account/reset-password/*", AllowUnverified: true},
+			{ID: ActionLogin, Title: "Login", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AuthLogin, RequireGuest: true, AllowUnverified: true},
+			{ID: ActionLogout, Title: "Logout", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AuthLogout, AllowUnverified: true},
+			{ID: ActionOAuth, Title: "OAuth Sign In", Methods: []string{http.MethodGet}, DefaultPath: paths.AuthOAuth, RequireGuest: true, AllowUnverified: true},
+			{ID: ActionVerify, Title: "Verify Account", Methods: []string{http.MethodGet}, DefaultPath: paths.AccountVerify, AllowUnverified: true},
+			{ID: ActionVerifyResend, Title: "Verification Pending", Methods: []string{http.MethodGet}, DefaultPath: paths.AccountVerifyResend, AllowUnverified: true},
+			{ID: ActionResetRequest, Title: "Reset Password Request", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountResetRequest, AllowUnverified: true},
+			{ID: ActionResetSubmit, Title: "Reset Password Submit", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountResetSubmit, AllowUnverified: true},
 		},
 	}
 }
@@ -51,6 +57,8 @@ func (c *Controller) Handle(ctx *controllers.Context, actionID string) controlle
 		return c.login(ctx)
 	case ActionLogout:
 		return c.logout(ctx)
+	case ActionOAuth:
+		return c.oauth(ctx)
 	case ActionVerify:
 		return c.verify(ctx)
 	case ActionVerifyResend:
@@ -70,21 +78,13 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
-	if !allowed {
-		return controllers.HTML("Sign In", map[string]any{
-			"Disabled": true,
-			"Message":  "Sign in is currently disabled on this site.",
-		})
-	}
 
 	if r.Method == http.MethodGet {
-		data := map[string]any{
-			"Error":      r.URL.Query().Get("error"),
-			"Verified":   r.URL.Query().Get("verified"),
-			"Return":     r.URL.Query().Get("return"),
-			"ReturnPath": returnPathFromRequest(ctx, r),
-		}
-		return controllers.HTML("Sign In", data)
+		return renderLoginPage(ctx, "", r.URL.Query().Get("verified"))
+	}
+
+	if !allowed {
+		return renderLoginPage(ctx, "Sign in is currently disabled on this site.", "")
 	}
 
 	if err := r.ParseForm(); err != nil {
@@ -123,6 +123,7 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 	if err := ctx.User.Login(u.UserID); err != nil {
 		return controllers.Error(http.StatusInternalServerError, "could not start session")
 	}
+	_ = user.EnsureRegisteredGroup(ctx.GoContext(), u.UserID)
 	afterArgs := map[string]any{
 		"context":  "frontend",
 		"user_id":  u.UserID,
@@ -143,12 +144,52 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 }
 
 func loginError(ctx *controllers.Context, message string) controllers.Result {
-	data := map[string]any{
-		"Error":      message,
-		"Return":     ctx.Request.URL.Query().Get("return"),
-		"ReturnPath": returnPathFromRequest(ctx, ctx.Request),
+	r := ctx.Request
+	encoded := strings.TrimSpace(r.FormValue("return"))
+	if encoded == "" {
+		encoded = strings.TrimSpace(r.URL.Query().Get("return"))
 	}
-	return controllers.HTML("Sign In", data)
+	if encoded != "" {
+		if path, err := controllers.DecodeReturn(ctx.Site, encoded); err == nil {
+			return controllers.Redirect(http.StatusSeeOther, appendQueryParam(path, "login_error", message))
+		}
+	}
+	return renderLoginPage(ctx, message, r.URL.Query().Get("verified"))
+}
+
+func renderLoginPage(ctx *controllers.Context, message, verified string) controllers.Result {
+	data, err := auth.BuildLoginFormData(ctx.GoContext(), ctx.Request, auth.LoginFormOptions{Error: message})
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	return controllers.HTML("Sign In", map[string]any{
+		"Login":    data,
+		"Verified": verified,
+	})
+}
+
+func (c *Controller) oauth(ctx *controllers.Context) controllers.Result {
+	name := strings.Trim(strings.Trim(ctx.PathSuffix(), "/"), "/")
+	if name == "" {
+		return controllers.Error(http.StatusNotFound, "unknown oauth provider")
+	}
+	_, ok, err := auth.IsActiveProvider(ctx.GoContext(), name)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	if !ok {
+		return loginError(ctx, "That sign-in provider is not available.")
+	}
+	label := auth.ProviderDisplayName(name)
+	return loginError(ctx, "Sign in with "+label+" is not available yet. Use local sign-in or contact the site administrator.")
+}
+
+func appendQueryParam(path, key, value string) string {
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + key + "=" + url.QueryEscape(value)
 }
 
 func returnPathFromRequest(ctx *controllers.Context, r *http.Request) string {
@@ -157,7 +198,7 @@ func returnPathFromRequest(ctx *controllers.Context, r *http.Request) string {
 			return path
 		}
 	}
-	return "/"
+	return sites.DefaultRoutePath(ctx.GoContext())
 }
 
 func (c *Controller) logout(ctx *controllers.Context) controllers.Result {
@@ -177,9 +218,9 @@ func (c *Controller) logout(ctx *controllers.Context) controllers.Result {
 		}
 		_ = ctx.User.Logout()
 	}
-	dest := "/login"
+	dest := routepath.Controller(ctx.GoContext(), "auth", "login")
 	if allowed, err := settings.AllowLogin(ctx.GoContext()); err == nil && !allowed {
-		dest = "/"
+		dest = sites.DefaultRoutePath(ctx.GoContext())
 	}
 	return controllers.Redirect(http.StatusSeeOther, dest)
 }
@@ -244,13 +285,15 @@ func (c *Controller) resetRequest(ctx *controllers.Context) controllers.Result {
 				q = q.Where("username = ?", identifier)
 			}
 			if err := q.First(&u).Error; err == nil && u.Validated {
-				_, _ = IssueResetToken(ctx.GoContext(), u.UserID)
+				if token, err := IssueResetToken(ctx.GoContext(), u.UserID); err == nil {
+					sendPasswordResetEmail(ctx, u, token)
+				}
 			}
 		}
 	}
 	return controllers.HTML("Reset Password", map[string]any{
 		"Sent":    true,
-		"Message": "If a matching verified account exists, a reset link has been issued. Contact a site administrator to receive your reset link.",
+		"Message": "If a matching verified account exists, a reset link has been sent by email when mail is configured.",
 	})
 }
 
@@ -296,5 +339,5 @@ func (c *Controller) resetSubmit(ctx *controllers.Context) controllers.Result {
 	if err := db.Model(&models.User{}).Where("user_id = ?", row.UserID).Update("hash", string(hash)).Error; err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
-	return controllers.Redirect(http.StatusSeeOther, "/login?reset=1")
+	return controllers.Redirect(http.StatusSeeOther, routepath.Controller(ctx.GoContext(), "auth", "login")+"?reset=1")
 }

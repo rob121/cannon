@@ -1,12 +1,16 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">{{if .Success}}Account Verified{{else}}Verify Account{{end}}</h1>
-  </header>
-  <div class="site-content">
-    {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
-    {{if .Success}}
-    <p>{{.Message}}</p>
-    <p><a class="site-btn site-btn-primary" href="/login">Sign In</a></p>
-    {{end}}
+<article class="mb-4">
+  {{if .Success}}
+  {{template "pageHeader" (dict "Title" "Account Verified")}}
+  {{else}}
+  {{template "pageHeader" (dict "Title" "Verify Account")}}
+  {{end}}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
+      {{if .Success}}
+      <div class="alert alert-success" role="alert">{{.Message}}</div>
+      <a class="btn btn-primary" href="{{controllerURL "auth" "login"}}">Sign In</a>
+      {{end}}
+    </div>
   </div>
 </article>

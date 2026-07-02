@@ -18,55 +18,101 @@
     {{end}}
   </div>
 
-  <div class="admin-data-card">
-    {{template "error_alert" .}}
-    <div class="admin-table-scroll">
-      <table class="admin-table">
-        <thead>
-          <tr>
-            {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Template")}}
-            {{template "sort_th" (dict "Root" $ "Key" "source" "Label" "Source")}}
-            {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
-            <th class="admin-col-actions"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {{range .Entries}}
-          <tr>
-            <td>
-              <span class="admin-cell-primary">{{.Name}}</span>
-              <div class="admin-cell-muted"><code class="admin-code">{{.Path}}</code></div>
-            </td>
-            <td>{{if .Builtin}}Built-in{{else}}Custom{{end}}</td>
-            <td>
-              {{if .Overridden}}
-              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Overridden</span>
-              {{else}}
-              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Built-in</span>
-              {{end}}
-            </td>
-            <td class="admin-col-actions">
-              <div class="admin-row-actions">
-                {{if .Overridden}}
-                <a class="btn-admin-icon" href="{{$.TemplatesBase}}/edit?path={{queryEscape .Path}}" title="Edit">
-                  <i class="bi bi-pencil"></i>
-                </a>
-                {{else}}
-                <form method="post" action="{{$.TemplatesBase}}/override{{listQuery $.Page $.Sort $.Dir}}" class="admin-inline-form" data-turbo-frame="main-content">
-      {{csrfField}}
-                  <input type="hidden" name="path" value="{{.Path}}">
-                  <button type="submit" class="btn-admin-ghost btn-admin-sm">Override</button>
-                </form>
-                {{end}}
-              </div>
-            </td>
-          </tr>
-          {{else}}
-          <tr><td colspan="4"><div class="admin-empty">No templates in this group.</div></td></tr>
-          {{end}}
-        </tbody>
-      </table>
+  {{if or .GroupLabel .GroupType .GroupStatus}}
+  <div class="admin-form-card admin-form-card-compact">
+    <div class="admin-form-card-body">
+      <div class="row g-2">
+        {{if .GroupLabel}}
+        <div class="col-md-4"><span class="admin-cell-muted">Label</span><div class="admin-cell-primary">{{.GroupLabel}}</div></div>
+        {{end}}
+        {{if .GroupType}}
+        <div class="col-md-4"><span class="admin-cell-muted">Type</span><div>{{.GroupType}}</div></div>
+        {{end}}
+        <div class="col-md-4">
+          <span class="admin-cell-muted">Status</span>
+          <div>
+            {{if eq .GroupStatus "inactive"}}
+            <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
+            {{else}}
+            <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
+            {{end}}
+          </div>
+        </div>
+        {{if .MetaURL}}
+        <div class="col-md-12">
+          <a class="btn-admin-ghost btn-admin-sm" href="{{.MetaURL}}">Edit theme metadata</a>
+        </div>
+        {{end}}
+      </div>
     </div>
-    {{template "pagination" .}}
+  </div>
+  {{end}}
+
+  <div class="admin-data-card admin-template-browser-card">
+    {{template "error_alert" .}}
+    <div class="admin-template-browser-toolbar">
+      <p class="admin-template-browser-summary">
+        {{.TemplateTotal}} {{if eq .TemplateTotal 1}}template{{else}}templates{{end}}
+        {{if gt .FolderTotal 0}} in {{.FolderTotal}} {{if eq .FolderTotal 1}}folder{{else}}folders{{end}}{{end}}.
+      </p>
+      <div class="admin-template-browser-actions">
+        <button type="button" class="btn-admin-ghost btn-admin-sm" data-template-browser-expand>Expand All</button>
+        <button type="button" class="btn-admin-ghost btn-admin-sm" data-template-browser-collapse>Collapse All</button>
+      </div>
+    </div>
+
+    {{if and (not .RootEntries) (not .Folders)}}
+    {{template "table_empty_state" (dict "Icon" "bi-file-earmark-code" "Title" "No templates in this group" "Message" "Create or import templates to customize this part of your theme." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}
+    {{else}}
+    <div class="admin-template-browser">
+      {{if .RootEntries}}
+      <section class="admin-template-folder admin-template-folder-root">
+        <div class="admin-template-folder-header">
+          <span class="admin-template-folder-icon"><i class="bi bi-file-earmark-code"></i></span>
+          <div class="admin-template-folder-heading">
+            <h3 class="admin-template-folder-title">Theme Root</h3>
+            <p class="admin-template-folder-desc">Templates in the theme root directory.</p>
+          </div>
+          <span class="admin-template-folder-count">{{len .RootEntries}}</span>
+        </div>
+        <div class="admin-table-scroll admin-template-folder-table-wrap">
+          <table class="admin-table admin-table-compact">
+            {{template "template_file_table_head" (dict "Root" $)}}
+            <tbody>
+              {{range .RootEntries}}
+              {{template "template_file_row" (dict "Root" $ "Entry" .)}}
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {{end}}
+
+      {{range .Folders}}
+      <details class="admin-template-folder" data-template-folder {{if .HasOverride}}open{{end}}>
+        <summary class="admin-template-folder-summary">
+          <span class="admin-template-folder-icon"><i class="bi bi-folder-fill"></i></span>
+          <span class="admin-template-folder-heading">
+            <span class="admin-template-folder-title">{{.Label}}</span>
+            <span class="admin-template-folder-desc">
+              {{.Total}} {{if eq .Total 1}}file{{else}}files{{end}}{{if .Overridden}} · {{.Overridden}} overridden{{end}}
+            </span>
+          </span>
+          <span class="admin-template-folder-count">{{.Total}}</span>
+        </summary>
+        <div class="admin-table-scroll admin-template-folder-table-wrap">
+          <table class="admin-table admin-table-compact">
+            {{template "template_file_table_head" (dict "Root" $)}}
+            <tbody>
+              {{range .Entries}}
+              {{template "template_file_row" (dict "Root" $ "Entry" .)}}
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {{end}}
+    </div>
+    {{end}}
   </div>
 </div>

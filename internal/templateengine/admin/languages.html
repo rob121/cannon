@@ -16,7 +16,7 @@
         <tr>
           <td>{{.Locale}}</td>
           <td><code class="admin-code">{{.Filename}}</code></td>
-          <td><span class="admin-cell-primary">{{.Label}}</span></td>
+          <td>{{template "row_edit_link" (dict "Href" (printf "%s/%s" $.BasePath .Scope) "Label" .Label)}}</td>
           <td>{{.Count}}</td>
           <td class="admin-col-actions">
             <div class="admin-row-actions">
@@ -27,7 +27,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Language Files Found</div></td></tr>
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-translate" "Title" "No language files yet" "Message" "Add translation files to support multiple languages on your site." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

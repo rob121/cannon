@@ -1,0 +1,41 @@
+{{define "loginForm"}}
+{{if .Disabled}}
+<div class="alert alert-info mb-0" role="alert">{{.DisabledMessage}}</div>
+<a class="btn btn-outline-primary mt-3" href="{{homeURL}}">Back to home</a>
+
+{{else if .Authenticated}}
+<p class="mb-3">Signed in as <strong>{{.Username}}</strong></p>
+<a class="btn btn-outline-secondary btn-sm" href="{{.LogoutURL}}">Sign out</a>
+
+{{else}}
+{{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
+
+{{if .LocalEnabled}}
+<form method="post" action="{{.LoginAction}}">
+  {{.CSRF}}
+  {{if .Return}}<input type="hidden" name="return" value="{{.Return}}">{{end}}
+  <div class="mb-3">
+    <label class="form-label" for="login-username-{{.BlockID}}">Username</label>
+    <input class="form-control" id="login-username-{{.BlockID}}" name="username" required{{if not .BlockID}} autofocus{{end}} autocomplete="username">
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="login-password-{{.BlockID}}">Password</label>
+    <input class="form-control" id="login-password-{{.BlockID}}" name="password" type="password" required autocomplete="current-password">
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <button type="submit" class="btn btn-primary">Sign In</button>
+    {{if .ShowResetLink}}<a class="btn btn-link px-0" href="{{.ResetURL}}">Forgot password</a>{{end}}
+  </div>
+</form>
+{{end}}
+
+{{if .Providers}}
+{{if .LocalEnabled}}<div class="text-center text-muted small my-3">or continue with</div>{{end}}
+<div class="d-grid gap-2">
+  {{range .Providers}}
+  <a class="btn btn-outline-primary" href="{{.URL}}">Sign in with {{.Label}}</a>
+  {{end}}
+</div>
+{{end}}
+{{end}}
+{{end}}

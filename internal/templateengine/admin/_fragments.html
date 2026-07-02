@@ -32,11 +32,18 @@
     <h1 class="admin-page-title">{{.Title}}</h1>
     {{if .Subtitle}}<p class="admin-page-desc">{{.Subtitle}}</p>{{end}}
   </div>
-  {{if .PageActionURL}}
+  {{if or .PageActionURL .PageSecondaryActionURL}}
   <div class="admin-page-actions">
+    {{if .PageSecondaryActionURL}}
+    <a class="btn-admin-outline" href="{{.PageSecondaryActionURL}}" data-turbo-frame="_top">
+      <i class="bi bi-git"></i> {{.PageSecondaryActionLabel}}
+    </a>
+    {{end}}
+    {{if .PageActionURL}}
     <a class="btn-admin-primary" href="{{.PageActionURL}}" data-turbo-frame="_top">
       <i class="bi bi-plus-lg"></i> {{.PageActionLabel}}
     </a>
+    {{end}}
   </div>
   {{end}}
 </div>
@@ -71,9 +78,27 @@
 {{end}}
 {{end}}
 
+{{define "table_empty_state"}}
+<div class="admin-empty-state">
+  <div class="admin-empty-state-icon" aria-hidden="true"><i class="bi {{if .Icon}}{{.Icon}}{{else}}bi-inbox{{end}}"></i></div>
+  <h2 class="admin-empty-state-title">{{.Title}}</h2>
+  {{if .Message}}<p class="admin-empty-state-desc">{{.Message}}</p>{{end}}
+  {{if .ActionURL}}
+  <a class="btn-admin-primary btn-admin-sm admin-empty-state-action" href="{{.ActionURL}}"{{if .ActionExternal}} target="_blank" rel="noopener noreferrer"{{else}} data-turbo-frame="_top"{{end}}>
+    {{if .ActionIcon}}<i class="bi {{.ActionIcon}}"></i> {{end}}{{.ActionLabel}}
+  </a>
+  {{end}}
+</div>
+{{end}}
+
+{{define "sort_preserve_fields"}}
+{{with .Sort}}<input type="hidden" name="sort" value="{{.}}">{{end}}
+{{with .Dir}}<input type="hidden" name="dir" value="{{.}}">{{end}}
+{{end}}
+
 {{define "sort_th"}}
 <th class="admin-sort-th{{if eq .Root.Sort .Key}} is-active is-{{.Root.Dir}}{{end}}">
-  <a class="admin-sort-link" href="{{sortLink .Root.BasePath .Root.Page .Root.Sort .Root.Dir .Key}}">
+  <a class="admin-sort-link" href="{{sortLinkRoot .Root .Key}}" data-turbo-frame="main-content" aria-label="Sort by {{.Label}}">
     <span class="admin-sort-label">{{.Label}}</span>
     <span class="admin-sort-icons" aria-hidden="true">
       <i class="bi bi-chevron-up"></i>
@@ -92,7 +117,7 @@
 {{end}}
 
 {{define "status_toggle"}}
-<form method="post" action="{{.BasePath}}/{{.ID}}/toggle-status{{if .ListQuery}}{{.ListQuery}}{{else if .Root}}{{listQuery .Root.Page .Root.Sort .Root.Dir}}{{end}}" class="admin-inline-form admin-status-toggle-form">
+<form method="post" action="{{.BasePath}}/{{.ID}}/toggle-status{{if .ListQuery}}{{.ListQuery}}{{else if .Root}}{{listQueryFromData .Root}}{{end}}" class="admin-inline-form admin-status-toggle-form" data-turbo-frame="main-content">
       {{csrfField}}
   <button type="submit" class="admin-status-toggle-btn" title="Click to toggle status">
     {{template "status_badge" .Status}}
@@ -162,8 +187,37 @@
 </div>
 {{end}}
 
+{{define "sort_controls"}}
+<div class="admin-sort-controls">
+  {{if .CanMoveUp}}
+  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/move-up{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+    {{csrfField}}
+    <button type="submit" class="btn-admin-icon" title="Move up">
+      <i class="bi bi-chevron-up"></i>
+    </button>
+  </form>
+  {{else}}
+  <span class="btn-admin-icon disabled" aria-hidden="true"><i class="bi bi-chevron-up"></i></span>
+  {{end}}
+  {{if .CanMoveDown}}
+  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/move-down{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+    {{csrfField}}
+    <button type="submit" class="btn-admin-icon" title="Move down">
+      <i class="bi bi-chevron-down"></i>
+    </button>
+  </form>
+  {{else}}
+  <span class="btn-admin-icon disabled" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
+  {{end}}
+</div>
+{{end}}
+
+{{define "extension_sort_controls"}}
+{{template "sort_controls" (dict "Root" .Root "ID" .Row.ExtensionID "CanMoveUp" .Row.CanMoveUp "CanMoveDown" .Row.CanMoveDown)}}
+{{end}}
+
 {{define "process_restart"}}
-<form method="post" action="{{.BasePath}}/{{.ID}}/restart{{listQuery .Page .Sort .Dir}}" class="admin-inline-form admin-process-restart-form" onsubmit="return confirm('Restart this extension process?')">
+<form method="post" action="{{.BasePath}}/{{.ID}}/restart{{listQuery .Page .Sort .Dir}}" class="admin-inline-form admin-process-restart-form" data-turbo-frame="main-content" onsubmit="return confirm('Restart this extension process?')">
       {{csrfField}}
   <button type="submit" class="admin-process-restart-btn" title="Click to restart">
     {{template "process_status" .Running}}
@@ -185,22 +239,82 @@
 
 {{define "table_toolbar"}}{{end}}
 
+{{define "group_access_toggles"}}
+<div class="admin-toggle-grid admin-toggle-grid-sidebar">
+  {{range .AllGroups}}
+  <label class="admin-form-toggle admin-form-toggle-inline">
+    <input type="checkbox" class="admin-form-toggle-input" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+    <span class="admin-form-toggle-label">{{groupName .Name}}</span>
+  </label>
+  {{else}}
+  <p class="admin-cell-muted">No groups defined yet.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "group_permission_toggles"}}
+<div class="admin-toggle-grid admin-toggle-grid-sidebar">
+  {{range .AllGroups}}
+  <label class="admin-form-toggle admin-form-toggle-inline">
+    <input type="checkbox" class="admin-form-toggle-input" name="{{$.FieldName}}" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+    <span class="admin-form-toggle-label">{{groupName .Name}}</span>
+  </label>
+  {{else}}
+  <p class="admin-cell-muted">No groups defined yet.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "group_access_panel"}}
+<label class="admin-form-label">Visible To Groups</label>
+<p class="admin-form-help mb-3">Only members of the selected groups can see this block. The <code class="admin-code">Public</code> group is assigned to all visitors by default.</p>
+<div class="admin-toggle-grid">
+  {{range .AllGroups}}
+  <label class="admin-form-toggle admin-form-toggle-inline">
+    <input type="checkbox" class="admin-form-toggle-input" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+    <span class="admin-form-toggle-label">{{groupName .Name}}</span>
+  </label>
+  {{else}}
+  <p class="admin-cell-muted">No groups defined yet.</p>
+  {{end}}
+</div>
+{{end}}
+
 {{define "group_visibility_fields"}}
 <div class="col-12"><div class="admin-form-divider"></div></div>
 <div class="col-12">
   <label class="admin-form-label">Visible To Groups</label>
   <p class="admin-form-help mb-3">Only members of the selected groups can see this content. The <code class="admin-code">Public</code> group is assigned to all visitors by default.</p>
-  <div class="admin-checkbox-grid">
+  <div class="admin-toggle-grid">
     {{range .AllGroups}}
-    <label class="admin-form-check">
-      <input type="checkbox" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
-      {{groupName .Name}}
+    <label class="admin-form-toggle admin-form-toggle-inline">
+      <input type="checkbox" class="admin-form-toggle-input" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+      <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+      <span class="admin-form-toggle-label">{{groupName .Name}}</span>
     </label>
     {{else}}
     <p class="admin-cell-muted">No groups defined yet.</p>
     {{end}}
   </div>
 </div>
+{{end}}
+
+{{define "row_edit_link"}}
+<a class="admin-cell-link" href="{{if .Href}}{{.Href}}{{else}}{{.BasePath}}/{{.ID}}{{if .ListQuery}}{{.ListQuery}}{{end}}{{end}}" data-turbo-frame="_top">{{.Label}}</a>
+{{end}}
+
+{{define "menu_item_tree_name"}}
+<span class="admin-tree-cell{{if .Current}} is-current{{end}}" style="--tree-depth: {{.Depth}};">
+  {{if gt .Depth 0}}<i class="bi bi-arrow-return-right admin-tree-icon" aria-hidden="true"></i>{{end}}
+  {{if .Current}}
+  <span class="admin-tree-label">{{.Label}}</span>
+  {{else}}
+  {{template "row_edit_link" (dict "BasePath" .BasePath "ID" .ID "ListQuery" .ListQuery "Label" .Label)}}
+  {{end}}
+</span>
 {{end}}
 
 {{define "row_actions"}}
@@ -229,6 +343,72 @@
 </td>
 {{end}}
 
+{{define "media_folder_card"}}
+<a class="admin-media-folder-card" href="{{.URL}}" data-turbo-frame="main-content">
+  <span class="admin-media-folder-icon" aria-hidden="true">
+    <i class="bi bi-folder-fill"></i>
+  </span>
+  <span class="admin-media-folder-text">
+    <span class="admin-media-folder-name">{{.Label}}</span>
+    <span class="admin-media-folder-meta">{{.Count}} {{if eq .Count 1}}file{{else}}files{{end}}</span>
+  </span>
+  <i class="bi bi-chevron-right admin-media-folder-chevron" aria-hidden="true"></i>
+</a>
+{{end}}
+
+{{define "media_file_card"}}
+<div class="admin-media-item admin-media-file">
+  <div class="admin-media-item-thumb">
+    {{if .Row.IsImage}}
+    <img src="{{.Row.Path}}" alt="{{if .Row.Alt}}{{.Row.Alt}}{{else}}{{.Row.Name}}{{end}}" loading="lazy">
+    {{else}}
+    <i class="bi {{.Row.IconClass}}" aria-hidden="true"></i>
+    {{end}}
+  </div>
+  <div class="admin-media-item-body">
+    <div class="admin-media-item-name" title="{{.Row.Name}}">{{.Row.Name}}</div>
+    <div class="admin-media-item-meta">{{.Row.SizeLabel}}{{if and .Row.IsImage .Row.Width .Row.Height}} · {{.Row.Width}}×{{.Row.Height}}{{end}}</div>
+    <div class="admin-media-item-path"><code class="admin-code">{{.Row.Path}}</code></div>
+    <div class="admin-media-item-actions">
+      <button type="button" class="btn-admin-ghost btn-admin-sm" data-copy-text="{{.Row.Path}}" title="Copy URL">
+        <i class="bi bi-clipboard"></i>
+      </button>
+      <a class="btn-admin-ghost btn-admin-sm" href="{{.Row.Path}}" target="_blank" rel="noopener noreferrer" title="Open">
+        <i class="bi bi-box-arrow-up-right"></i>
+      </a>
+      <form method="post" action="{{.Root.BasePath}}/{{.Row.MediaID}}/delete{{if .Root.FolderFilter}}?folder={{.Root.FolderFilter}}{{end}}" class="admin-inline-form" onsubmit="return confirm('Delete this file permanently?')">
+        {{csrfField}}
+        <button type="submit" class="btn-admin-ghost btn-admin-sm btn-admin-icon-danger" title="Delete">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "form_toolbar"}}
+<div class="admin-form-sticky-toolbar">
+  <div class="admin-form-sticky-toolbar-inner">
+    <button type="submit" class="btn-admin-primary" {{if .FormID}}form="{{.FormID}}"{{end}}>Save</button>
+    <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
+  </div>
+</div>
+{{end}}
+
+{{define "form_toggle"}}
+{{$on := .OnLabel}}{{if not $on}}{{$on = .Label}}{{end}}{{if not $on}}{{$on = "On"}}{{end}}
+{{$off := .OffLabel}}{{if not $off}}{{$off = "Off"}}{{end}}
+<label class="admin-form-toggle{{if .Class}} {{.Class}}{{end}}">
+  <input type="checkbox" class="admin-form-toggle-input" name="{{.Name}}" value="{{if .Value}}{{.Value}}{{else}}1{{end}}" {{if .Checked}}checked{{end}}>
+  <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+  <span class="admin-form-toggle-text">
+    <span class="admin-form-toggle-label-on">{{$on}}</span>
+    <span class="admin-form-toggle-label-off">{{$off}}</span>
+  </span>
+</label>
+{{end}}
+
 {{define "form_actions"}}
 <div class="admin-form-actions">
   <button type="submit" class="btn-admin-primary">Save</button>
@@ -241,4 +421,115 @@
   <h3 class="admin-form-section-title">{{.Title}}</h3>
   {{if .Description}}<p class="admin-form-section-desc">{{.Description}}</p>{{end}}
 </div>
+{{end}}
+
+{{define "template_file_table_head"}}
+<thead>
+  <tr>
+    {{template "sort_th" (dict "Root" .Root "Key" "name" "Label" "Template")}}
+    {{template "sort_th" (dict "Root" .Root "Key" "source" "Label" "Source")}}
+    {{template "sort_th" (dict "Root" .Root "Key" "status" "Label" "Status")}}
+    <th class="admin-col-actions"></th>
+  </tr>
+</thead>
+{{end}}
+
+{{define "template_file_row"}}
+<tr class="admin-template-file-row">
+  <td>
+    <span class="admin-cell-primary">{{.Entry.Name}}</span>
+    <span class="admin-cell-muted">.html</span>
+  </td>
+  <td>{{if .Entry.Builtin}}Built-in{{else}}Custom{{end}}</td>
+  <td>
+    {{if .Entry.Overridden}}
+    <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Overridden</span>
+    {{else}}
+    <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Built-in</span>
+    {{end}}
+  </td>
+  <td class="admin-col-actions">
+    <div class="admin-row-actions">
+      <a class="btn-admin-icon" href="{{.Root.TemplatesBase}}/edit?path={{.Entry.Path}}" data-turbo-frame="_top" title="Edit">
+        <i class="bi bi-pencil"></i>
+      </a>
+      {{if not .Entry.Overridden}}
+      <form method="post" action="{{.Root.TemplatesBase}}/override{{listQuery .Root.Page .Root.Sort .Root.Dir}}" class="admin-inline-form" data-turbo-frame="main-content">
+        {{csrfField}}
+        <input type="hidden" name="path" value="{{.Entry.Path}}">
+        <button type="submit" class="btn-admin-ghost btn-admin-sm">Override</button>
+      </form>
+      {{else if .Entry.Builtin}}
+      <form method="post" action="{{.Root.TemplatesBase}}/revert{{listQuery .Root.Page .Root.Sort .Root.Dir}}" class="admin-inline-form" data-turbo-frame="main-content" onsubmit="return confirm('Remove this override and restore the built-in template?')">
+        {{csrfField}}
+        <input type="hidden" name="path" value="{{.Entry.Path}}">
+        <button type="submit" class="btn-admin-ghost btn-admin-sm">Revert</button>
+      </form>
+      {{end}}
+    </div>
+  </td>
+</tr>
+{{end}}
+
+{{define "custom_field_input"}}
+{{$field := .Field}}
+{{$value := .Value}}
+{{$id := printf "field-%d" $field.FieldID}}
+{{if eq $field.Type "textarea"}}
+<textarea class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}" rows="4">{{$value}}</textarea>
+{{else if eq $field.Type "rich_text"}}
+<textarea class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}" rows="6" data-ckeditor="field-{{$field.FieldID}}">{{$value}}</textarea>
+{{else if eq $field.Type "boolean"}}
+<label class="admin-form-check">
+  <input type="checkbox" id="{{$id}}" name="field_{{$field.FieldID}}" value="1" {{if eq $value "1"}}checked{{end}}> Yes
+</label>
+{{else if eq $field.Type "select"}}
+<select class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}">
+  <option value="">—</option>
+  {{range fieldOptions $field.Configuration}}
+  <option value="{{.Value}}" {{if eq $value .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+  {{end}}
+</select>
+{{else if eq $field.Type "multi_select"}}
+<select class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}" multiple size="4">
+  {{range fieldOptions $field.Configuration}}
+  <option value="{{.Value}}" {{if fieldValueContains $value .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+  {{end}}
+</select>
+{{else if eq $field.Type "radio"}}
+<div class="admin-radio-group">
+  {{range fieldOptions $field.Configuration}}
+  <label class="admin-form-check">
+    <input type="radio" name="field_{{$field.FieldID}}" value="{{.Value}}" {{if eq $value .Value}}checked{{end}}>
+    {{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}
+  </label>
+  {{end}}
+</div>
+{{else if eq $field.Type "checkbox"}}
+<div class="admin-checkbox-grid">
+  {{range fieldOptions $field.Configuration}}
+  <label class="admin-form-check">
+    <input type="checkbox" name="field_{{$field.FieldID}}" value="{{.Value}}" {{if fieldValueContains $value .Value}}checked{{end}}>
+    {{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}
+  </label>
+  {{end}}
+</div>
+{{else if eq $field.Type "number"}}
+<input class="admin-form-control" type="number" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "url"}}
+<input class="admin-form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "date"}}
+<input class="admin-form-control" type="date" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "datetime"}}
+<input class="admin-form-control" type="datetime-local" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{else if eq $field.Type "image" "file"}}
+<div class="admin-media-field">
+  <input class="admin-form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="/assets/media/...">
+  <button type="button" class="btn-admin-outline btn-admin-sm mt-2" data-media-picker-open data-media-picker-target="{{$id}}">
+    <i class="bi bi-images"></i> Choose From Media
+  </button>
+</div>
+{{else}}
+<input class="admin-form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+{{end}}
 {{end}}

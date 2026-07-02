@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -55,6 +57,8 @@ func RenderContentBlock(ctx context.Context, viewerGroups []uint, opts ContentBl
 		items, err = itemsForAuthorKey(ctx, viewerGroups, opts.AuthorKey, opts.Limit)
 	case "related":
 		items, err = relatedForSlug(ctx, viewerGroups, opts.ItemSlug, opts.Limit)
+	case "archive":
+		return renderArchiveBlock(ctx, viewerGroups, opts.Limit)
 	case "tag_cloud":
 		return renderTagCloud(ctx, viewerGroups, opts.Limit)
 	case "category_menu":
@@ -114,32 +118,41 @@ func relatedForSlug(ctx context.Context, viewerGroups []uint, slug string, limit
 
 func renderItemBlock(items []models.Item, layout string) string {
 	if len(items) == 0 {
-		return `<p class="site-block-empty">No items to display.</p>`
-	}
-	containerClass := "site-block-items site-block-items--list"
-	itemClass := "site-block-item"
-	if layout == "grid" {
-		containerClass = "site-block-items site-block-items--grid"
-		itemClass = "site-block-item site-block-item--card"
+		return `<p class="text-muted mb-0">No items to display.</p>`
 	}
 	var b strings.Builder
-	b.WriteString(`<div class="`)
-	b.WriteString(containerClass)
-	b.WriteString(`">`)
+	if layout == "grid" {
+		b.WriteString(`<div class="row g-3">`)
+		for _, item := range items {
+			b.WriteString(`<div class="col-12 col-md-6"><article class="card h-100 shadow-sm"><div class="card-body position-relative">`)
+			b.WriteString(`<h3 class="card-title h6 mb-2"><a href="`)
+			b.WriteString(html.EscapeString(ItemURL(item.Slug)))
+			b.WriteString(`" class="stretched-link text-decoration-none">`)
+			b.WriteString(html.EscapeString(item.Title))
+			b.WriteString(`</a></h3>`)
+			if intro := strings.TrimSpace(item.Intro); intro != "" {
+				b.WriteString(`<p class="card-text small text-muted mb-0">`)
+				b.WriteString(html.EscapeString(intro))
+				b.WriteString(`</p>`)
+			}
+			b.WriteString(`</div></article></div>`)
+		}
+		b.WriteString(`</div>`)
+		return b.String()
+	}
+	b.WriteString(`<div class="list-group list-group-flush">`)
 	for _, item := range items {
-		b.WriteString(`<article class="`)
-		b.WriteString(itemClass)
-		b.WriteString(`"><h3><a href="`)
+		b.WriteString(`<a class="list-group-item list-group-item-action px-0" href="`)
 		b.WriteString(html.EscapeString(ItemURL(item.Slug)))
-		b.WriteString(`">`)
+		b.WriteString(`"><h3 class="h6 mb-1">`)
 		b.WriteString(html.EscapeString(item.Title))
-		b.WriteString(`</a></h3>`)
+		b.WriteString(`</h3>`)
 		if intro := strings.TrimSpace(item.Intro); intro != "" {
-			b.WriteString(`<p>`)
+			b.WriteString(`<p class="mb-0 small text-muted">`)
 			b.WriteString(html.EscapeString(intro))
 			b.WriteString(`</p>`)
 		}
-		b.WriteString(`</article>`)
+		b.WriteString(`</a>`)
 	}
 	b.WriteString(`</div>`)
 	return b.String()
@@ -151,20 +164,20 @@ func renderTagCloud(ctx context.Context, viewerGroups []uint, limit int) (string
 		return "", err
 	}
 	if len(cloud) == 0 {
-		return `<p class="site-block-empty">No tags yet.</p>`, nil
+		return `<p class="text-muted mb-0">No tags yet.</p>`, nil
 	}
 	var b strings.Builder
-	b.WriteString(`<ul class="site-tag-cloud">`)
+	b.WriteString(`<div class="d-flex flex-wrap gap-2">`)
 	for _, row := range cloud {
-		b.WriteString(`<li class="site-tag-cloud-item"><a href="`)
+		b.WriteString(`<a class="badge text-bg-light border text-decoration-none" href="`)
 		b.WriteString(html.EscapeString(TagURL(row.Tag.Slug)))
 		b.WriteString(`">`)
 		b.WriteString(html.EscapeString(row.Tag.Name))
-		b.WriteString(`</a> <span class="site-tag-count">(`)
+		b.WriteString(` <span class="text-muted">(`)
 		b.WriteString(strconv.FormatInt(row.Count, 10))
-		b.WriteString(`)</span></li>`)
+		b.WriteString(`)</span></a>`)
 	}
-	b.WriteString(`</ul>`)
+	b.WriteString(`</div>`)
 	return b.String(), nil
 }
 
@@ -174,7 +187,7 @@ func renderCategoryMenu(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if len(categories) == 0 {
-		return `<p class="site-block-empty">No categories yet.</p>`, nil
+		return `<p class="text-muted mb-0">No categories yet.</p>`, nil
 	}
 	byParent := map[uint][]models.Category{}
 	roots := make([]models.Category, 0)
@@ -186,7 +199,7 @@ func renderCategoryMenu(ctx context.Context) (string, error) {
 		byParent[*cat.ParentID] = append(byParent[*cat.ParentID], cat)
 	}
 	var b strings.Builder
-	b.WriteString(`<ul class="site-category-menu">`)
+	b.WriteString(`<ul class="list-unstyled mb-0">`)
 	writeCategoryNodes(&b, roots, byParent)
 	b.WriteString(`</ul>`)
 	return b.String(), nil
@@ -200,10 +213,65 @@ func writeCategoryNodes(b *strings.Builder, nodes []models.Category, byParent ma
 		b.WriteString(html.EscapeString(cat.Name))
 		b.WriteString(`</a>`)
 		if children := byParent[cat.CategoryID]; len(children) > 0 {
-			b.WriteString(`<ul>`)
+			b.WriteString(`<ul class="list-unstyled ps-3 mb-0">`)
 			writeCategoryNodes(b, children, byParent)
 			b.WriteString(`</ul>`)
 		}
 		b.WriteString(`</li>`)
 	}
+}
+
+type archiveMonth struct {
+	Key   string
+	Label string
+	Count int
+}
+
+func renderArchiveBlock(ctx context.Context, viewerGroups []uint, limit int) (string, error) {
+	if limit <= 0 {
+		limit = 12
+	}
+	items, _, err := ListItems(ctx, viewerGroups, ListOptions{Page: 1, Limit: 2000})
+	if err != nil {
+		return "", err
+	}
+	counts := map[string]int{}
+	for _, item := range items {
+		when := item.CreatedAt
+		if item.PublishStart != nil && !item.PublishStart.IsZero() {
+			when = *item.PublishStart
+		}
+		if when.IsZero() {
+			continue
+		}
+		key := when.Format("2006-01")
+		counts[key]++
+	}
+	months := make([]archiveMonth, 0, len(counts))
+	for key, count := range counts {
+		t, parseErr := time.Parse("2006-01", key)
+		label := key
+		if parseErr == nil {
+			label = t.Format("January 2006")
+		}
+		months = append(months, archiveMonth{Key: key, Label: label, Count: count})
+	}
+	sort.Slice(months, func(i, j int) bool { return months[i].Key > months[j].Key })
+	if len(months) > limit {
+		months = months[:limit]
+	}
+	if len(months) == 0 {
+		return `<p class="text-muted mb-0">No archived content yet.</p>`, nil
+	}
+	var b strings.Builder
+	b.WriteString(`<ul class="list-unstyled mb-0">`)
+	for _, row := range months {
+		b.WriteString(`<li class="d-flex justify-content-between gap-2 py-1"><span>`)
+		b.WriteString(html.EscapeString(row.Label))
+		b.WriteString(`</span><span class="text-muted">(`)
+		b.WriteString(strconv.Itoa(row.Count))
+		b.WriteString(`)</span></li>`)
+	}
+	b.WriteString(`</ul>`)
+	return b.String(), nil
 }

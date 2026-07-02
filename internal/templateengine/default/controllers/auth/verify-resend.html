@@ -1,9 +1,9 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">Account Not Verified</h1>
-  </header>
-  <div class="site-content">
-    <p>{{.Message}}</p>
-    <p><a class="site-btn site-btn-primary" href="/login">Back to Sign In</a></p>
+<article class="mb-4">
+  {{template "pageHeader" (dict "Title" "Account Not Verified")}}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="alert alert-info mb-3" role="alert">{{.Message}}</div>
+      <a class="btn btn-primary" href="{{controllerURL "auth" "login"}}">Back to Sign In</a>
+    </div>
   </div>
 </article>

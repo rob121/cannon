@@ -21,7 +21,7 @@ func (h *Handler) authenticators(w http.ResponseWriter, r *http.Request, path st
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.authenticatorForm(w, r, id)
@@ -34,13 +34,13 @@ func (h *Handler) authenticatorList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Authenticator
 	var total int64
 	db.Model(&models.Authenticator{}).Count(&total)
-	data := listPage(page, total, authenticatorsBase,
+	data := listPage(r, page, total, authenticatorsBase,
 		"Authentication providers configured for this site.",
 		"", map[string]any{"ActiveNav": "authenticators"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
 	}, "name")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Authenticators", "admin/authenticators.html", data)
 }
@@ -49,7 +49,7 @@ func (h *Handler) authenticatorForm(w http.ResponseWriter, r *http.Request, id u
 	db, _ := sites.DB(r.Context())
 	var row models.Authenticator
 	if err := db.First(&row, id).Error; err != nil {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	if r.Method == http.MethodPost {
@@ -76,12 +76,10 @@ func (h *Handler) authenticatorForm(w http.ResponseWriter, r *http.Request, id u
 
 func (h *Handler) renderAuthenticatorForm(w http.ResponseWriter, r *http.Request, row models.Authenticator, errMsg string) {
 	title := authenticatorTitle(row.Name)
-	subtitle := "Configure Goth provider credentials and callback settings."
 	data := formData(map[string]any{
 		"ActiveNav":     "authenticators",
 		"Row":           row,
 		"BasePath":      authenticatorsBase,
-		"Subtitle":      subtitle,
 		"ConfigFields":  auth.ConfigFormFields(row.Name, row.Configuration),
 		"ProviderLabel": displayProviderName(row.Name),
 	})

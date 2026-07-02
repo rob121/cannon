@@ -1,0 +1,22 @@
+{{define "menu-vertical-link-attrs"}}
+{{if .Target}} target="{{.Target}}"{{if eq .Target "_blank"}} rel="noopener noreferrer"{{end}}{{end}}
+{{end}}
+
+{{define "menu-vertical-node"}}
+{{$item := .Item}}
+{{$depth := .Depth}}
+<li class="nav-item">
+  <a class="nav-link {{$item.Class}}" href="{{$item.Href}}"{{template "menu-vertical-link-attrs" $item}}>{{$item.Name}}</a>
+  {{if and $item.Children (lt $depth 3)}}
+  <ul class="nav flex-column ms-3 border-start ps-2 mb-1">
+    {{range $item.Children}}{{template "menu-vertical-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
+  </ul>
+  {{end}}
+</li>
+{{end}}
+
+<nav class="site-menu-vertical{{if .Class}} {{.Class}}{{end}}" aria-label="Menu">
+  <ul class="nav flex-column">
+    {{range .Items}}{{template "menu-vertical-node" (dict "Item" . "Depth" 1)}}{{end}}
+  </ul>
+</nav>

@@ -5,26 +5,38 @@
     <table class="admin-table">
       <thead>
         <tr>
-          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Group")}}
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Theme")}}
+          {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           {{template "sort_th" (dict "Root" $ "Key" "total" "Label" "Templates")}}
-          {{template "sort_th" (dict "Root" $ "Key" "overridden" "Label" "Overridden")}}
           <th class="admin-col-actions"></th>
         </tr>
       </thead>
       <tbody>
         {{range .Groups}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>
+            <span class="admin-cell-primary">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</span>
+            <div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>
+          </td>
+          <td>{{if .Type}}{{.Type}}{{else}}—{{end}}</td>
+          <td>
+            {{if eq .Status "inactive"}}
+            <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
+            {{else}}
+            <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
+            {{end}}
+          </td>
           <td>{{.Total}}</td>
-          <td>{{.Overridden}}</td>
           <td class="admin-col-actions">
             <div class="admin-row-actions">
-                <a class="btn-admin-ghost btn-admin-sm" href="{{$.TemplatesBase}}/{{.Name}}">Browse</a>
+              <a class="btn-admin-ghost btn-admin-sm" href="{{$.TemplatesBase}}/{{.Name}}" data-turbo-frame="_top">Browse</a>
+              <a class="btn-admin-ghost btn-admin-sm" href="{{$.TemplatesBase}}/{{.Name}}/meta" data-turbo-frame="_top">Metadata</a>
             </div>
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="4"><div class="admin-empty">No template groups found.</div></td></tr>
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-palette" "Title" "No themes yet" "Message" "Create a theme folder under your site template directory, or start with a new theme." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

@@ -14,7 +14,7 @@
         {{range .Sites}}
         <tr>
           <td><code class="admin-code">{{.ID}}</code></td>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ID "Label" .Name)}}</td>
           <td>
             {{if .Host}}
             <a class="admin-site-link" href="{{siteURL .Host}}" target="_blank" rel="noopener noreferrer" title="Visit {{siteHostLabel .Host}}">
@@ -45,7 +45,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="4"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-globe2" "Title" "No sites configured" "Message" "Sites are defined in your sites.json configuration file.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

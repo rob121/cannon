@@ -1,19 +1,22 @@
 {{template "page_header" .}}
-<div class="admin-help-toolbar admin-blocks-toolbar">
-  <form class="admin-blocks-filter" method="get" action="{{.BasePath}}">
-    <label class="admin-form-label" for="space-filter">Space</label>
-    <select class="admin-form-control admin-form-control-sm" id="space-filter" name="space" onchange="this.form.submit()">
-      <option value="">All spaces</option>
-      {{range .Spaces}}
-      <option value="{{.}}" {{if eq $.SpaceFilter .}}selected{{end}}>{{.}}</option>
-      {{end}}
-    </select>
-    {{if .SpaceFilter}}
-    <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear filter</a>
-    {{end}}
-  </form>
-</div>
 <div class="admin-data-card">
+  <div class="admin-list-card-header">
+    <div class="admin-table-toolbar">
+      <form class="admin-filter-form" method="get" action="{{.BasePath}}">
+        {{template "sort_preserve_fields" .}}
+        <label class="admin-form-label" for="space-filter">Space</label>
+        <select class="admin-form-control admin-form-control-sm" id="space-filter" name="space" onchange="this.form.submit()">
+          <option value="">All spaces</option>
+          {{range .Spaces}}
+          <option value="{{.}}" {{if eq $.SpaceFilter .}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+        {{if .SpaceFilter}}
+        <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear filter</a>
+        {{end}}
+      </form>
+    </div>
+  </div>
   <div class="admin-table-scroll">
     <table class="admin-table">
       <thead>
@@ -21,7 +24,7 @@
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
           {{template "sort_th" (dict "Root" $ "Key" "space" "Label" "Space")}}
           {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
-          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th>Order</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
         </tr>
@@ -29,15 +32,15 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery "Label" .Name)}}</td>
           <td><code class="admin-code">{{.Space}}</code></td>
           <td>{{.TypeLabel}}</td>
-          <td>{{.Sort}}</td>
+          <td>{{template "sort_controls" (dict "Root" $ "ID" .BlockID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .BlockID "Status" .Status "ListQuery" $.ListQuery)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery)}}
         </tr>
         {{else}}
-        <tr><td colspan="6"><div class="admin-empty">No blocks found. Add a block to fill a template space such as <code class="admin-code">footer</code> (<code class="admin-code">{{"{{"}}space "footer"{{"}}"}}</code>).</div></td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-layout-text-window" "Title" "No blocks yet" "Message" "Blocks fill template spaces such as sidebars and footers in your theme." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

@@ -1,0 +1,45 @@
+<turbo-frame id="media-picker-frame">
+  <div class="admin-media-picker" data-media-picker>
+    <div class="admin-media-picker-header">
+      <div class="admin-media-picker-heading">
+        <h2 class="admin-media-picker-title">Choose Image</h2>
+        <p class="admin-media-picker-desc">Select an image from the media library.</p>
+      </div>
+      <button type="button" class="btn-admin-icon admin-media-picker-close" data-media-picker-close aria-label="Close">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </div>
+    <div class="admin-media-picker-toolbar">
+      <label class="admin-filter-label" for="media-picker-folder">Folder</label>
+      <select class="admin-form-control admin-form-control-sm" id="media-picker-folder" data-media-picker-folder>
+        <option value="">All Images</option>
+        {{range .FolderOptions}}
+        <option value="{{.Path}}" {{if eq $.FolderFilter .Path}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+      </select>
+      <a class="btn-admin-outline btn-admin-sm" href="{{.BasePath}}/upload{{if .FolderFilter}}?folder={{.FolderFilter}}{{end}}" target="_blank" rel="noopener noreferrer">
+        <i class="bi bi-cloud-arrow-up"></i> Upload
+      </a>
+    </div>
+    <div class="admin-media-picker-body">
+      {{if .Rows}}
+      <div class="admin-media-picker-grid">
+        {{range .Rows}}
+        {{if .IsImage}}
+        <button type="button" class="admin-media-picker-item" data-media-pick data-media-path="{{.Path}}" title="{{.Name}}">
+          <span class="admin-media-picker-thumb">
+            <img src="{{if .ThumbPath}}{{.ThumbPath}}{{else}}{{.Path}}{{end}}" alt="{{if .Alt}}{{.Alt}}{{else}}{{.Name}}{{end}}" loading="lazy">
+          </span>
+          <span class="admin-media-picker-name">{{.Name}}</span>
+        </button>
+        {{end}}
+        {{end}}
+      </div>
+      {{else}}
+      <div class="admin-empty-state-wrap">
+        {{template "table_empty_state" (dict "Icon" "bi-images" "Title" "No images found" "Message" "Upload a file or choose another folder from the toolbar above.")}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+</turbo-frame>

@@ -4,22 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{if .MetaTitle}}{{.MetaTitle}}{{else if .Title}}{{.Title}}{{else}}Home{{end}}{{if siteName}} · {{siteName}}{{end}}</title>
-  {{if .MetaDescription}}<meta name="description" content="{{.MetaDescription}}">{{end}}
+  {{if .MetaDescription}}<meta name="description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta name="description" content="{{siteMetaDescription}}">{{end}}
   {{if .MetaKeywords}}<meta name="keywords" content="{{.MetaKeywords}}">{{end}}
   {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
   {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{end}}
   {{if .MetaTitle}}<meta property="og:title" content="{{.MetaTitle}}">{{end}}
-  {{if .MetaDescription}}<meta property="og:description" content="{{.MetaDescription}}">{{end}}
+  {{if .MetaDescription}}<meta property="og:description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta property="og:description" content="{{siteMetaDescription}}">{{end}}
   <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link href="/theme/site.css" rel="stylesheet">
 </head>
-<body>
-  <header class="site-header" id="site-header">
-    <div class="site-container site-header-inner">
-      <a class="site-brand" href="/">
+<body class="d-flex flex-column min-vh-100">
+  {{if isOffline}}{{template "offlineNotice" .}}{{end}}
+  <nav class="navbar navbar-expand-lg site-header sticky-top border-bottom bg-body">
+    <div class="container">
+      <a class="navbar-brand site-brand d-flex align-items-center gap-2" href="{{if .HomeURL}}{{.HomeURL}}{{else}}/{{end}}">
         <span class="site-brand-icon" aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#ffffff">
             <path d="M2.6 28.8 9.8 26.6 12.6 22.4 10.8 20.6 4.8 26.2 2.4 28Z"/>
@@ -31,36 +33,39 @@
         </span>
         <span class="site-brand-text">{{if siteName}}{{siteName}}{{else}}Cannon{{end}}</span>
       </a>
-      <button type="button" class="site-nav-toggle" id="site-nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="site-nav">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <path d="M4 7h16M4 12h16M4 17h16"/>
-        </svg>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteNav" aria-controls="siteNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
       </button>
-      <nav class="site-nav" id="site-nav" aria-label="Main">
-        {{range menu "main"}}
-        <a class="site-nav-link {{.Class}}" href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a>
-        {{else}}
-        <a class="site-nav-link" href="/">Home</a>
-        <a class="site-nav-link" href="/admin">Admin</a>
-        {{end}}
-      </nav>
+      <div class="collapse navbar-collapse" id="siteNav">
+        {{with .User}}{{if .authenticated}}
+        <p class="navbar-text me-lg-3 mb-2 mb-lg-0 order-lg-last">Hi, <span class="fw-semibold">{{if .display_name}}{{.display_name}}{{else}}{{.username}}{{end}}</span></p>
+        {{end}}{{end}}
+        <ul class="navbar-nav ms-lg-auto mb-2 mb-lg-0">
+          {{range menu "main"}}
+          <li class="nav-item"><a class="nav-link {{.Class}}" href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a></li>
+          {{else}}
+          <li class="nav-item"><a class="nav-link" href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+          {{end}}
+        </ul>
+      </div>
     </div>
-  </header>
+  </nav>
 
   {{if gt (lenspace "header") 0}}
-  <div class="site-banner">
-    <div class="site-container site-banner-inner">{{space "header"}}</div>
+  <div class="site-banner border-bottom bg-body-tertiary">
+    <div class="container py-3">{{space "header"}}</div>
   </div>
   {{end}}
 
-  <main class="site-main">
-    <div class="site-container">
-      <div class="site-layout{{if le (lenspace "sidebar") 0}} site-layout--full{{end}}">
-        <div class="site-main-column">
+  <main class="site-main flex-grow-1 py-4 py-lg-5">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-12{{if gt (lenspace "sidebar") 0}} col-lg-9{{end}}">
           {{.Main}}
         </div>
         {{if gt (lenspace "sidebar") 0}}
-        <aside class="site-sidebar" aria-label="Sidebar">
+        <aside class="col-12 col-lg-3" aria-label="Sidebar">
           {{space "sidebar"}}
         </aside>
         {{end}}
@@ -68,11 +73,11 @@
     </div>
   </main>
 
-  <footer class="site-footer">
-    <div class="site-container site-footer-inner">
-      <div class="site-footer-grid">
-        <div class="site-footer-brand">
-          <p class="site-footer-title">
+  <footer class="site-footer border-top bg-body-tertiary mt-auto py-5">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-6">
+          <p class="d-flex align-items-center gap-2 fw-semibold mb-2">
             <span class="site-brand-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#ffffff">
                 <path d="M2.6 28.8 9.8 26.6 12.6 22.4 10.8 20.6 4.8 26.2 2.4 28Z"/>
@@ -84,44 +89,29 @@
             </span>
             {{if siteName}}{{siteName}}{{else}}Cannon{{end}}
           </p>
-          <p class="site-footer-desc">Thoughts, updates, and stories — powered by Cannon CMS.</p>
+          <p class="text-muted small mb-0">Thoughts, updates, and stories — powered by Cannon CMS.</p>
         </div>
-        <div class="site-footer-nav">
-          <p class="site-footer-nav-label">Explore</p>
-          {{range menu "main"}}
-          <a href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a>
-          {{else}}
-          <a href="/">Home</a>
-          <a href="/admin">Admin</a>
-          {{end}}
+        <div class="col-md-6">
+          <p class="text-uppercase text-muted small fw-semibold mb-2">Explore</p>
+          <ul class="list-unstyled mb-0">
+            {{range menu "main"}}
+            <li class="mb-1"><a href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a></li>
+            {{else}}
+            <li class="mb-1"><a href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">Home</a></li>
+            <li class="mb-1"><a href="/admin">Admin</a></li>
+            {{end}}
+          </ul>
         </div>
       </div>
       {{if gt (lenspace "footer") 0}}
-      <div class="site-footer-blocks">{{space "footer"}}</div>
+      <div class="site-footer-blocks mt-4 pt-4 border-top">{{space "footer"}}</div>
       {{end}}
-      <div class="site-footer-bottom">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 pt-3 border-top text-muted small">
         <span>© {{year}} {{if siteName}}{{siteName}}{{else}}Cannon{{end}}</span>
         <a href="/admin">Site admin</a>
       </div>
     </div>
   </footer>
-  <script>
-  (function () {
-    var header = document.getElementById('site-header');
-    var toggle = document.getElementById('site-nav-toggle');
-    if (!header || !toggle) return;
-    toggle.addEventListener('click', function () {
-      var open = header.classList.toggle('is-open');
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-    document.addEventListener('click', function (e) {
-      if (!header.classList.contains('is-open')) return;
-      if (!header.contains(e.target)) {
-        header.classList.remove('is-open');
-        toggle.setAttribute('aria-expanded', 'false');
-      }
-    });
-  })();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
 </html>

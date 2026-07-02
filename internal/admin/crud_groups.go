@@ -24,7 +24,7 @@ func (h *Handler) groups(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.groupForm(w, r, id)
@@ -37,13 +37,13 @@ func (h *Handler) groupList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Group
 	var total int64
 	db.Model(&models.Group{}).Count(&total)
-	data := listPage(page, total, groupsBase,
+	data := listPage(r, page, total, groupsBase,
 		"User groups that bundle roles for access control.",
 		"Add Group", map[string]any{"ActiveNav": "groups"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
 	}, "name")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Preload("Roles").Preload("Parent").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Roles").Preload("Parent").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Groups", "admin/groups.html", data)
 }
@@ -54,7 +54,7 @@ func (h *Handler) groupForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.Group
 	if !isNew {
 		if err := db.Preload("Roles").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -151,13 +151,13 @@ func (h *Handler) groupDelete(w http.ResponseWriter, r *http.Request, idStr stri
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
 	var row models.Group
 	if err := db.First(&row, id).Error; err != nil {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	if isProtectedGroupName(row.Name) {

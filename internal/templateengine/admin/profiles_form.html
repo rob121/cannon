@@ -60,7 +60,7 @@
                 </td>
               </tr>
               {{else}}
-              <tr><td colspan="5"><div class="admin-empty">No Fields Yet</div></td></tr>
+              <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No profile fields yet" "Message" "Add fields such as bio, avatar URL, or social links for authors.")}}</td></tr>
               {{end}}
             </tbody>
           </table>

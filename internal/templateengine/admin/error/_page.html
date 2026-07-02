@@ -1,0 +1,19 @@
+{{define "adminErrorPage"}}
+<div class="admin-error-page">
+  <div class="admin-error-card admin-form-card">
+    <div class="admin-error-card-body">
+      <div class="admin-error-icon" aria-hidden="true">
+        <i class="bi {{if .ErrorIcon}}{{.ErrorIcon}}{{else}}bi-exclamation-circle{{end}}"></i>
+      </div>
+      <p class="admin-error-code">{{if .ErrorStatus}}{{.ErrorStatus}}{{else}}Error{{end}}</p>
+      <p class="admin-error-message">{{if .ErrorMessage}}{{.ErrorMessage}}{{else}}{{.Subtitle}}{{end}}</p>
+      {{if .ErrorHint}}<p class="admin-error-hint">{{.ErrorHint}}</p>{{end}}
+      <div class="admin-error-actions">
+        <a class="btn-admin-primary" href="{{if .BackURL}}{{.BackURL}}{{else}}/admin{{end}}" data-turbo-frame="_top">
+          <i class="bi bi-house"></i> Back to Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

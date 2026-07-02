@@ -114,7 +114,7 @@ func (h *Handler) requireAccess(w http.ResponseWriter, r *http.Request) bool {
 	write := r.Method != http.MethodGet && r.Method != http.MethodHead
 	allowed, err := CanAccessAdmin(r.Context(), userID, r.URL.Path, write)
 	if err != nil || !allowed {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		h.forbidden(w, r)
 		return false
 	}
 	return true

@@ -1,7 +1,8 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
   <div class="admin-table-toolbar">
-    <form method="get" class="admin-inline-form">
+    <form method="get" action="{{.BasePath}}" class="admin-inline-form">
+      {{template "sort_preserve_fields" .}}
       <select class="admin-form-control admin-form-control-sm" name="filter" onchange="this.form.submit()">
         <option value="">All Comments</option>
         <option value="pending" {{if eq .Filter "pending"}}selected{{end}}>Pending</option>
@@ -16,6 +17,7 @@
           <th>Item</th>
           <th>Author</th>
           <th>Comment</th>
+          {{template "sort_th" (dict "Root" $ "Key" "created" "Label" "Created")}}
           <th>Status</th>
           <th class="admin-col-actions"></th>
         </tr>
@@ -26,6 +28,7 @@
           <td>{{if .ItemTitle}}{{.ItemTitle}}{{else}}—{{end}}</td>
           <td>{{if .AuthorName}}{{.AuthorName}}{{else if .AuthorEmail}}{{.AuthorEmail}}{{else}}Guest{{end}}</td>
           <td>{{.Body}}</td>
+          <td class="admin-cell-muted">{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
           <td>{{if .Approved}}Approved{{else}}Pending{{end}}</td>
           <td class="admin-col-actions">
             <div class="admin-row-actions">
@@ -39,7 +42,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Comments Found</div></td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-chat-dots" "Title" "No comments yet" "Message" "When visitors leave comments on your items, they will appear here for moderation.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

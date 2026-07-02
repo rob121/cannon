@@ -34,6 +34,9 @@ func CreateComment(ctx context.Context, in CommentInput, authenticated bool) (*m
 	if err != nil {
 		return nil, err
 	}
+	if !cfg.ShowComments {
+		return nil, ErrCommentsDisabled
+	}
 	if !cfg.AllowComments {
 		return nil, ErrCommentsDisabled
 	}

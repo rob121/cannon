@@ -21,3 +21,42 @@
     </form>
   </div>
 </div>
+
+{{if not .IsNew}}
+<div class="admin-data-card mt-4">
+  <div class="admin-data-card-header">
+    <div class="admin-data-card-summary-main">
+      <h2 class="admin-data-card-title">Menu Items</h2>
+      <p class="admin-data-card-desc">Nested links rendered by the <code class="admin-code">menu</code> template function.</p>
+    </div>
+    <a class="btn btn-admin-primary btn-sm" href="{{.AddMenuItemURL}}">Add Item</a>
+  </div>
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Parent</th>
+          <th>Route</th>
+          <th>Sort</th>
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .ItemRows}}
+        <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
+          <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" .IsCurrent)}}</td>
+          <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
+          <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
+          <td>{{.Item.Sort}}</td>
+          {{template "row_actions" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" (printf "menu_id=%d" $.Row.MenuID))}}
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add the first link to start building this menu." "ActionURL" .AddMenuItemURL "ActionLabel" "Add menu item" "ActionIcon" "bi-plus-lg")}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{if .ItemRows}}<div class="admin-table-toolbar"><a class="btn btn-admin-outline btn-sm" href="{{.MenuItemsURL}}">View all items</a></div>{{end}}
+</div>
+{{end}}

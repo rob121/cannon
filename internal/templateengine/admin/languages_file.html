@@ -37,14 +37,14 @@
                   </td>
                 </tr>
                 {{else}}
-                <tr><td colspan="3"><div class="admin-empty">No Keys In This Section</div></td></tr>
+                <tr><td colspan="3" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-key" "Title" "No keys in this section" "Message" "Translation keys for this section will appear here.")}}</td></tr>
                 {{end}}
               </tbody>
             </table>
           </div>
         </div>
         {{else}}
-        <div class="admin-empty mb-0">This file has no translation keys yet. Add one below.</div>
+        {{template "table_empty_state" (dict "Icon" "bi-translate" "Title" "No translation keys yet" "Message" "Add your first key below to start translating this file.")}}
         {{end}}
 
         <div class="admin-lang-section">

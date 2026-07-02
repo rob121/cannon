@@ -21,6 +21,7 @@ A json response that tells the parent process what this extension can do
   "block": "block_handler"
   "admin": "admin_handler"
   "hooks": "hooks_handler"
+  "templates": "templates_handler"
 }
 }
 ```
@@ -113,6 +114,34 @@ Block is similar to page except as part of a block rendering callback blocks nee
 In the example above request is sent to /request_handler, likewise for page and block.
 
 If a extension has a "admin" capability it should register a entry on Extensions to manage the extension and route requests to the configured admin handler endpoint for rendering in the admin area.  
+
+If an extension embeds templates, it should expose a `templates` capability. The Go extension package does this automatically when `EmbedTemplates` is called.
+
+`GET /templates` lists embedded HTML templates and the site-relative path Cannon should write when creating an override:
+
+```json
+{
+  "templates": [
+    {
+      "path": "contact/form.html",
+      "override_path": "extension/contact/form.html",
+      "size": 1234
+    }
+  ]
+}
+```
+
+`GET /templates/{path}` returns the embedded default source for one template:
+
+```json
+{
+  "path": "contact/form.html",
+  "override_path": "extension/contact/form.html",
+  "content": "<form>...</form>"
+}
+```
+
+Template override files live under `{template_dir}/extension/...`. For example an embedded local template named `calendar/page.html` is overridden by `{template_dir}/extension/calendar/page.html`. Extension template paths should be namespaced to the extension, such as `contact/form.html`, so multiple extensions do not collide.
 
 
 Another built in capability should be /help which provides help docs to be included in the parents /admin/help area.  /help should respond with the list of help articles the extension provides ie 

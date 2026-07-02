@@ -1,0 +1,13 @@
+{{define "itemCard"}}
+{{$item := .}}
+{{$col := "col-md-6 col-lg-4"}}
+{{if .Item}}{{$item = .Item}}{{if .ColClass}}{{$col = .ColClass}}{{end}}{{end}}
+<div class="{{$col}}">
+  <div class="card h-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title h6 mb-2"><a href="{{itemURL $item.Slug}}" class="stretched-link text-decoration-none">{{$item.Title}}</a></h2>
+      {{if $item.Intro}}<div class="card-text small text-muted">{{richText $item.Intro}}</div>{{end}}
+    </div>
+  </div>
+</div>
+{{end}}

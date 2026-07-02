@@ -22,11 +22,18 @@ type Category struct {
 	Template        string `gorm:"size:256"`
 	FieldGroupID    *uint  `gorm:"index"`
 	InheritSettings bool   `gorm:"not null;default:true"`
+	ShowTitle       bool   `gorm:"not null;default:true"`
+	ShowDescription bool   `gorm:"not null;default:true"`
+	ListColumns     int    `gorm:"not null;default:3"`
+	ListPagination  bool   `gorm:"not null;default:true"`
+	ListPageSize    int    `gorm:"not null;default:20"`
 	Sort            int    `gorm:"not null;default:0"`
 	Status          Status `gorm:"size:16;not null;default:active"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	Groups          []Group `gorm:"many2many:category_groups;"`
+	CreateGroups    []Group `gorm:"many2many:category_create_groups;"`
+	EditGroups      []Group `gorm:"many2many:category_edit_groups;"`
 }
 
 // Tag is a reusable content label.

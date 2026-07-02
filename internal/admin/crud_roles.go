@@ -24,7 +24,7 @@ func (h *Handler) roles(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.roleForm(w, r, id)
@@ -37,13 +37,13 @@ func (h *Handler) roleList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Role
 	var total int64
 	db.Model(&models.Role{}).Count(&total)
-	data := listPage(page, total, rolesBase,
+	data := listPage(r, page, total, rolesBase,
 		"Permission roles assigned to user groups.",
 		"Add Role", map[string]any{"ActiveNav": "roles"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
 	}, "name")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Roles", "admin/roles.html", data)
 }
@@ -54,7 +54,7 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.Role
 	if !isNew {
 		if err := db.First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -99,13 +99,13 @@ func (h *Handler) roleDelete(w http.ResponseWriter, r *http.Request, idStr strin
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
 	var row models.Role
 	if err := db.First(&row, id).Error; err != nil {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	if row.Name == roles.AdminRole {

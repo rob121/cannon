@@ -1,35 +1,11 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">Sign In</h1>
-    {{if eq .Verified "0"}}
-    <p class="site-subtitle">Your account must be verified before you can sign in.</p>
-    {{end}}
-  </header>
-  <div class="site-content">
-    {{if .Disabled}}
-    <p class="site-alert site-alert-info">{{.Message}}</p>
-    <p><a class="site-btn site-btn-ghost" href="/">Back to home</a></p>
-    {{else}}
-    {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
-    {{if eq $.Verified "0"}}
-    <p class="site-alert site-alert-info">Contact a site administrator for a verification link.</p>
-    {{end}}
-    <form class="site-form" method="post" action="/login">
-      {{csrfField}}
-      {{if .Return}}<input type="hidden" name="return" value="{{.Return}}">{{end}}
-      <div class="site-form-field">
-        <label for="username">Username</label>
-        <input id="username" name="username" required autofocus autocomplete="username">
-      </div>
-      <div class="site-form-field">
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password">
-      </div>
-      <div class="site-form-actions">
-        <button type="submit" class="site-btn site-btn-primary">Sign In</button>
-        <a class="site-btn site-btn-ghost" href="/account/reset-password">Forgot password</a>
-      </div>
-    </form>
-    {{end}}
+<article class="mb-4">
+  {{template "pageHeader" (dict "Title" "Sign In" "Subtitle" "")}}
+  {{if eq .Verified "0"}}
+  <div class="alert alert-info mb-3" role="alert">Your account must be verified before you can sign in. Contact a site administrator for a verification link.</div>
+  {{end}}
+  <div class="card shadow-sm site-login-block">
+    <div class="card-body">
+      {{template "loginForm" .Login}}
+    </div>
   </div>
 </article>

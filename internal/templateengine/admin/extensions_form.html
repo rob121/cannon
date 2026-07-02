@@ -5,7 +5,7 @@
     <div class="admin-form-card-header">
       <div class="admin-form-card-heading">
         <h2 class="admin-form-card-title">Edit Extension</h2>
-        <p class="admin-form-card-desc">Control extension sort order, activation status, and process lifecycle.</p>
+        <p class="admin-form-card-desc">Control activation status, menu label, and process lifecycle. Reorder extensions from the list view.</p>
       </div>
     </div>
     <div class="admin-form-card-body">
@@ -17,14 +17,10 @@
             <label class="admin-form-label">Name</label>
             <input class="admin-form-control" value="{{.Row.Name}}" disabled>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-3">
             <label class="admin-form-label">Process</label>
             <div class="admin-form-static">{{template "process_status" .Running}}</div>
             <p class="admin-form-help">Use the toolbar above to start, stop, or restart.</p>
-          </div>
-          <div class="col-md-3">
-            <label class="admin-form-label">Sort</label>
-            <input class="admin-form-control" name="sort" type="number" value="{{.Row.Sort}}">
           </div>
           <div class="col-md-3">
             <label class="admin-form-label">Status</label>
@@ -34,7 +30,7 @@
             </select>
             <p class="admin-form-help">Whether Cannon should start this extension.</p>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <label class="admin-form-label">Installed</label>
             <div class="admin-form-static">{{template "installed_badge" .Row.Installed}}</div>
             <p class="admin-form-help">Set after the first successful POST /install when the extension starts.</p>
@@ -61,14 +57,26 @@
   </div>
 
   <div class="admin-form-section-card">
-    {{template "form_section_header" (dict "Title" "Extension Info" "Description" "Metadata reported by the running extension via GET /meta.")}}
+    {{template "form_section_header" (dict "Title" "Extension Info" "Description" "Metadata reported by the running extension via GET /meta and cached for admin display.")}}
     <div class="admin-form-section-body">
       {{if .Meta.Available}}
       <dl class="admin-capability-defaults-list">
+        {{if .DisplayTitle}}
+        <div class="admin-capability-defaults-item">
+          <dt>Title</dt>
+          <dd>{{.DisplayTitle}}</dd>
+        </div>
+        {{end}}
+        {{if .Meta.Description}}
+        <div class="admin-capability-defaults-item">
+          <dt>Description</dt>
+          <dd class="admin-extension-desc-block">{{.Meta.Description}}</dd>
+        </div>
+        {{end}}
         {{if .Meta.Name}}
         <div class="admin-capability-defaults-item">
           <dt>Package Name</dt>
-          <dd>{{.Meta.Name}}</dd>
+          <dd><code class="admin-code">{{.Meta.Name}}</code></dd>
         </div>
         {{end}}
         {{if .Meta.Version}}
@@ -91,7 +99,7 @@
         {{end}}
       </dl>
       {{else}}
-      <div class="admin-empty">Extension info is unavailable while the process is stopped. Set status to Active or restart the process to load metadata.</div>
+      <div class="admin-empty">Extension info is unavailable until the process has started at least once. Set status to Active or restart the process to load metadata from GET /meta.</div>
       {{end}}
     </div>
   </div>
@@ -148,6 +156,65 @@
       {{end}}
       {{else}}
       <div class="admin-empty">Capabilities are unavailable while the extension process is stopped. Set status to Active or restart the process to load capability data.</div>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="admin-form-section-card">
+    {{template "form_section_header" (dict "Title" "Templates" "Description" "Embedded extension templates that can be copied into the site override folder.")}}
+    <div class="admin-form-section-body">
+      {{if .Templates.Available}}
+        {{if .Templates.Items}}
+        <div class="admin-table-scroll">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Template</th>
+                <th>Override Path</th>
+                <th>Status</th>
+                <th class="admin-col-actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {{range .Templates.Items}}
+              <tr>
+                <td>
+                  <span class="admin-cell-primary">{{.Path}}</span>
+                  {{if .Size}}<div class="admin-cell-muted">{{.Size}} bytes</div>{{end}}
+                </td>
+                <td><code class="admin-code">{{.OverridePath}}</code></td>
+                <td>
+                  {{if .Overridden}}
+                  <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Overridden</span>
+                  {{else}}
+                  <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Embedded</span>
+                  {{end}}
+                </td>
+                <td class="admin-col-actions">
+                  <div class="admin-row-actions">
+                    {{if .Overridden}}
+                    <a class="btn-admin-icon" href="{{$.TemplatesBase}}/edit?path={{.OverridePath}}" data-turbo-frame="_top" title="Edit Override">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    {{else}}
+                    <form method="post" action="{{$.BasePath}}/{{$.Row.ExtensionID}}/templates/override" class="admin-inline-form" data-turbo-frame="_top">
+                      {{csrfField}}
+                      <input type="hidden" name="template_path" value="{{.Path}}">
+                      <button type="submit" class="btn-admin-ghost btn-admin-sm">Override</button>
+                    </form>
+                    {{end}}
+                  </div>
+                </td>
+              </tr>
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+        {{else}}
+        <div class="admin-empty">This extension has not advertised any embedded templates.</div>
+        {{end}}
+      {{else}}
+      <div class="admin-empty">Template metadata is unavailable while the extension process is stopped or when it does not expose the templates capability.</div>
       {{end}}
     </div>
   </div>

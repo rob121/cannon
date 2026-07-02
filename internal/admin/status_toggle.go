@@ -60,7 +60,7 @@ func (h *Handler) postToggleModel(w http.ResponseWriter, r *http.Request, idStr 
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, err := sites.DB(r.Context())
@@ -70,7 +70,7 @@ func (h *Handler) postToggleModel(w http.ResponseWriter, r *http.Request, idStr 
 	}
 	if err := toggleModelStatus(db, id, dest); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,12 +114,12 @@ func (h *Handler) profileFieldToggleStatus(w http.ResponseWriter, r *http.Reques
 	}
 	profileID, ok := parseID(profileIDStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	fieldID, ok := parseID(fieldIDStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, err := sites.DB(r.Context())
@@ -130,7 +130,7 @@ func (h *Handler) profileFieldToggleStatus(w http.ResponseWriter, r *http.Reques
 	var field models.ProfileField
 	if err := db.Where("profile_id = ?", profileID).First(&field, fieldID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -13,13 +13,13 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.MenuName}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .MenuID "Label" .MenuName)}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .MenuID "Status" .Status)}}</td>
-          <td>{{len .Items}}</td>
+          <td><a href="/admin/menu-items?menu_id={{.MenuID}}">{{len .Items}}</a></td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .MenuID)}}
         </tr>
         {{else}}
-        <tr><td colspan="4"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-ul" "Title" "No menus yet" "Message" "Create navigation menus to display links on your site." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

@@ -1,30 +1,139 @@
 {{template "page_header" .}}
-<div class="admin-data-card">
-  <div class="admin-table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
-          <th>Folder</th>
-          <th>Path</th>
-          <th>Size</th>
-          <th class="admin-col-actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Rows}}
-        <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
-          <td>{{.Folder}}</td>
-          <td><code class="admin-code">{{.Path}}</code></td>
-          <td>{{.Size}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .MediaID)}}
-        </tr>
-        {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Media Found</div></td></tr>
+<div class="admin-media-manager">
+  <aside class="admin-media-sidebar">
+    <div class="admin-media-sidebar-header">
+      <div class="admin-media-sidebar-title">Library</div>
+      <p class="admin-media-sidebar-desc">Browse by folder</p>
+    </div>
+    <nav class="admin-media-nav" aria-label="Media folders">
+      <a class="admin-media-nav-link{{if not .InFolder}} active{{end}}" href="{{.BasePath}}" data-turbo-frame="main-content">
+        <i class="bi bi-grid"></i>
+        <span>All Files</span>
+      </a>
+      {{range .AllFolderNav}}
+      <a class="admin-media-nav-link admin-media-nav-link-nested{{if eq $.FolderFilter .Path}} active{{end}}" href="{{$.BasePath}}?folder={{.Path}}" data-turbo-frame="main-content" style="--media-nav-depth: {{.Depth}};">
+        <i class="bi bi-folder-fill"></i>
+        <span>{{if gt .Depth 0}}{{.Segment}}{{else}}{{.Label}}{{end}}</span>
+      </a>
+      {{end}}
+    </nav>
+    <div class="admin-media-sidebar-actions">
+      <a class="btn-admin-primary btn-admin-sm admin-media-upload-btn" href="{{.BasePath}}/upload{{if .FolderFilter}}?folder={{.FolderFilter}}{{end}}" data-turbo-frame="_top">
+        <i class="bi bi-cloud-arrow-up"></i> Upload
+      </a>
+    </div>
+  </aside>
+
+  <div class="admin-media-main">
+    <div class="admin-media-browser">
+      <div class="admin-media-browser-header">
+        <nav class="admin-media-breadcrumb" aria-label="Media breadcrumb">
+          {{range $i, $c := .Breadcrumbs}}
+          {{if $i}}<span class="admin-media-breadcrumb-sep">/</span>{{end}}
+          {{if eq (add $i 1) (len $.Breadcrumbs)}}
+          <span class="admin-media-breadcrumb-current">{{$c.Label}}</span>
+          {{else}}
+          <a class="admin-media-breadcrumb-link" href="{{$c.URL}}" data-turbo-frame="main-content">{{$c.Label}}</a>
+          {{end}}
+          {{end}}
+        </nav>
+        <div class="admin-media-toolbar-actions">
+          <button type="button" class="btn-admin-outline btn-admin-sm" data-media-new-folder-toggle>
+            <i class="bi bi-folder-plus"></i> New Folder
+          </button>
+          {{if .InFolder}}
+          <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}" data-turbo-frame="main-content">
+            <i class="bi bi-arrow-left"></i> Back
+          </a>
+          {{end}}
+        </div>
+      </div>
+
+      <div class="admin-media-new-folder-panel hidden" data-media-new-folder-panel>
+        {{template "error_alert" .}}
+        <form method="post" action="{{.BasePath}}/folders" class="admin-media-new-folder-form" data-turbo="false">
+          {{csrfField}}
+          <input type="hidden" name="return" value="browse">
+          <div class="admin-media-new-folder-grid">
+            <div class="admin-media-new-folder-field">
+              <label class="admin-form-label" for="browse-folder-parent">Parent folder</label>
+              <select class="admin-form-control admin-form-control-sm" id="browse-folder-parent" name="parent">
+                <option value="">Root level</option>
+                {{range .ParentFolderOptions}}
+                <option value="{{.Path}}" {{if eq $.NewFolderParent .Path}}selected{{else if eq $.FolderFilter .Path}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="admin-media-new-folder-field">
+              <label class="admin-form-label" for="browse-folder-name">Folder name</label>
+              <input class="admin-form-control admin-form-control-sm" id="browse-folder-name" name="name" value="{{.NewFolderName}}" placeholder="reports" required>
+            </div>
+            <div class="admin-media-new-folder-submit">
+              <button type="submit" class="btn-admin-primary btn-admin-sm">
+                <i class="bi bi-folder-plus"></i> Create Folder
+              </button>
+              <button type="button" class="btn-admin-ghost btn-admin-sm" data-media-new-folder-toggle>Cancel</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="admin-media-browser-body">
+        {{if not .InFolder}}
+        {{if .FolderNav}}
+        <section class="admin-media-section admin-media-section-folders">
+          <div class="admin-media-folder-grid">
+            {{range .FolderNav}}
+            {{template "media_folder_card" .}}
+            {{end}}
+          </div>
+        </section>
         {{end}}
-      </tbody>
-    </table>
+        {{if .Rows}}
+        <section class="admin-media-section">
+          <header class="admin-media-section-header">
+            <h2 class="admin-media-section-title">Root Files</h2>
+            <p class="admin-media-section-desc">Files not stored in a folder</p>
+          </header>
+          <div class="admin-media-grid">
+            {{range .Rows}}
+            {{template "media_file_card" (dict "Root" $ "Row" .)}}
+            {{end}}
+          </div>
+        </section>
+        {{else if not .FolderNav}}
+        {{template "table_empty_state" (dict "Icon" "bi-images" "Title" "No media yet" "Message" "Upload images and files to build your media library." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-cloud-arrow-up")}}
+        {{end}}
+        {{else}}
+        {{if .SubfolderNav}}
+        <section class="admin-media-section admin-media-section-folders">
+          <header class="admin-media-section-header">
+            <h2 class="admin-media-section-title">Subfolders</h2>
+          </header>
+          <div class="admin-media-folder-grid">
+            {{range .SubfolderNav}}
+            {{template "media_folder_card" .}}
+            {{end}}
+          </div>
+        </section>
+        {{end}}
+        {{if .Rows}}
+        <section class="admin-media-section">
+          <header class="admin-media-section-header">
+            <h2 class="admin-media-section-title">Files</h2>
+          </header>
+          <div class="admin-media-grid">
+            {{range .Rows}}
+            {{template "media_file_card" (dict "Root" $ "Row" .)}}
+            {{end}}
+          </div>
+        </section>
+        {{else if not .SubfolderNav}}
+        {{template "table_empty_state" (dict "Icon" "bi-folder2-open" "Title" "This folder is empty" "Message" "Upload a file here or create a subfolder to organize your media." "ActionURL" (printf "%s/upload?folder=%s" .BasePath .FolderFilter) "ActionLabel" "Upload file" "ActionIcon" "bi-cloud-arrow-up")}}
+        {{end}}
+        {{template "pagination" .}}
+        {{end}}
+      </div>
+    </div>
   </div>
-  {{template "pagination" .}}
 </div>

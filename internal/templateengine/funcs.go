@@ -99,5 +99,6 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			}
 			return false
 		},
+		"showRouteTitle": func() bool { return true },
 	}
 }

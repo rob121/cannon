@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rob121/cannon/internal/controllers/auth"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
@@ -26,7 +27,7 @@ func (h *Handler) users(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.userForm(w, r, id)
@@ -39,7 +40,7 @@ func (h *Handler) userList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.User
 	var total int64
 	db.Model(&models.User{}).Count(&total)
-	data := listPage(page, total, usersBase,
+	data := listPage(r, page, total, usersBase,
 		"Manage user accounts and access.",
 		"Add Account", map[string]any{"ActiveNav": "accounts"})
 	order := applyListSort(r, data, map[string]string{
@@ -47,7 +48,7 @@ func (h *Handler) userList(w http.ResponseWriter, r *http.Request) {
 		"email":    "email",
 		"status":   "status",
 	}, "username")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Preload("Groups").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Groups").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Accounts", "admin/users.html", data)
 }
@@ -58,7 +59,7 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.User
 	if !isNew {
 		if err := db.Preload("Groups").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -80,6 +81,11 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			}
 			row = *u
 		} else {
+			var prior models.User
+			wasLocked := false
+			if err := db.First(&prior, id).Error; err == nil {
+				wasLocked = prior.Locked
+			}
 			row.GivenName = formString(r, "given_name")
 			row.FamilyName = formString(r, "family_name")
 			row.Email = formString(r, "email")
@@ -98,6 +104,13 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			if err := db.Save(&row).Error; err != nil {
 				h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
 				return
+			}
+			if row.Locked && !wasLocked {
+				_, _ = hooks.Fire(r.Context(), hooks.OnUserLocked, map[string]any{
+					"user_id":  row.UserID,
+					"username": row.Username,
+					"email":    row.Email,
+				})
 			}
 		}
 		groupIDs := formUintList(r, "group_ids")
@@ -143,7 +156,7 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 	}
 	if !isNew && !row.Validated {
 		if token, err := auth.EnsureVerifyToken(r.Context(), row.UserID); err == nil {
-			data["VerifyURL"] = auth.VerifyURL(token)
+			data["VerifyURL"] = auth.VerifyURL(r.Context(), token)
 		}
 	}
 	h.render(w, r, title, "admin/users_form.html", data)
@@ -156,7 +169,7 @@ func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request, idStr strin
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

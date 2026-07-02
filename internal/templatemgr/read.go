@@ -9,7 +9,7 @@ import (
 	"github.com/rob121/cannon/internal/templateengine"
 )
 
-// Read loads template content from disk or built-in defaults.
+// Read loads template content from a theme folder or built-in defaults.
 func Read(root, relPath string) (content string, source string, fromBuiltin bool, err error) {
 	if err := ValidateRelPath(relPath); err != nil {
 		return "", "", false, err
@@ -24,33 +24,26 @@ func Read(root, relPath string) (content string, source string, fromBuiltin bool
 		return string(raw), relPath, false, nil
 	}
 
-	builtin, err := templateengine.ReadBuiltin(relPath)
+	theme := ThemeFromPath(relPath)
+	relative := strings.TrimPrefix(relPath, theme+"/")
+	builtinPath := logicalBuiltinPath(root, theme, relative)
+	builtin, err := templateengine.ReadBuiltin(builtinPath)
 	if err != nil {
 		return "", "", false, fmt.Errorf("template not found")
 	}
-	return builtin, "builtin:" + relPath, true, nil
+	return builtin, "builtin:" + builtinPath, true, nil
 }
 
-// AvailableBuiltins returns built-in templates not yet overridden on disk.
-func AvailableBuiltins(root string) ([]string, error) {
-	builtins, err := templateengine.BuiltinTemplates()
+// AvailableBuiltins returns built-in templates not yet copied into a theme.
+func AvailableBuiltins(root, theme string) ([]string, error) {
+	entries, err := ThemeTemplates(root, theme)
 	if err != nil {
 		return nil, err
 	}
-	onDisk := map[string]bool{}
-	if root != "" {
-		files, err := List(root)
-		if err != nil {
-			return nil, err
-		}
-		for _, file := range files {
-			onDisk[file.Path] = true
-		}
-	}
 	out := make([]string, 0)
-	for _, name := range builtins {
-		if !onDisk[name] {
-			out = append(out, name)
+	for _, entry := range entries {
+		if entry.Builtin && !entry.Overridden {
+			out = append(out, entry.Path)
 		}
 	}
 	return out, nil

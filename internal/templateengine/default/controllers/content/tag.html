@@ -1,16 +1,9 @@
-<article class="site-page">
-  <header class="site-hero">
-    <h1 class="site-title">Tag: {{.Tag.Name}}</h1>
-  </header>
-  <section class="site-section">
-    <div class="site-item-grid">
-      {{range .Items}}
-      <article class="site-item-card">
-        <h2><a href="/content/item/{{.Slug}}">{{.Title}}</a></h2>
-        {{if .Intro}}<p>{{.Intro}}</p>{{end}}
-      </article>
-      {{else}}
-      <p>No items with this tag.</p>
+<article class="mb-4">
+  {{template "pageHeader" (dict "Title" (printf "Tag: %s" .Tag.Name))}}
+  <section>
+    <div class="row g-3">
+      {{range .Items}}{{template "itemCard" .}}{{else}}
+      <div class="col-12"><p class="text-muted mb-0">No items with this tag yet.</p></div>
       {{end}}
     </div>
   </section>

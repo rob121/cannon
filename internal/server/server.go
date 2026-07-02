@@ -1,10 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -24,8 +27,11 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/roles"
 	"github.com/rob121/cannon/internal/router"
+	"github.com/rob121/cannon/internal/routepath"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
+	"github.com/rob121/cannon/internal/themes"
 	"github.com/rob121/cannon/internal/user"
 )
 
@@ -81,11 +87,8 @@ func (s *Server) Reload() error {
 }
 
 func (s *Server) activate() error {
-	s.mux.HandleFunc("/admin/assets/admin.css", s.serveAdminCSS)
-	s.mux.HandleFunc("/admin/assets/admin.js", s.serveAdminJS)
-	s.mux.HandleFunc("/admin/assets/cannon-icon.svg", s.serveAdminIcon)
-	s.mux.HandleFunc("/theme/site.css", s.serveSiteCSS)
-	s.mux.HandleFunc("/theme/cannon-icon.svg", s.serveSiteIcon)
+	s.mux.HandleFunc("/admin/assets/", s.serveAdminThemeAsset)
+	s.mux.HandleFunc("/theme/", s.serveThemeAsset)
 
 	if config.NeedsInstall(s.cfg) {
 		ih, err := install.NewHandler(s.cfg, s.Activate)
@@ -119,6 +122,9 @@ func (s *Server) activate() error {
 			if err := roles.EnsureDefaults(db); err != nil {
 				log.Printf("seed defaults for site %s: %v", site.ID, err)
 			}
+			if err := router.EnsureDefaultRoute(db); err != nil {
+				log.Printf("seed routes for site %s: %v", site.ID, err)
+			}
 		}
 		ctx := sites.WithContext(context.Background(), site)
 		ext := s.chain.Extensions(site)
@@ -140,6 +146,7 @@ func (s *Server) registerRoutes() {
 	s.mux.Handle("/admin/", adminHandler)
 	s.mux.Handle("/assets/", s.wrap(http.StripPrefix("/assets/", s.assetsHandler())))
 	s.mux.Handle("/robots.txt", s.wrap(http.HandlerFunc(s.serveRobotsTXT)))
+	s.mux.Handle("/sitemap.xml", s.wrap(http.HandlerFunc(s.serveSitemapXML)))
 
 	// Completed installs should not expose the installer again.
 	s.mux.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
@@ -161,9 +168,30 @@ func (s *Server) frontendHandler() http.Handler {
 		site, _ := sites.FromContext(r.Context())
 		ext := s.chain.Extensions(site)
 
+		var eng *templateengine.Engine
+		renderCtx := func() context.Context {
+			ctx := r.Context()
+			if eng != nil {
+				if hookCtx := eng.HookContext(); hookCtx != nil {
+					return hookCtx
+				}
+			}
+			return ctx
+		}
 		blockRenderer := func(name string) (template.HTML, error) {
 			userCtx := extensionUserContext(r)
-			html, err := blocks.RenderSpace(r.Context(), ext, name, r, userCtx)
+			ctx := renderCtx()
+			var fragment blocks.FragmentRenderer
+			if eng != nil {
+				fragment = func(tmpl string, data map[string]any) (string, error) {
+					var buf bytes.Buffer
+					if err := eng.RenderFragment(&buf, tmpl, data); err != nil {
+						return "", err
+					}
+					return buf.String(), nil
+				}
+			}
+			html, err := blocks.RenderSpace(ctx, ext, name, r, userCtx, fragment)
 			if err != nil {
 				return "", err
 			}
@@ -174,20 +202,78 @@ func (s *Server) frontendHandler() http.Handler {
 		}
 
 		blockLen := func(name string) (int, error) {
-			return blocks.CountForSpace(r.Context(), ext, name)
+			return blocks.CountForSpace(renderCtx(), ext, name)
 		}
 
-		eng := templateengine.New(site, blockRenderer, blockLen, templateengine.MergeFuncMaps(
+		sel, _ := themes.SelectionFromContext(r.Context())
+		eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
 			templateengine.CSRFFuncs(r),
 			template.FuncMap{
-			"menu": func(name string) ([]map[string]string, error) {
-				return router.MenuData(r.Context(), name)
+			"menu": func(name string) ([]map[string]any, error) {
+				return router.MenuData(renderCtx(), name)
 			},
 			"siteName": func() string {
 				return site.Name
 			},
+			"isOffline": func() bool {
+				offline, err := settings.SiteOffline(r.Context())
+				return err == nil && offline
+			},
+			"homeURL": func() string {
+				return sites.DefaultRoutePath(r.Context())
+			},
+			"controllerURL": func(controller, action string) string {
+				return routepath.Controller(r.Context(), controller, action)
+			},
+			"controllerURLFor": func(controller, action, suffix string) string {
+				return routepath.ControllerWithSuffix(r.Context(), controller, action, suffix)
+			},
+			"isDefaultRoute": func() bool {
+				return router.IsDefaultRouteContext(renderCtx())
+			},
+			"routeName": func() string {
+				if route, ok := router.RouteFromContext(renderCtx()); ok {
+					return route.Name
+				}
+				return ""
+			},
+			"routePath": func() string {
+				if route, ok := router.RouteFromContext(renderCtx()); ok {
+					return route.Path
+				}
+				return ""
+			},
+			"routeController": func() string {
+				if route, ok := router.RouteFromContext(renderCtx()); ok {
+					return route.Controller
+				}
+				return ""
+			},
+			"routeAction": func() string {
+				if route, ok := router.RouteFromContext(renderCtx()); ok {
+					return route.Action
+				}
+				return ""
+			},
+			"showRouteTitle": func() bool {
+				if route, ok := router.MatchedRoute(renderCtx()); ok {
+					return router.ShowTitleForRoute(route)
+				}
+				return true
+			},
+			"siteMetaDescription": func() string {
+				desc, _ := settings.SiteMetaDescription(r.Context())
+				return desc
+			},
 			"year": func() int {
 				return time.Now().Year()
+			},
+			"richText": func(src string) template.HTML {
+				html, err := cms.RichTextToHTML(src)
+				if err != nil {
+					return template.HTML("")
+				}
+				return template.HTML(html)
 			},
 			"items": func(mode string, limit int) ([]models.Item, error) {
 				viewerGroups, err := groups.ViewerGroupIDs(r.Context())
@@ -209,6 +295,7 @@ func (s *Server) frontendHandler() http.Handler {
 			"tagURL": cms.TagURL,
 			"authorURL": cms.AuthorURL,
 			"searchURL": cms.SearchURL,
+			"featuredURL": cms.FeaturedURL,
 			"categories": func() ([]models.Category, error) {
 				return cms.CategoryTree(r.Context())
 			},
@@ -224,6 +311,19 @@ func (s *Server) frontendHandler() http.Handler {
 			},
 			"commentCount": func(itemID uint) (int64, error) {
 				return cms.CommentCount(r.Context(), itemID)
+			},
+			"fieldOptions": func(raw string) []cms.FieldOption {
+				return cms.ParseFieldConfig(raw).Options
+			},
+			"fieldValueContains": cms.FieldValueContains,
+			"safeHTML": func(s string) template.HTML {
+				return template.HTML(s)
+			},
+			"formatDateTimeLocal": func(t *time.Time) string {
+				if t == nil || t.IsZero() {
+					return ""
+				}
+				return t.Format("2006-01-02T15:04")
 			},
 		}))
 		router.NewDispatcher(ext, eng).ServeHTTP(w, r)
@@ -245,46 +345,107 @@ func extensionUserContext(r *http.Request) map[string]any {
 	return ctx
 }
 
-func (s *Server) serveAdminCSS(w http.ResponseWriter, r *http.Request) {
-	s.serveAdminAsset(w, r, "admin.css", "text/css; charset=utf-8")
-}
-
-func (s *Server) serveAdminJS(w http.ResponseWriter, r *http.Request) {
-	s.serveAdminAsset(w, r, "admin.js", "application/javascript; charset=utf-8")
-}
-
-func (s *Server) serveAdminIcon(w http.ResponseWriter, r *http.Request) {
-	s.serveAdminAsset(w, r, "cannon-icon.svg", "image/svg+xml")
-}
-
-func (s *Server) serveAdminAsset(w http.ResponseWriter, r *http.Request, name, contentType string) {
-	raw, err := templateengine.AdminAsset(name)
+func (s *Server) serveThemeAsset(w http.ResponseWriter, r *http.Request) {
+	if s.sites == nil {
+		http.NotFound(w, r)
+		return
+	}
+	site, err := s.sites.Resolve(r)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", contentType)
-	w.Header().Set("Cache-Control", "public, max-age=3600")
-	_, _ = w.Write(raw)
-}
-
-func (s *Server) serveSiteCSS(w http.ResponseWriter, r *http.Request) {
-	s.serveSiteAsset(w, r, "site.css", "text/css; charset=utf-8")
-}
-
-func (s *Server) serveSiteIcon(w http.ResponseWriter, r *http.Request) {
-	s.serveSiteAsset(w, r, "cannon-icon.svg", "image/svg+xml")
-}
-
-func (s *Server) serveSiteAsset(w http.ResponseWriter, r *http.Request, name, contentType string) {
-	raw, err := templateengine.SiteAsset(name)
+	r = r.WithContext(sites.WithContext(r.Context(), site))
+	name := strings.TrimPrefix(r.URL.Path, "/theme/")
+	name = strings.TrimPrefix(name, "/")
+	if name == "" || strings.Contains(name, "..") {
+		http.NotFound(w, r)
+		return
+	}
+	theme, err := settings.FrontendTheme(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !themes.IsBuiltinFrontend(theme) {
+		assetsRoot := themes.AssetsDir(site.TemplateDir, theme)
+		path := filepath.Join(assetsRoot, filepath.FromSlash(name))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, path)
+			return
+		}
+	}
+	raw, _, err := templateengine.ThemeAsset(site.TemplateDir, theme, filepath.Base(name))
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Type", detectContentType(name))
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	_, _ = w.Write(raw)
+}
+
+func (s *Server) serveAdminThemeAsset(w http.ResponseWriter, r *http.Request) {
+	if s.sites == nil {
+		http.NotFound(w, r)
+		return
+	}
+	site, err := s.sites.Resolve(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	r = r.WithContext(sites.WithContext(r.Context(), site))
+	name := strings.TrimPrefix(r.URL.Path, "/admin/assets/")
+	name = strings.TrimPrefix(name, "/")
+	if name == "" || strings.Contains(name, "..") {
+		http.NotFound(w, r)
+		return
+	}
+	theme, err := settings.AdminTheme(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !themes.IsBuiltinAdmin(theme) {
+		assetsRoot := themes.AssetsDir(site.TemplateDir, theme)
+		path := filepath.Join(assetsRoot, filepath.FromSlash(name))
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, path)
+			return
+		}
+	}
+	raw, _, err := templateengine.AdminThemeAsset(site.TemplateDir, theme, filepath.Base(name))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", detectContentType(name))
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	_, _ = w.Write(raw)
+}
+
+func detectContentType(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".css":
+		return "text/css; charset=utf-8"
+	case ".js":
+		return "application/javascript; charset=utf-8"
+	case ".svg":
+		return "image/svg+xml"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".woff2":
+		return "font/woff2"
+	case ".woff":
+		return "font/woff"
+	default:
+		return "application/octet-stream"
+	}
 }
 
 func (s *Server) assetsHandler() http.Handler {

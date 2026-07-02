@@ -47,8 +47,23 @@ func SubmittedToken(r *http.Request) string {
 	if v := strings.TrimSpace(r.Header.Get(HeaderName)); v != "" {
 		return v
 	}
-	if r.Form == nil {
+	if token := formFieldToken(r); token != "" {
+		return token
+	}
+	ct := r.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		_ = r.ParseMultipartForm(32 << 20)
+	} else if r.Form == nil {
 		_ = r.ParseForm()
+	}
+	return formFieldToken(r)
+}
+
+func formFieldToken(r *http.Request) string {
+	if r.MultipartForm != nil {
+		if vals := r.MultipartForm.Value[FieldName]; len(vals) > 0 {
+			return strings.TrimSpace(vals[0])
+		}
 	}
 	return strings.TrimSpace(r.FormValue(FieldName))
 }

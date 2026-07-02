@@ -17,14 +17,14 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .NotificationID "ListQuery" $.ListQuery "Label" .Name)}}</td>
           <td>{{range .Events}}<span class="admin-badge admin-badge-muted">{{.Event}}</span> {{end}}</td>
           <td><code class="admin-code">{{.ShoutrrURL}}</code></td>
           <td>{{template "status_toggle" (dict "BasePath" $.BasePath "ID" .NotificationID "Status" .Status "ListQuery" $.ListQuery)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .NotificationID "ListQuery" $.ListQuery)}}
         </tr>
         {{else}}
-        <tr><td colspan="5"><div class="admin-empty">No Notifications Found</div></td></tr>
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-bell" "Title" "No notifications yet" "Message" "System notifications and alerts will appear here.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

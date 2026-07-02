@@ -40,6 +40,13 @@ func TestSubmittedToken(t *testing.T) {
 	if got := SubmittedToken(r); got != "from-header" {
 		t.Fatalf("header token = %q, want from-header", got)
 	}
+
+	body := strings.NewReader("--bound\r\nContent-Disposition: form-data; name=\"_csrf\"\r\n\r\nmultipart-token\r\n--bound\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.txt\"\r\nContent-Type: text/plain\r\n\r\nhello\r\n--bound--\r\n")
+	r = httptest.NewRequest(http.MethodPost, "/", body)
+	r.Header.Set("Content-Type", "multipart/form-data; boundary=bound")
+	if got := SubmittedToken(r); got != "multipart-token" {
+		t.Fatalf("multipart token = %q, want multipart-token", got)
+	}
 }
 
 func TestHiddenFieldEscapes(t *testing.T) {

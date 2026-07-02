@@ -13,7 +13,7 @@ func (h *Handler) system(w http.ResponseWriter, r *http.Request, path string) {
 	case len(parts) == 1 && parts[0] == "reload":
 		h.systemReload(w, r)
 	default:
-		http.NotFound(w, r)
+		h.notFound(w, r)
 	}
 }
 

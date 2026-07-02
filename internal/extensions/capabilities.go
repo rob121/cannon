@@ -72,6 +72,12 @@ var capabilityCatalog = []struct {
 		desc:  "Subscribes to Cannon event hooks (onBeforeRoute, onUserBeforeLogin, etc.).",
 		get:   func(c Capabilities) string { return c.Hooks },
 	},
+	{
+		key:   "templates",
+		label: "Templates",
+		desc:  "Lists embedded templates that can be copied into the site template override folder.",
+		get:   func(c Capabilities) string { return c.Templates },
+	},
 }
 
 // CapabilitiesSummary returns capability details for a running extension.

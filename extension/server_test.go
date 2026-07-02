@@ -15,6 +15,8 @@ func testServer(t *testing.T) *extension.Server {
 	t.Helper()
 	s := extension.New(extension.Info{
 		Name:          "test-extension",
+		Title:         "Test Extension",
+		Description:   "A test extension for unit tests.",
 		Version:       "1.0.0",
 		UpdateURLBase: "https://example.com/releases",
 		AdminMenuName: "Test Admin",
@@ -75,6 +77,8 @@ func TestMeta(t *testing.T) {
 
 	var got struct {
 		Name          string `json:"name"`
+		Title         string `json:"title"`
+		Description   string `json:"description"`
 		Version       string `json:"version"`
 		UpdateURLBase string `json:"update_url_base"`
 	}
@@ -83,6 +87,9 @@ func TestMeta(t *testing.T) {
 	}
 	if got.Name != "test-extension" || got.Version != "1.0.0" {
 		t.Fatalf("unexpected meta: %+v", got)
+	}
+	if got.Title != "Test Extension" || got.Description != "A test extension for unit tests." {
+		t.Fatalf("unexpected meta details: %+v", got)
 	}
 }
 

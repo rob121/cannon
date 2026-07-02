@@ -16,4 +16,6 @@ Complex form pages should be laid out similar to this: https://apex-shadcn.dashb
 
 install should be themed like this: https://apex-shadcn.dashboardpack.com/wizard
 
+Users table should look like this: https://apex-shadcn.dashboardpack.com/users
+
 The source template has a Collapse Sidebar button that needs implementing.

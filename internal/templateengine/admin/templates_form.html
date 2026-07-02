@@ -1,5 +1,50 @@
 {{template "page_header" .}}
-<div class="admin-help-manager">
+<div class="admin-help-manager" data-turbo="false">
+  {{if .IsThemeCreate}}
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">New Theme</h2>
+        <p class="admin-form-card-desc">Creates a self-contained theme folder with <code class="admin-code">template.json</code> and an <code class="admin-code">assets/</code> directory for CSS, JS, and images.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post" action="{{.TemplatesBase}}/new">
+        {{csrfField}}
+        <input type="hidden" name="action" value="create_theme">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="admin-form-label">Folder name</label>
+            <input class="admin-form-control" name="theme_name" placeholder="mysite" required>
+            <p class="admin-form-help">Used as the directory name under your site template folder.</p>
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label">Display name</label>
+            <input class="admin-form-control" name="theme_label" placeholder="My Site Theme">
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label">Type</label>
+            <select class="admin-form-control" name="theme_type">
+              <option value="full">Full (frontend + admin)</option>
+              <option value="frontend">Frontend only</option>
+              <option value="backend">Admin only</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label">Author</label>
+            <input class="admin-form-control" name="theme_author" placeholder="Author or team">
+          </div>
+          <div class="col-md-12">
+            <label class="admin-form-label">Description</label>
+            <textarea class="admin-form-control" name="theme_description" rows="2"></textarea>
+          </div>
+        </div>
+        {{template "form_actions" .}}
+      </form>
+    </div>
+  </div>
+  {{else}}
   {{if .Breadcrumbs}}
   <div class="admin-help-toolbar">
     <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
@@ -23,13 +68,13 @@
   <div class="admin-form-card">
     <div class="admin-form-card-header">
       <div class="admin-form-card-heading">
-        <h2 class="admin-form-card-title">{{if .IsNew}}New Template{{else if .IsCreate}}Override Template{{else}}Edit Template{{end}}</h2>
-        <p class="admin-form-card-desc">Raw HTML template source. Saving creates a versioned backup when the file already exists.</p>
+        <h2 class="admin-form-card-title">{{if .IsNew}}New File{{else if .IsCreate}}Override Template{{else}}Edit Template{{end}}</h2>
+        <p class="admin-form-card-desc">Raw HTML template source. Paths are relative to the theme folder, e.g. <code class="admin-code">mysite/layout.html</code>.</p>
       </div>
     </div>
     <div class="admin-form-card-body">
       {{template "error_alert" .}}
-      <form method="post" action="{{if .IsCreate}}{{.BasePath}}/new{{else}}{{.BasePath}}/edit?path={{queryEscape .Path}}{{end}}">
+      <form method="post" id="template-form" action="{{if .IsCreate}}{{.BasePath}}/new{{else}}{{.BasePath}}/edit{{end}}">
       {{csrfField}}
         <div class="row g-3">
           <div class="col-md-12">
@@ -39,8 +84,8 @@
               <div class="admin-form-static"><code class="admin-code">{{.Path}}</code></div>
               <input type="hidden" name="path" value="{{.Path}}">
               {{else}}
-              <input class="admin-form-control" name="path" value="{{.Path}}" placeholder="{{if .Group}}{{.Group}}/page.html{{else}}admin/dashboard.html{{end}}" required>
-              <p class="admin-form-help">Use paths like <code class="admin-code">{{if .Group}}{{.Group}}/page.html{{else}}admin/dashboard.html{{end}}</code>.</p>
+              <input class="admin-form-control" name="path" value="{{.Path}}" placeholder="{{if .Group}}{{.Group}}/layout.html{{else}}mysite/layout.html{{end}}" required>
+              <p class="admin-form-help">Use paths like <code class="admin-code">{{if .Group}}{{.Group}}/layout.html{{else}}mysite/layout.html{{end}}</code>.</p>
               {{end}}
             {{else}}
             <div class="admin-form-static"><code class="admin-code">{{.Path}}</code></div>
@@ -49,7 +94,7 @@
           </div>
           {{if .FromBuiltin}}
           <div class="col-md-12">
-            <div class="admin-alert admin-alert-info">Editing built-in template source. Saving writes an override to your template directory.</div>
+            <div class="admin-alert admin-alert-info">Editing built-in template source. Saving writes a copy into the selected theme folder.</div>
           </div>
           {{end}}
           {{if .Source}}
@@ -59,11 +104,20 @@
           {{end}}
           <div class="col-md-12">
             <label class="admin-form-label">Content</label>
-            <textarea class="admin-form-control admin-template-editor" name="content" rows="24" required>{{.Content}}</textarea>
+            <div class="admin-code-editor-field">
+              <textarea class="admin-form-control admin-template-editor" id="template-content" name="content" rows="24" required>{{.Content}}</textarea>
+            </div>
           </div>
         </div>
-        {{template "form_actions" .}}
+        <div class="admin-form-actions">
+          <button type="submit" class="btn-admin-primary">Save</button>
+          <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
+          {{if .CanRevert}}
+          <button type="submit" class="btn-admin-outline admin-form-actions-revert" formaction="{{.TemplatesBase}}/revert" formmethod="post" onclick="return confirm('Remove this override and restore the built-in template?')">Revert to Built-in</button>
+          {{end}}
+        </div>
       </form>
     </div>
   </div>
+  {{end}}
 </div>

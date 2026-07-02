@@ -10,6 +10,8 @@ import (
 // Meta is extension metadata from GET /meta.
 type Meta struct {
 	Name          string `json:"name"`
+	Title         string `json:"title"`
+	Description   string `json:"description"`
 	Version       string `json:"version"`
 	UpdateURLBase string `json:"update_url_base"`
 }
@@ -18,6 +20,8 @@ type Meta struct {
 type MetaSummary struct {
 	Available     bool
 	Name          string
+	Title         string
+	Description   string
 	Version       string
 	UpdateURLBase string
 	UpdateURL     string
@@ -33,6 +37,8 @@ func (m *Manager) MetaSummary(name string) MetaSummary {
 	return MetaSummary{
 		Available:     true,
 		Name:          meta.Name,
+		Title:         meta.Title,
+		Description:   meta.Description,
 		Version:       meta.Version,
 		UpdateURLBase: meta.UpdateURLBase,
 		UpdateURL:     meta.UpdateURL(),

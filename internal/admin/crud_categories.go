@@ -2,13 +2,21 @@ package admin
 
 import (
 	"net/http"
+	"sort"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 const categoriesBase = "/admin/categories"
+
+type categoryListRow struct {
+	models.Category
+	CanMoveUp   bool
+	CanMoveDown bool
+}
 
 func (h *Handler) categories(w http.ResponseWriter, r *http.Request, path string) {
 	parts := pathParts("/categories", path)
@@ -21,10 +29,14 @@ func (h *Handler) categories(w http.ResponseWriter, r *http.Request, path string
 		h.categoryDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
 		h.categoryToggleStatus(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "move-up":
+		h.categoryMoveSort(w, r, parts[0], -1)
+	case len(parts) == 2 && parts[1] == "move-down":
+		h.categoryMoveSort(w, r, parts[0], 1)
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.categoryForm(w, r, id)
@@ -36,17 +48,33 @@ func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	var total int64
 	db.Model(&models.Category{}).Count(&total)
-	data := listPage(page, total, categoriesBase,
+	data := listPage(r, page, total, categoriesBase,
 		"Organize items into nested categories.",
 		"Add Category", map[string]any{"ActiveNav": "categories"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "slug": "slug", "sort": "sort", "status": "status",
 	}, "sort")
 	var rows []models.Category
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
+
+	var ordered []models.Category
+	db.Order("sort asc, category_id asc").Find(&ordered)
+	sortPos := categorySortPositions(ordered)
+
+	listRows := make([]categoryListRow, 0, len(rows))
+	for _, row := range rows {
+		item := categoryListRow{Category: row}
+		if pos, ok := sortPos[row.CategoryID]; ok {
+			item.CanMoveUp = pos.canMoveUp
+			item.CanMoveDown = pos.canMoveDown
+		}
+		listRows = append(listRows, item)
+	}
+
 	all, _ := content.CategoryTree(r.Context())
-	data["Rows"] = rows
+	data["Rows"] = listRows
 	data["AllCategories"] = all
+	data["ListQuery"] = listQueryFromData(data)
 	h.render(w, r, "Categories", "admin/categories.html", data)
 }
 
@@ -55,13 +83,21 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 	isNew := id == 0
 	var row models.Category
 	if !isNew {
-		if err := db.Preload("Groups").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+		if err := db.Preload("Groups").Preload("CreateGroups").Preload("EditGroups").First(&row, id).Error; err != nil {
+			h.notFound(w, r)
 			return
 		}
 	} else {
 		row.Status = models.StatusActive
 		row.InheritSettings = true
+		row.ShowTitle = true
+		row.ShowDescription = true
+		row.ListColumns = content.DefaultCategoryListColumns
+		row.ListPagination = true
+		row.ListPageSize = content.DefaultCategoryListPageSize
+		if pid, ok := parseID(r.URL.Query().Get("parent_id")); ok {
+			row.ParentID = &pid
+		}
 	}
 	allGroups := loadActiveGroups(db)
 	var fieldGroups []models.ContentFieldGroup
@@ -74,9 +110,12 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			return
 		}
 		row.Name = formString(r, "name")
-		row.Slug = formString(r, "slug")
-		if row.Slug == "" {
-			row.Slug, _ = content.UniqueCategorySlug(r.Context(), row.Name, row.CategoryID)
+		row.ParentID = formUintPtr(r, "parent_id")
+		var slugErr error
+		row.Slug, slugErr = content.ResolveCategorySlug(r.Context(), row.Name, formString(r, "slug"), row.ParentID, row.CategoryID)
+		if slugErr != nil {
+			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, slugErr.Error())
+			return
 		}
 		row.Description = r.FormValue("description")
 		row.Image = formString(r, "image")
@@ -84,11 +123,18 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.Sort = formInt(r, "sort", 0)
 		row.Status = formStatus(r)
 		row.InheritSettings = formBool(r, "inherit_settings")
-		row.ParentID = formUintPtr(r, "parent_id")
+		row.ShowTitle = formBool(r, "show_title")
+		row.ShowDescription = formBool(r, "show_description")
+		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
+		row.ListPagination = formBool(r, "list_pagination")
+		row.ListPageSize = content.NormalizeCategoryListPageSize(formInt(r, "list_page_size", content.DefaultCategoryListPageSize))
 		row.FieldGroupID = formUintPtr(r, "field_group_id")
 		var saveErr error
 		if isNew {
-			saveErr = db.Create(&row).Error
+			saveErr = db.Select(
+				"ParentID", "Name", "Slug", "Description", "Image", "Template",
+				"FieldGroupID", "InheritSettings", "ShowTitle", "ShowDescription", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
+			).Create(&row).Error
 		} else {
 			saveErr = db.Save(&row).Error
 		}
@@ -97,6 +143,14 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			return
 		}
 		if err := replaceFormGroups(db, &row, r); err != nil {
+			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
+			return
+		}
+		if err := replaceFormGroupsOptional(db, &row, "CreateGroups", r, "create_group_ids"); err != nil {
+			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
+			return
+		}
+		if err := replaceFormGroupsOptional(db, &row, "EditGroups", r, "edit_group_ids"); err != nil {
 			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
 			return
 		}
@@ -113,16 +167,19 @@ func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row
 		title = "Edit Category"
 		subtitle = "Update category details, template, and access."
 	}
+	db, _ := sites.DB(r.Context())
 	data := formData(map[string]any{
-		"ActiveNav":     "categories",
-		"Row":           row,
-		"IsNew":         isNew,
-		"BasePath":      categoriesBase,
-		"Subtitle":      subtitle,
-		"AllGroups":     allGroups,
-		"SelectedIDs":   groupSelectedIDs(row.Groups),
-		"FieldGroups":   fieldGroups,
-		"AllCategories": allCats,
+		"ActiveNav":       "categories",
+		"Row":             row,
+		"IsNew":           isNew,
+		"BasePath":        categoriesBase,
+		"Subtitle":        subtitle,
+		"AllGroups":       allGroups,
+		"SelectedIDs":     defaultGroupSelectedIDs(db, row.Groups, isNew),
+		"CreateGroupIDs":  groupSelectedIDs(row.CreateGroups),
+		"EditGroupIDs":    groupSelectedIDs(row.EditGroups),
+		"FieldGroups":     fieldGroups,
+		"AllCategories":   allCats,
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
@@ -137,11 +194,13 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request, idStr s
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
 	db.Exec("DELETE FROM category_groups WHERE category_category_id = ?", id)
+	db.Exec("DELETE FROM category_create_groups WHERE category_category_id = ?", id)
+	db.Exec("DELETE FROM category_edit_groups WHERE category_category_id = ?", id)
 	if err := db.Delete(&models.Category{}, id).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -151,4 +210,103 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request, idStr s
 
 func (h *Handler) categoryToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
 	h.postToggleModel(w, r, idStr, &models.Category{}, categoriesBase)
+}
+
+type categorySortPosition struct {
+	canMoveUp   bool
+	canMoveDown bool
+}
+
+func categorySiblingKey(row models.Category) uint {
+	if row.ParentID == nil || *row.ParentID == 0 {
+		return 0
+	}
+	return *row.ParentID
+}
+
+func categorySortPositions(categories []models.Category) map[uint]categorySortPosition {
+	byParent := make(map[uint][]models.Category)
+	for _, row := range categories {
+		key := categorySiblingKey(row)
+		byParent[key] = append(byParent[key], row)
+	}
+	out := make(map[uint]categorySortPosition, len(categories))
+	for _, group := range byParent {
+		sort.Slice(group, func(i, j int) bool {
+			if group[i].Sort != group[j].Sort {
+				return group[i].Sort < group[j].Sort
+			}
+			return group[i].CategoryID < group[j].CategoryID
+		})
+		last := len(group) - 1
+		for i, row := range group {
+			out[row.CategoryID] = categorySortPosition{
+				canMoveUp:   i > 0,
+				canMoveDown: i < last,
+			}
+		}
+	}
+	return out
+}
+
+func (h *Handler) categoryMoveSort(w http.ResponseWriter, r *http.Request, idStr string, direction int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	if err := categoryReorder(db, id, direction); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, categoriesBase+listRedirectQuery(r))
+}
+
+func categoryReorder(db *gorm.DB, id uint, direction int) error {
+	if direction == 0 {
+		return nil
+	}
+	var row models.Category
+	if err := db.First(&row, id).Error; err != nil {
+		return err
+	}
+	var siblings []models.Category
+	q := db.Model(&models.Category{})
+	if row.ParentID == nil || *row.ParentID == 0 {
+		q = q.Where("parent_id IS NULL OR parent_id = 0")
+	} else {
+		q = q.Where("parent_id = ?", *row.ParentID)
+	}
+	if err := q.Order("sort asc, category_id asc").Find(&siblings).Error; err != nil {
+		return err
+	}
+	idx := -1
+	for i, item := range siblings {
+		if item.CategoryID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return gorm.ErrRecordNotFound
+	}
+	target := idx + direction
+	if target < 0 || target >= len(siblings) {
+		return nil
+	}
+	siblings[idx], siblings[target] = siblings[target], siblings[idx]
+	for i, item := range siblings {
+		if item.Sort == i {
+			continue
+		}
+		if err := db.Model(&models.Category{}).Where("category_id = ?", item.CategoryID).Update("sort", i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

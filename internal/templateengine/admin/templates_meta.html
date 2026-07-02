@@ -1,0 +1,70 @@
+{{template "page_header" .}}
+<div class="admin-help-manager" data-turbo="false">
+  {{if .Breadcrumbs}}
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if .URL}}
+      <a class="admin-help-breadcrumb-link" href="{{.URL}}">{{.Label}}</a>
+      {{else}}
+      <span class="admin-help-breadcrumb-current">{{.Label}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{.TemplatesBase}}">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+  {{end}}
+
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Theme Metadata</h2>
+        <p class="admin-form-card-desc">Stored in <code class="admin-code">{{.Theme}}/template.json</code>. Select this theme under <strong>Configuration → General</strong> after saving.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post" action="{{.BasePath}}">
+      {{csrfField}}
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="admin-form-label">Theme name</label>
+            <input class="admin-form-control" name="name" value="{{.Meta.Name}}" placeholder="My Theme">
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label">Author</label>
+            <input class="admin-form-control" name="author" value="{{.Meta.Author}}" placeholder="Author or team">
+          </div>
+          <div class="col-md-12">
+            <label class="admin-form-label">Description</label>
+            <textarea class="admin-form-control" name="description" rows="2">{{.Meta.Description}}</textarea>
+          </div>
+          <div class="col-md-4">
+            <label class="admin-form-label">Version</label>
+            <input class="admin-form-control" name="version" value="{{.Meta.Version}}" placeholder="1.0.0">
+          </div>
+          <div class="col-md-4">
+            <label class="admin-form-label">Theme type</label>
+            <select class="admin-form-control" name="type">
+              <option value="full"{{if eq .Meta.Type "full"}} selected{{end}}>Full (frontend + admin)</option>
+              <option value="frontend"{{if eq .Meta.Type "frontend"}} selected{{end}}>Frontend</option>
+              <option value="backend"{{if eq .Meta.Type "backend"}} selected{{end}}>Admin</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="admin-form-label">Status</label>
+            <select class="admin-form-control" name="status">
+              <option value="active"{{if ne .Meta.Status "inactive"}} selected{{end}}>Active</option>
+              <option value="inactive"{{if eq .Meta.Status "inactive"}} selected{{end}}>Inactive</option>
+            </select>
+            <p class="admin-form-help">Inactive themes cannot be selected in site configuration.</p>
+          </div>
+        </div>
+        {{template "form_actions" .}}
+      </form>
+    </div>
+  </div>
+</div>

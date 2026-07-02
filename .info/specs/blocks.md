@@ -11,7 +11,11 @@ There are two types of blocks native and extension
 Native Blocks - HTML, Markdown
 Extension Blocks - custom block if a block exposes /block capability it should list it's blocks at that endpoint 
 
-# Block Definition
+# Block Templates
 
-Each block definiton should specify block type, space, name and then depending on the block type selected metadata related to it ie a form id 
+Block wrapper templates live under `partials/blocks/` in the active frontend theme, e.g. `default/partials/blocks/default.html`. Add new wrappers in that folder and reference them from the block **Template Wrapper** field in admin.
+
+Login blocks use `default/partials/blocks/login.html` by default.
+
+Legacy paths `default/partials/block.html` and `default/partials/login-block.html` are still resolved automatically.
 

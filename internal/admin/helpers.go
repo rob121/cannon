@@ -14,6 +14,7 @@ import (
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
@@ -119,9 +120,22 @@ func slugify(v string) string {
 	return v
 }
 
-func listData(page int, total int64, extra map[string]any) map[string]any {
+const defaultPageSize = 25
+
+func pageSizeFor(r *http.Request) int {
+	if r == nil {
+		return defaultPageSize
+	}
+	limit, err := settings.DefaultListLimit(r.Context())
+	if err != nil || limit <= 0 {
+		return defaultPageSize
+	}
+	return limit
+}
+
+func listData(page int, total int64, size int, extra map[string]any) map[string]any {
 	data := map[string]any{
-		"Page": page, "Total": total, "PageSize": pageSize,
+		"Page": page, "Total": total, "PageSize": size,
 		"Sort": "", "Dir": "asc",
 	}
 	for k, v := range extra {
@@ -130,8 +144,8 @@ func listData(page int, total int64, extra map[string]any) map[string]any {
 	return data
 }
 
-func listPage(page int, total int64, basePath, subtitle, addLabel string, extra map[string]any) map[string]any {
-	data := listData(page, total, extra)
+func listPage(r *http.Request, page int, total int64, basePath, subtitle, addLabel string, extra map[string]any) map[string]any {
+	data := listData(page, total, pageSizeFor(r), extra)
 	if basePath != "" {
 		data["BasePath"] = basePath
 	}
@@ -325,6 +339,18 @@ func replaceFormGroups(db *gorm.DB, model any, r *http.Request) error {
 		return fmt.Errorf("select at least one group")
 	}
 	return db.Model(model).Association("Groups").Replace(selected)
+}
+
+func replaceFormGroupsOptional(db *gorm.DB, model any, assocName string, r *http.Request, formKey string) error {
+	groupIDs := formUintList(r, formKey)
+	if len(groupIDs) == 0 {
+		return db.Model(model).Association(assocName).Clear()
+	}
+	var selected []models.Group
+	if err := db.Where("group_id IN ?", groupIDs).Find(&selected).Error; err != nil {
+		return err
+	}
+	return db.Model(model).Association(assocName).Replace(selected)
 }
 
 func isProtectedGroupName(name string) bool {

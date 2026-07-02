@@ -77,10 +77,10 @@ type Bundle struct {
 
 // Manager loads and formats locale strings.
 type Manager struct {
-	dir      string
-	locale   string
-	bundles  map[string]*Bundle
-	mu       sync.RWMutex
+	dir     string
+	locale  string
+	bundles map[string]*Bundle
+	mu      sync.RWMutex
 }
 
 // NewManager creates a language manager for a site.
@@ -450,5 +450,5 @@ func ScopeFromPath(path string) string {
 
 // Format is a package-level helper when a manager is unavailable.
 func Format(key string, pairs ...string) string {
-	return fmt.Sprintf(key)
+	return key
 }

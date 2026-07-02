@@ -71,6 +71,26 @@ func TestRenderFormMailDoesNotShowGeneralTitle(t *testing.T) {
 	}
 }
 
+func TestRenderFormMailHTMLTemplatePlaceholder(t *testing.T) {
+	def, ok, err := settings.GlobalDefinition("mail")
+	if err != nil || !ok {
+		t.Fatal(err, ok)
+	}
+	html, err := settings.RenderForm(extension.ConfigurationSection{
+		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
+		Data: []byte(`{}`),
+	}, "/admin/configuration/global/mail", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html, `name="#/properties/html_template"`) {
+		t.Fatalf("expected html_template field: %q", html)
+	}
+	if !strings.Contains(html, `placeholder="default/mail/default.html"`) {
+		t.Fatalf("expected default mail template placeholder: %q", html)
+	}
+}
+
 func TestRenderFormGeneralHTML(t *testing.T) {
 	def, ok, err := settings.GlobalDefinition("general")
 	if err != nil || !ok {

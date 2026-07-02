@@ -39,6 +39,33 @@ func TestCleanRelPath(t *testing.T) {
 	if got := CleanRelPath("global?section=general"); got != "global" {
 		t.Fatalf("CleanRelPath global: got %q", got)
 	}
+	if got := CleanRelPath("fr%252Fcontrollers%252Fcontent%252Fauthor.html"); got != "fr/controllers/content/author.html" {
+		t.Fatalf("CleanRelPath double-encoded: got %q", got)
+	}
+	if got := CleanRelPath("fr%2Fcontrollers%2Fcontent%2Fauthor.html"); got != "fr/controllers/content/author.html" {
+		t.Fatalf("CleanRelPath encoded: got %q", got)
+	}
+}
+
+func TestReadDoubleEncodedPath(t *testing.T) {
+	root := t.TempDir()
+	rel := "fr/controllers/content/author.html"
+	if err := os.MkdirAll(filepath.Join(root, "fr", "controllers", "content"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte("<html>author</html>"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	content, _, fromBuiltin, err := Read(root, CleanRelPath("fr%252Fcontrollers%252Fcontent%252Fauthor.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromBuiltin {
+		t.Fatal("expected on-disk override")
+	}
+	if content != "<html>author</html>" {
+		t.Fatalf("content = %q", content)
+	}
 }
 
 func TestSaveVersions(t *testing.T) {

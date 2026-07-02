@@ -1,160 +1,167 @@
 # Frontend Templates
 
-Cannon renders the public site with **Go `html/template`** files. Templates live in your site's template directory (configured in `sites.json` as `template_dir`) and can override built-in files shipped with Cannon.
+Cannon renders the public site with **Go `html/template`** files organized as **themes** — self-contained folders under your site's `template_dir`.
 
-For a full list of **Cannon template functions** and a **Sprig reference**, see **Help → Templates → Template Functions**.
+For **Cannon template functions** and **Sprig**, see **Help → Templates → Template Functions**.
 
-Use **Admin → Templates** to browse groups, override built-ins, and edit HTML source. Saving keeps up to three timestamped backups under a `versions/` mirror of your template tree.
+---
+
+## Themes
+
+A theme is a folder like `{template_dir}/mysite/` containing:
+
+- HTML templates (`layout.html`, `controllers/...`)
+- Static assets in `assets/` (CSS, JS, images)
+- `template.json` metadata
+
+**Built-in frontend theme** (`default`) ships embedded in Cannon. To customize, create a custom theme and select it under **Configuration → General → Frontend Theme**.
+
+### Create a theme
+
+1. **Admin → Templates → New Theme**
+2. Enter folder name (e.g. `mysite`), type (`frontend` or `full`), and metadata
+3. Browse the theme, click **Override** on `layout.html` or other built-ins to copy source into your theme folder
+4. Set **Frontend Theme** to `mysite` in **Configuration → General**
+
+---
 
 ## Layout and page
 
-Most public pages use two templates:
+Most public pages use:
 
-| File | Role |
-|------|------|
-| `default/layout.html` | Outer document — `<html>`, shared chrome, navigation shell |
-| `default/page.html` | Inner page body rendered into the layout |
+| File (inside theme) | Role |
+|---------------------|------|
+| `layout.html` | Outer document — chrome, nav, `{{.Main}}` |
+| `page.html` | Inner body for extension routes |
+| `controllers/{controller}/{action}.html` | Controller page bodies |
 
-Cannon renders the page template first, then injects the result into the layout as **`.Main`**. Fields you pass to the page (for example `.Title`) are also available on the layout.
+Cannon still requests logical paths like `default/layout.html`; when your theme is active, files are loaded from `{theme}/layout.html` instead of the embed.
 
 Built-in layout excerpt:
 
 ```html
+<link href="/theme/site.css" rel="stylesheet">
 <main class="container">
   {{.Main}}
 </main>
 ```
 
-Built-in page excerpt:
+---
 
-```html
-<div class="py-4">
-  {{space "header"}}
-  <h1 class="display-6">{{.Title}}</h1>
-  {{if .Content}}<div class="content">{{.Content}}</div>{{end}}
-</div>
+## Theme assets
+
+Place CSS, JS, fonts, and images in **`{theme}/assets/`**. They are served at **`/theme/{path}`** when the theme is active:
+
+```
+mysite/assets/site.css      →  /theme/site.css
+mysite/assets/js/app.js     →  /theme/js/app.js
+mysite/assets/logo.png      →  /theme/logo.png
 ```
 
-Override either file from **Templates → default** when you want site-wide changes without editing Cannon itself.
+When **Frontend Theme** is `default` (built-in), `/theme/site.css` serves the embedded default stylesheet. Custom themes override with on-disk files first.
+
+Site media uploads remain under **`/assets/`** from `assets_dir` — separate from theme assets.
+
+---
 
 ## Template lookup order
 
-For a path like `default/page.html`, Cannon loads the first match:
+For logical path `default/controllers/content/item.html` with **Frontend Theme** = `mysite`:
 
-1. `{template_dir}/default/page.html` — your site override
-2. Built-in copy embedded in the Cannon binary
+1. `{template_dir}/mysite/controllers/content/item.html` (if theme active)
+2. Built-in embedded template
 
-The same rule applies under `admin/` for admin panel overrides (see the **admin** template group in the template manager).
+With **Frontend Theme** = `default`, only the embedded copy is used unless you later add a custom theme.
 
-Extension templates use an `extension/` prefix in your template directory (for example `extension/contact/form.html`) to override HTML returned by extensions. See **Help → Getting Started → Extensions** and `EXTENSIONS.md` in the repo for that layout.
+Extension HTML overrides remain at `{template_dir}/extension/{name}/...`.
+
+---
+
+## Theme metadata (`template.json`)
+
+Stored at **`{theme}/template.json`**, edited via **Admin → Templates → {theme} → Metadata**.
+
+| Field | Description |
+|-------|-------------|
+| `name` | Display name |
+| `type` | `frontend`, `backend`, or `full` |
+| `status` | `active` or `inactive` — inactive themes cannot be selected |
+
+Example:
+
+```json
+{
+  "name": "Acme Public Theme",
+  "author": "Acme Web Team",
+  "type": "frontend",
+  "status": "active",
+  "version": "1.0.0"
+}
+```
+
+---
+
+## Admin theme
+
+Admin UI templates work the same way with **Admin Theme** in Configuration → General. A theme with `type: backend` or `full` can be selected for admin. Admin assets live in `{theme}/assets/` and are served at `/admin/assets/`.
+
+---
 
 ## Block spaces
 
-**Block spaces** are named regions in a template. Extensions with a `block` capability can render HTML into a space when the template calls `space` (not `block` — that name is reserved by Go templates):
+Named regions in templates for extension blocks:
 
 ```html
 {{space "footer"}}
+{{if gt (lenspace "header") 0}}<div>{{space "header"}}</div>{{end}}
 ```
 
-Use **`lenspace`** to count blocks in a space before rendering a wrapper:
+Enable **Debug Template Spaces** under Configuration → General, then append `?tp=1` to public URLs.
 
-```html
-{{if gt (lenspace "header") 0}}
-<div class="site-banner">{{space "header"}}</div>
-{{end}}
-```
-
-`lenspace` counts active admin-assigned blocks visible to the current viewer.
-
-The string is an arbitrary space name (`header`, `footer`, `sidebar`, and so on). Cannon asks installed extensions for a matching block definition and renders the result inline.
-
-### Debug outlines
-
-Enable **Debug Template Spaces** under **Admin → System → Configuration → General**, then add `?tp=1` to any public URL. Each `{{space "…"}}` region is wrapped in a dashed red `#FF3300` border with the space name shown as a label. Useful when placing blocks and checking that spaces match your template calls.
-
-Use block spaces for reusable areas — contact forms, newsletter signups, or other extension-provided fragments — without hard-coding extension HTML in your layout.
+---
 
 ## Menus
-
-Load admin-managed navigation with the **`menu`** template function:
 
 ```html
 <ul class="nav">
   {{range menu "main"}}
-  <li class="nav-item">
-    <a class="nav-link {{.Class}}" href="{{.Href}}" target="{{.Target}}">{{.Name}}</a>
-  </li>
+  <li><a href="{{.Href}}">{{.Name}}</a></li>
   {{end}}
 </ul>
 ```
 
-Create the menu under **Admin → Menus**, set its **Menu name** to the same string you pass to `menu` (for example `main`), and attach menu items to routes.
+Create the menu under **Admin → Menus** with matching **Menu name**.
 
-Each item is a map with:
-
-| Key | Description |
-|-----|-------------|
-| `Name` | Link label |
-| `Href` | URL from the linked route |
-| `Class` | Optional CSS class |
-| `Target` | Optional link target (`_blank`, etc.) |
+---
 
 ## Extension routes
 
-When a route's type is **Extension**, Cannon calls the extension's page handler and wraps the returned HTML in `default/layout.html` and `default/page.html`.
+Extension page routes wrap handler HTML in `layout.html` + `page.html`. Data includes `.Title`, `.Content`, and `.Main` on the layout.
 
-Template data for those routes includes:
-
-| Field | Description |
-|-------|-------------|
-| `.Title` | Route name from **Admin → Routes** |
-| `.Content` | HTML fragment returned by the extension |
-| `.Main` | Rendered page body (available on the layout, same as other pages) |
-
-Customize `default/page.html` if you need a different wrapper around extension output.
+---
 
 ## Authoring tips
 
-**Use valid HTML paths.** Template paths must end with `.html` (for example `default/layout.html`, not `default/layout`).
+**Valid paths.** Template storage paths must end with `.html` and include the theme folder: `mysite/layout.html`.
 
-**Auto-escaping.** `html/template` escapes values in `{{.Field}}` by default. Use `{{.Content}}` only for trusted HTML (such as extension output). Prefer plain text fields for user-supplied data.
+**Auto-escaping.** `html/template` escapes `{{.Field}}` by default. Use trusted HTML only for extension output.
 
-**Conditionals and loops.** Standard Go template syntax applies:
+**Bootstrap.** Built-in styles use `/theme/site.css`. Override by placing `site.css` in your theme's `assets/` folder.
 
-```html
-{{if .Subtitle}}<p class="lead">{{.Subtitle}}</p>{{end}}
+**Site name.** `{{siteName}}` and `{{year}}` are available in layouts.
 
-{{range .Items}}
-  <article>{{.Title}}</article>
-{{end}}
-```
+**Category templates.** Set **Template override** on a category to a path like `mysite/controllers/content/custom-list.html`.
 
-**Bootstrap.** Built-in `default` templates use Cannon theme styles at `/theme/site.css` (emerald palette, Inter + Source Serif 4). Override `default/layout.html` or link your own assets from your site template directory.
-
-**Site name.** Layout templates can call `{{siteName}}` for the site label from `sites.json`, and `{{year}}` for the current year in footers.
-
-## Template functions
-
-Every template can call **Sprig** helpers plus Cannon functions such as `space`, `lenspace`, `menu`, `siteName`, `year`, and `csrfField`.
-
-```html
-{{upper .Title}}
-{{default "Untitled" .Title}}
-{{if gt (lenspace "sidebar") 0}}{{space "sidebar"}}{{end}}
-```
-
-Cannon overrides Sprig when names collide (`add`, `sub`, `mul`, `div`, `min`, `dict`, `initials`) so pagination and admin lists behave predictably with integers.
-
-See **Help → Templates → Template Functions** for the complete Cannon and Sprig reference.
-
-**Local assets.** Routes of type **Local File** serve files from the site `assets_dir`. Reference them with normal URLs in your templates (for example `/files/brochure.pdf` when configured in routes).
+---
 
 ## Workflow summary
 
-1. Open **Admin → Templates → default** and review built-in files.
-2. Click **Override** on `layout.html` or `page.html` to copy the built-in source into your site template directory.
-3. Edit the HTML and save. Prior versions are kept under `versions/` automatically.
-4. Add `{{space "…"}}` and `{{menu "…"}}` where you need extension blocks and navigation.
-5. Load the public site and confirm the route or extension page renders with your layout.
+1. **Templates → New Theme** — create `mysite` with `assets/` and `template.json`
+2. Override `layout.html`, `page.html`, or controller templates into the theme
+3. Add `assets/site.css` and reference `/theme/site.css` in layout
+4. **Configuration → General → Frontend Theme** — select `mysite`
+5. Confirm public routes render with your layout and assets
 
-For admin UI templates, use the **admin** group instead of **default**. Frontend and admin overrides are separate trees under the same `template_dir`.
+For admin customization, repeat with an admin-capable theme and **Admin Theme**.
+
+See **Help → Templates → Template Functions** for the full function reference.

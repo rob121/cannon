@@ -14,7 +14,7 @@ Cannon dispatches Joomla-style event hooks during routing, rendering, authentica
 | `onBeforeRoute` | After `/ext/…` handling, before DB route matching | `method`, `path`, `query` |
 | `onAfterRoute` | After a route is matched, before dispatch | above + `route_id`, `route_name`, `route_type`, `route_path` |
 | `onBeforeRender` | Before a layout/page template renders | `layout`, `page` |
-| `onAfterRender` | After layout render completes | `layout`, `page` |
+| `onAfterRender` | After layout render completes, before bytes are written | `layout`, `page`, `headers`, `body` (mutable), `body_base64` + `body_encoding: "base64"` for binary bodies |
 
 ### User
 

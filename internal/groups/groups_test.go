@@ -27,3 +27,17 @@ func TestCanView(t *testing.T) {
 		t.Fatal("content without groups should be hidden")
 	}
 }
+
+func TestCanViewContent(t *testing.T) {
+	members := models.Group{GroupID: 2, Name: "members", Status: models.StatusActive}
+
+	if !CanViewContent([]uint{1}, nil) {
+		t.Fatal("unrestricted content should be visible")
+	}
+	if CanViewContent([]uint{1}, []models.Group{members}) {
+		t.Fatal("public viewer should not see members-only content")
+	}
+	if !CanViewContent([]uint{1, 2}, []models.Group{members}) {
+		t.Fatal("member viewer should see members content")
+	}
+}

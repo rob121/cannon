@@ -52,7 +52,14 @@ Added when rendering the public site (`internal/server/server.go`).
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `menu` | `menu "main"` | Returns a slice of menu item maps for the named menu. Each item has `Name`, `Href`, `Class`, and `Target`. Menus are configured under **Admin → Menus**. |
+| `menu` | `menu "main"` | Returns top-level menu items for the named menu. Each item has `Name`, `Href`, `Class`, `Target`, and optional nested `Children` (same shape). Menus are configured under **Admin → Menus**. |
+| `homeURL` | `homeURL` | Path of the site default route (from **Admin → Routes**). |
+| `isDefaultRoute` | `isDefaultRoute` | `true` when the current request matched the default route. |
+| `routeName` | `routeName` | Display name of the matched route, or empty. |
+| `routePath` | `routePath` | Path pattern of the matched route (e.g. `/`, `/content/item/*`). |
+| `routeController` | `routeController` | Controller id for controller routes (e.g. `content`, `auth`). |
+| `routeAction` | `routeAction` | Controller action id (e.g. `index`, `item`). |
+| `richText` | `richText .Category.Description` | Renders stored HTML or Markdown from the admin editor as safe HTML (category descriptions, item intros in listings). |
 | `siteName` | `siteName` | Site display name from `sites.json`. |
 | `year` | `year` | Current calendar year (for footers). |
 
@@ -63,6 +70,9 @@ Example:
   <p>&copy; {{year}} {{siteName}}</p>
   {{range menu "footer"}}
   <a href="{{.Href}}">{{.Name}}</a>
+  {{range .Children}}
+  <a href="{{.Href}}">{{.Name}}</a>
+  {{end}}
   {{end}}
 </footer>
 ```

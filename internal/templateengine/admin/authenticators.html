@@ -12,12 +12,12 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .AuthenticatorID "Status" .Status)}}</td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .AuthID "Label" .Name)}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .AuthID "Status" .Status)}}</td>
           {{template "row_actions_edit_only" (dict "BasePath" $.BasePath "ID" .AuthID)}}
         </tr>
         {{else}}
-        <tr><td colspan="3"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="3" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-key" "Title" "No authenticators yet" "Message" "Connect OAuth or other external login providers." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

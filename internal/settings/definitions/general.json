@@ -40,16 +40,36 @@
       "default_list_limit": {
         "type": "integer",
         "title": "Default List Limit",
-        "default": 20,
-        "minimum": 5,
-        "maximum": 100,
+        "default": 25,
+        "enum": [25, 50, 75, 100, 200, 500],
         "description": "Rows per page in admin table views."
+      },
+      "log_level": {
+        "type": "string",
+        "title": "Log Level",
+        "default": "info",
+        "enum": ["debug", "info", "warning", "error", "none"],
+        "description": "Minimum severity written to the Cannon process log."
       },
       "debug_template_spaces": {
         "type": "boolean",
         "title": "Debug Template Spaces",
         "default": false,
         "description": "When enabled, append ?tp=1 to a public URL to outline each {{space \"…\"}} region with a labeled border."
+      },
+      "frontend_theme": {
+        "type": "string",
+        "title": "Frontend Theme",
+        "default": "default",
+        "enum": ["default"],
+        "description": "Template pack used for the public site. Built-in default uses embedded templates; custom themes live as folders under the site template directory."
+      },
+      "admin_theme": {
+        "type": "string",
+        "title": "Admin Theme",
+        "default": "admin",
+        "enum": ["admin"],
+        "description": "Template pack used for the admin UI. Built-in admin uses embedded templates; custom themes live as folders under the site template directory."
       }
     }
   },
@@ -62,7 +82,10 @@
       {"type": "Control", "scope": "#/properties/allow_signup"},
       {"type": "Control", "scope": "#/properties/site_offline"},
       {"type": "Control", "scope": "#/properties/default_list_limit"},
-      {"type": "Control", "scope": "#/properties/debug_template_spaces"}
+      {"type": "Control", "scope": "#/properties/log_level"},
+      {"type": "Control", "scope": "#/properties/debug_template_spaces"},
+      {"type": "Control", "scope": "#/properties/frontend_theme"},
+      {"type": "Control", "scope": "#/properties/admin_theme"}
     ]
   }
 }

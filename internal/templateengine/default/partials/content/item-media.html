@@ -1,0 +1,51 @@
+{{define "itemMedia"}}
+{{if .Embeds}}
+<section class="mb-4">
+  <h2 class="h5 mb-3">Media</h2>
+  <div class="vstack gap-3">
+    {{range .Embeds}}
+    <figure class="mb-0">
+      {{if .Title}}<figcaption class="figure-caption mb-2">{{.Title}}</figcaption>{{end}}
+      {{if eq .Kind "video"}}
+      <video class="w-100 rounded" controls preload="metadata" src="{{.URL}}"></video>
+      {{else if eq .Kind "audio"}}
+      <audio class="w-100" controls preload="metadata" src="{{.URL}}"></audio>
+      {{else}}
+      <div class="ratio ratio-16x9">
+        <iframe class="rounded" src="{{.URL}}" title="{{if .Title}}{{.Title}}{{else}}Embedded media{{end}}" loading="lazy" allowfullscreen></iframe>
+      </div>
+      {{end}}
+    </figure>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+{{if .Gallery}}
+<section class="mb-4">
+  <h2 class="h5 mb-3">Gallery</h2>
+  <div class="row g-3">
+    {{range .Gallery}}
+    <div class="col-md-6 col-lg-4">
+      <figure class="mb-0">
+        <img class="img-fluid rounded" src="{{.URL}}" alt="{{if .Alt}}{{.Alt}}{{else}}{{$.Item.Title}}{{end}}">
+      </figure>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+{{if .Attachments}}
+<section class="mb-4">
+  <h2 class="h5 mb-3">Downloads</h2>
+  <ul class="list-group list-group-flush">
+    {{range .Attachments}}
+    <li class="list-group-item px-0">
+      <a href="{{.URL}}" download>{{if .Label}}{{.Label}}{{else}}Download{{end}}</a>
+    </li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+{{end}}

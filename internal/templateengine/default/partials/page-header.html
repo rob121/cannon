@@ -1,0 +1,9 @@
+{{define "pageHeader"}}
+{{if or .AlwaysShow (showRouteTitle)}}
+<header class="mb-4 pb-3 border-bottom">
+  {{if .Eyebrow}}<p class="text-uppercase text-muted small mb-2">{{.Eyebrow}}</p>{{end}}
+  {{if .Title}}<h1 class="h2 mb-2">{{.Title}}</h1>{{end}}
+  {{if .Subtitle}}<p class="lead text-muted mb-0">{{.Subtitle}}</p>{{end}}
+</header>
+{{end}}
+{{end}}

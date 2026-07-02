@@ -9,19 +9,19 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rob121/cannon/internal/csrf"
+	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/help"
-	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
+	"github.com/rob121/cannon/internal/themes"
 	"github.com/rob121/cannon/internal/user"
 )
-
-const pageSize = 20
 
 type Handler struct {
 	chain    *middleware.Chain
@@ -35,7 +35,7 @@ func NewHandler(chain *middleware.Chain, activate ActivateFunc, reload ReloadFun
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/admin/login" {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	if !h.requireAccess(w, r) {
@@ -95,7 +95,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/system"):
 		h.system(w, r, path)
 	default:
-		http.NotFound(w, r)
+		h.notFound(w, r)
 	}
 }
 
@@ -104,7 +104,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 	if err != nil {
 		return nil, err
 	}
-	return templateengine.New(site, nil, nil, templateengine.MergeFuncMaps(
+	sel, _ := themes.SelectionFromContext(r.Context())
+	return templateengine.New(site, sel, nil, nil, templateengine.MergeFuncMaps(
 		templateengine.CSRFFuncs(r),
 		template.FuncMap{
 		"lang": func(key string, pairs ...string) string {
@@ -147,6 +148,14 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 		"sortLink": func(basePath string, page int, currentSort, currentDir, col string) string {
 			return sortLinkExtra(basePath, page, currentSort, currentDir, col, listExtra)
 		},
+		"sortLinkRoot": func(root map[string]any, col string) string {
+			basePath, _ := root["BasePath"].(string)
+			page, _ := root["Page"].(int)
+			sort, _ := root["Sort"].(string)
+			dir, _ := root["Dir"].(string)
+			return sortLinkExtra(basePath, page, sort, dir, col, listExtraFromData(root))
+		},
+		"listQueryFromData": listQueryFromData,
 		"listQuery": func(page int, sort, dir string) string {
 			return listQueryExtra(page, sort, dir, listExtra)
 		},
@@ -160,6 +169,10 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			return extensions.HelpArticleURL(extensionName, articlePath)
 		},
 		"containsUint":  containsUint,
+		"fieldOptions": func(raw string) []content.FieldOption {
+			return content.ParseFieldConfig(raw).Options
+		},
+		"fieldValueContains": content.FieldValueContains,
 		"uintPtrEq":     uintPtrEq,
 		"siteURL":       siteFrontendURL,
 		"siteAdminURL":  siteAdminURL,
@@ -201,10 +214,7 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 	for k, v := range layoutContext(r) {
 		data[k] = v
 	}
-	var listExtra url.Values
-	if sf, ok := data["SpaceFilter"].(string); ok && strings.TrimSpace(sf) != "" {
-		listExtra = url.Values{"space": {sf}}
-	}
+	listExtra := listExtraFromData(data)
 	data["AdminExtensions"] = h.adminExtensionNav(r)
 	if nav, ok := data["ActiveNav"].(string); ok {
 		data["NavUsersOpen"] = usersNavOpen(nav)
@@ -220,6 +230,24 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := eng.Render(w, "admin/layout.html", page, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) renderFragment(w http.ResponseWriter, r *http.Request, page string, data map[string]any) {
+	if data == nil {
+		data = map[string]any{}
+	}
+	for k, v := range layoutContext(r) {
+		data[k] = v
+	}
+	eng, err := h.engine(r, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := eng.RenderFragment(w, page, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -275,6 +303,7 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		u, err := user.AuthenticateLocal(r.Context(), username, r.FormValue("password"))
 		if err == nil {
+			_ = user.EnsureRegisteredGroup(r.Context(), u.UserID)
 			afterArgs := map[string]any{
 				"context":  "admin",
 				"user_id":  u.UserID,
@@ -287,7 +316,9 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 			allowed, err := CanAccessAdmin(r.Context(), u.UserID, "/admin", false)
 			if err != nil || !allowed {
-				http.Error(w, "forbidden", http.StatusForbidden)
+				writeStandaloneAdminError(w, http.StatusForbidden, "Access Denied",
+					"Your account does not have permission to access the admin panel.",
+					"Contact an administrator to request access.")
 				return
 			}
 			_ = svc.Login(u.UserID)

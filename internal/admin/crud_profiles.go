@@ -27,7 +27,7 @@ func (h *Handler) profiles(w http.ResponseWriter, r *http.Request, path string) 
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.profileForm(w, r, id)
@@ -40,11 +40,11 @@ func (h *Handler) profileList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Profile
 	var total int64
 	db.Model(&models.Profile{}).Count(&total)
-	data := listPage(page, total, profilesBase,
+	data := listPage(r, page, total, profilesBase,
 		"User profile schemas and custom fields.",
 		"Add Profile", map[string]any{"ActiveNav": "profiles"})
 	order := applyListSort(r, data, map[string]string{"name": "name"}, "name")
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Preload("Fields").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Fields").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Profiles", "admin/profiles.html", data)
 }
@@ -55,7 +55,7 @@ func (h *Handler) profileForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.Profile
 	if !isNew {
 		if err := db.Preload("Fields").First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		sort.Slice(row.Fields, func(i, j int) bool { return row.Fields[i].Sort < row.Fields[j].Sort })
@@ -93,7 +93,7 @@ func (h *Handler) profileForm(w http.ResponseWriter, r *http.Request, id uint) {
 func (h *Handler) profileFieldAction(w http.ResponseWriter, r *http.Request, parts []string) {
 	profileID, ok := parseID(parts[0])
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
@@ -123,7 +123,7 @@ func (h *Handler) profileFieldAction(w http.ResponseWriter, r *http.Request, par
 		}
 		fieldID, ok := parseID(parts[2])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		db.Where("profile_id = ?", profileID).Delete(&models.ProfileField{}, fieldID)
@@ -133,12 +133,12 @@ func (h *Handler) profileFieldAction(w http.ResponseWriter, r *http.Request, par
 	if len(parts) == 3 {
 		fieldID, ok := parseID(parts[2])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		var field models.ProfileField
 		if err := db.Where("profile_id = ?", profileID).First(&field, fieldID).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		if r.Method == http.MethodPost {
@@ -160,7 +160,7 @@ func (h *Handler) profileFieldAction(w http.ResponseWriter, r *http.Request, par
 		}))
 		return
 	}
-	http.NotFound(w, r)
+	h.notFound(w, r)
 }
 
 func (h *Handler) profileDelete(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -170,7 +170,7 @@ func (h *Handler) profileDelete(w http.ResponseWriter, r *http.Request, idStr st
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

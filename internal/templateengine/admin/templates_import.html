@@ -1,0 +1,73 @@
+{{template "page_header" .}}
+<div class="admin-help-manager" data-turbo="false">
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Import Theme from Git</h2>
+        <p class="admin-form-card-desc">Clone a public repository branch into your site template directory. Cannon copies the files only — no <code class="admin-code">.git</code> metadata is kept.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post" action="{{.TemplatesBase}}/import">
+        {{csrfField}}
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="admin-form-label" for="git-repo-url">Repository URL</label>
+            <input class="admin-form-control" id="git-repo-url" name="repo_url" value="{{.RepoURL}}" placeholder="https://github.com/org/theme.git" required {{if .Branches}}readonly{{end}}>
+            <p class="admin-form-help">Use an HTTPS or <code class="admin-code">git@host:path</code> URL.</p>
+          </div>
+          {{if .Branches}}
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-branch">Branch</label>
+            <select class="admin-form-control" id="git-branch" name="branch" required>
+              {{range .Branches}}
+              <option value="{{.}}" {{if eq $.Branch .}}selected{{end}}>{{.}}</option>
+              {{end}}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-theme-name">Theme folder name</label>
+            <input class="admin-form-control" id="git-theme-name" name="theme_name" value="{{.ThemeName}}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-theme-label">Display name</label>
+            <input class="admin-form-control" id="git-theme-label" name="theme_label" value="{{.ThemeLabel}}">
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-theme-type">Type</label>
+            <select class="admin-form-control" id="git-theme-type" name="theme_type">
+              <option value="full" {{if eq .ThemeType "full"}}selected{{end}}>Full (frontend + admin)</option>
+              <option value="frontend" {{if eq .ThemeType "frontend"}}selected{{end}}>Frontend only</option>
+              <option value="backend" {{if eq .ThemeType "backend"}}selected{{end}}>Admin only</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-theme-author">Author</label>
+            <input class="admin-form-control" id="git-theme-author" name="theme_author" value="{{.ThemeAuthor}}">
+          </div>
+          <div class="col-md-12">
+            <label class="admin-form-label" for="git-theme-description">Description</label>
+            <textarea class="admin-form-control" id="git-theme-description" name="theme_description" rows="2">{{.ThemeDescription}}</textarea>
+          </div>
+          {{else}}
+          <div class="col-md-6">
+            <label class="admin-form-label" for="git-theme-name">Theme folder name</label>
+            <input class="admin-form-control" id="git-theme-name" name="theme_name" value="{{.ThemeName}}" placeholder="auto-detected from URL">
+            <p class="admin-form-help">Optional now — required before import.</p>
+          </div>
+          {{end}}
+        </div>
+        <div class="admin-form-actions">
+          {{if .Branches}}
+          <button type="submit" class="btn-admin-primary" name="action" value="import_theme"><i class="bi bi-download"></i> Import Theme</button>
+          <a class="btn-admin-outline" href="{{.TemplatesBase}}/import">Start Over</a>
+          {{else}}
+          <button type="submit" class="btn-admin-primary" name="action" value="fetch_branches"><i class="bi bi-git"></i> Fetch Branches</button>
+          {{end}}
+          <a class="btn-admin-outline" href="{{.TemplatesBase}}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

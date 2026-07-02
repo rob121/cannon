@@ -5,15 +5,32 @@ import (
 	"sync"
 )
 
+// ConfigFieldOption is one selectable value for a controller route config field.
+type ConfigFieldOption struct {
+	Value string
+	Label string
+}
+
+// ConfigField describes admin-editable metadata for a controller route placement.
+type ConfigField struct {
+	Name     string
+	Label    string
+	Type     string // text, number, select, category, item, tag, author
+	Help     string
+	Required bool
+	Options  []ConfigFieldOption
+}
+
 // ActionDefinition describes one handler on a controller.
 type ActionDefinition struct {
-	ID           string
-	Title        string
-	Methods      []string
-	DefaultPath  string
-	RequireAuth  bool
-	RequireGuest bool
+	ID              string
+	Title           string
+	Methods         []string
+	DefaultPath     string
+	RequireAuth     bool
+	RequireGuest    bool
 	AllowUnverified bool // skip validated check (verify/reset flows)
+	ConfigFields    []ConfigField
 }
 
 // Definition is listed in admin when creating controller routes.

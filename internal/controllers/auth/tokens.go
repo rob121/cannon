@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
@@ -125,11 +126,11 @@ func LookupToken(ctx context.Context, tokenType, value string) (*models.UserToke
 }
 
 // VerifyURL builds a frontend verification URL for a token value.
-func VerifyURL(token string) string {
-	return "/account/verify/" + token
+func VerifyURL(ctx context.Context, token string) string {
+	return routepath.ControllerWithSuffix(ctx, "auth", "verify", token)
 }
 
 // ResetURL builds a frontend password reset URL for a token value.
-func ResetURL(token string) string {
-	return "/account/reset-password/" + token
+func ResetURL(ctx context.Context, token string) string {
+	return routepath.ControllerWithSuffix(ctx, "auth", "reset-submit", token)
 }

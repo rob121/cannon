@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/settings"
+	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 )
 
@@ -33,7 +35,7 @@ func Dispatch(w http.ResponseWriter, r *http.Request, route models.Route, tpl *t
 	}
 
 	if action.RequireGuest && ctx.Authenticated() {
-		return Redirect(http.StatusSeeOther, "/").Write(w, r, ctx)
+		return Redirect(http.StatusSeeOther, sites.DefaultRoutePath(ctx.GoContext())).Write(w, r, ctx)
 	}
 	if action.RequireAuth && !ctx.Authenticated() {
 		allowed, err := settings.AllowLogin(ctx.GoContext())
@@ -41,11 +43,11 @@ func Dispatch(w http.ResponseWriter, r *http.Request, route models.Route, tpl *t
 			return Error(http.StatusInternalServerError, err.Error()).Write(w, r, ctx)
 		}
 		if !allowed {
-			return Redirect(http.StatusSeeOther, "/").Write(w, r, ctx)
+			return Redirect(http.StatusSeeOther, sites.DefaultRoutePath(ctx.GoContext())).Write(w, r, ctx)
 		}
-		loginURL, err := AppendReturn(ctx.Site, "/login", r.URL.Path)
+		loginURL, err := AppendReturn(ctx.Site, routepath.Controller(ctx.GoContext(), "auth", "login"), r.URL.Path)
 		if err != nil {
-			loginURL = "/login"
+			loginURL = routepath.Controller(ctx.GoContext(), "auth", "login")
 		}
 		return Redirect(http.StatusSeeOther, loginURL).Write(w, r, ctx)
 	}
@@ -53,9 +55,9 @@ func Dispatch(w http.ResponseWriter, r *http.Request, route models.Route, tpl *t
 		u, err := ctx.CurrentUser()
 		if err == nil && !u.Validated {
 			if allowed, _ := settings.AllowLogin(ctx.GoContext()); allowed {
-				return Redirect(http.StatusSeeOther, "/login?verified=0").Write(w, r, ctx)
+				return Redirect(http.StatusSeeOther, routepath.Controller(ctx.GoContext(), "auth", "login")+"?verified=0").Write(w, r, ctx)
 			}
-			return Redirect(http.StatusSeeOther, "/").Write(w, r, ctx)
+			return Redirect(http.StatusSeeOther, sites.DefaultRoutePath(ctx.GoContext())).Write(w, r, ctx)
 		}
 	}
 

@@ -26,7 +26,7 @@ func (h *Handler) comments(w http.ResponseWriter, r *http.Request, path string) 
 	case len(parts) == 2 && parts[1] == "delete":
 		h.commentDelete(w, r, parts[0])
 	default:
-		http.NotFound(w, r)
+		h.notFound(w, r)
 	}
 }
 
@@ -43,13 +43,13 @@ func (h *Handler) commentList(w http.ResponseWriter, r *http.Request) {
 	}
 	var total int64
 	q.Count(&total)
-	data := listPage(page, total, commentsBase,
+	data := listPage(r, page, total, commentsBase,
 		"Moderate item comments.",
 		"", map[string]any{"ActiveNav": "comments"})
-	order := applyListSort(r, data, map[string]string{"created": "created_at"}, "created")
+	order := applyListSortDesc(r, data, map[string]string{"created": "created_at"}, "created")
 	var rows []models.Comment
 	q.Preload("Item").Preload("User").
-		Offset((page - 1) * pageSize).Limit(pageSize).Order(order + " DESC").Find(&rows)
+		Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 	listRows := make([]commentListRow, 0, len(rows))
 	for _, row := range rows {
 		lr := commentListRow{Comment: row}
@@ -70,7 +70,7 @@ func (h *Handler) commentApprove(w http.ResponseWriter, r *http.Request, idStr s
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())
@@ -85,7 +85,7 @@ func (h *Handler) commentDelete(w http.ResponseWriter, r *http.Request, idStr st
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

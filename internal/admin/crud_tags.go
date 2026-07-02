@@ -22,7 +22,7 @@ func (h *Handler) tags(w http.ResponseWriter, r *http.Request, path string) {
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		h.tagForm(w, r, id)
@@ -34,12 +34,12 @@ func (h *Handler) tagList(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	var total int64
 	db.Model(&models.Tag{}).Count(&total)
-	data := listPage(page, total, tagsBase,
+	data := listPage(r, page, total, tagsBase,
 		"Reusable labels for organizing and filtering items.",
 		"Add Tag", map[string]any{"ActiveNav": "tags"})
 	order := applyListSort(r, data, map[string]string{"name": "name", "slug": "slug"}, "name")
 	var rows []models.Tag
-	db.Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Tags", "admin/tags.html", data)
 }
@@ -50,7 +50,7 @@ func (h *Handler) tagForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var row models.Tag
 	if !isNew {
 		if err := db.First(&row, id).Error; err != nil {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 	}
@@ -107,7 +107,7 @@ func (h *Handler) tagDelete(w http.ResponseWriter, r *http.Request, idStr string
 	}
 	id, ok := parseID(idStr)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	db, _ := sites.DB(r.Context())

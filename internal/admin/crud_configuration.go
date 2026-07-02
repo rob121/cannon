@@ -11,6 +11,7 @@ import (
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/themes"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
@@ -62,7 +63,7 @@ func (h *Handler) configuration(w http.ResponseWriter, r *http.Request, path str
 		}
 		h.configurationExtension(w, r, extMgr, parts[1], sectionID)
 	default:
-		http.NotFound(w, r)
+		h.notFound(w, r)
 	}
 }
 
@@ -78,7 +79,7 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 		return
 	}
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 
@@ -111,8 +112,18 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 	}
 	section, ok := settings.FindSection(doc, sectionID)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
+	}
+	if sectionID == settings.SectionGeneral {
+		site, _ := sites.FromContext(r.Context())
+		templateDir := ""
+		if site != nil {
+			templateDir = site.TemplateDir
+		}
+		if patched, err := themes.PatchGeneralSchema(section, templateDir); err == nil {
+			section = patched
+		}
 	}
 	formHTML, err := settings.RenderForm(section, postURL, configurationCSRFToken(r))
 	if err != nil {
@@ -125,13 +136,13 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 func (h *Handler) configurationExtension(w http.ResponseWriter, r *http.Request, extMgr *extensions.Manager, rawName, sectionID string) {
 	name, err := url.PathUnescape(rawName)
 	if err != nil || name == "" {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 
 	rt, ok := extMgr.Runtime(name)
 	if !ok || rt.Capabilities.Configuration == "" {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 
@@ -145,7 +156,7 @@ func (h *Handler) configurationExtension(w http.ResponseWriter, r *http.Request,
 	if sectionID == "" {
 		section, ok := settings.FindSection(doc, "")
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		redirectList(w, r, configurationBase+"/extensions/"+url.PathEscape(name)+"/"+url.PathEscape(section.ID))
@@ -154,7 +165,7 @@ func (h *Handler) configurationExtension(w http.ResponseWriter, r *http.Request,
 
 	section, ok := settings.FindSection(doc, sectionID)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	postURL := configurationBase + "/extensions/" + url.PathEscape(name) + "/" + url.PathEscape(section.ID)

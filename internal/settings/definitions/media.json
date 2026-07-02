@@ -1,0 +1,29 @@
+{
+  "title": "Media",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "max_file_size_mb": {
+        "type": "integer",
+        "title": "Maximum File Size (MB)",
+        "default": 32,
+        "minimum": 1,
+        "maximum": 512,
+        "description": "Maximum upload size for files in the media manager."
+      },
+      "approved_extensions": {
+        "type": "string",
+        "title": "Approved File Extensions",
+        "default": "jpg, jpeg, png, gif, webp, svg, pdf, mp4, webm, mp3, wav, zip",
+        "description": "Comma-separated list of allowed extensions without dots. Use * to allow all file types."
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/max_file_size_mb"},
+      {"type": "Control", "scope": "#/properties/approved_extensions"}
+    ]
+  }
+}

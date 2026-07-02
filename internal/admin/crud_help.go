@@ -58,7 +58,7 @@ func (h *Handler) help(w http.ResponseWriter, r *http.Request, path string) {
 		data["Breadcrumbs"] = []helpCrumb{{Label: "All Help", URL: helpBase, Current: true}}
 		data["Folders"] = buildRootFolders(internalSections, extensionSections)
 	case parts[0] == "extensions":
-		h.helpExtensionsPath(w, r, parts, extensionSections, extMgr, data, &title)
+		h.helpExtensionsPath(w, r, parts, internalSections, extensionSections, extMgr, data, &title)
 		return
 	default:
 		h.helpInternalPath(w, r, parts, internalSections, data, &title)
@@ -72,7 +72,7 @@ func (h *Handler) helpInternalPath(w http.ResponseWriter, r *http.Request, parts
 	folder := parts[0]
 	section, ok := help.FindSection(sections, folder)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 
@@ -91,12 +91,12 @@ func (h *Handler) helpInternalPath(w http.ResponseWriter, r *http.Request, parts
 	slug := parts[1]
 	article, ok := help.FindArticle(sections, folder, slug)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	md, err := help.Fetch(folder, slug)
 	if err != nil {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	html, err := markdown.ToHTML(md)
@@ -115,21 +115,28 @@ func (h *Handler) helpInternalPath(w http.ResponseWriter, r *http.Request, parts
 	h.render(w, r, *title, "admin/help.html", data)
 }
 
-func (h *Handler) helpExtensionsPath(w http.ResponseWriter, r *http.Request, parts []string, sections []extensions.HelpSection, extMgr *extensions.Manager, data map[string]any, title *string) {
+func (h *Handler) helpExtensionsPath(w http.ResponseWriter, r *http.Request, parts []string, internalSections []help.Section, sections []extensions.HelpSection, extMgr *extensions.Manager, data map[string]any, title *string) {
 	if len(parts) == 1 {
 		data["Breadcrumbs"] = []helpCrumb{
 			{Label: "All Help", URL: helpBase},
 			{Label: "Extensions", URL: help.ExtensionsRootURL(), Current: true},
 		}
 		data["Folders"] = extensionFolderItems(sections)
+		if sec, ok := help.FindSection(internalSections, "extensions"); ok {
+			data["Files"] = builtinExtensionFileItems(*sec)
+		}
 		h.render(w, r, "Extensions", "admin/help.html", data)
 		return
 	}
 
 	extName, _ := url.PathUnescape(parts[1])
+	if extName == "_" {
+		h.helpBuiltinExtensionDocs(w, r, parts, internalSections, data, title)
+		return
+	}
 	section, ok := findExtensionSection(sections, extName)
 	if !ok {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 
@@ -161,7 +168,7 @@ func (h *Handler) renderExtensionHelpReader(w http.ResponseWriter, r *http.Reque
 	if articlePath != "" {
 		article, ok := findHelpArticle([]extensions.HelpSection{*section}, extName, articlePath)
 		if !ok {
-			http.NotFound(w, r)
+			h.notFound(w, r)
 			return
 		}
 		md, err := extMgr.FetchHelpArticle(extName, articlePath)
@@ -196,11 +203,19 @@ func buildRootFolders(internal []help.Section, ext []extensions.HelpSection) []h
 	if sec, ok := help.FindSection(internal, "admin"); ok {
 		out = append(out, internalFolderItem(*sec))
 	}
-	if len(ext) > 0 {
+	extDocCount := 0
+	if sec, ok := help.FindSection(internal, "extensions"); ok {
+		extDocCount = len(sec.Articles)
+	}
+	if len(ext) > 0 || extDocCount > 0 {
+		count := len(ext)
+		if count == 0 {
+			count = extDocCount
+		}
 		out = append(out, helpBrowseItem{
 			Label: "Extensions",
 			URL:   help.ExtensionsRootURL(),
-			Count: len(ext),
+			Count: count,
 			Kind:  "folder",
 		})
 	}
@@ -208,7 +223,7 @@ func buildRootFolders(internal []help.Section, ext []extensions.HelpSection) []h
 		out = append(out, internalFolderItem(*sec))
 	}
 	for _, sec := range internal {
-		if sec.Folder == "admin" || sec.Folder == "getting-started" {
+		if sec.Folder == "admin" || sec.Folder == "getting-started" || sec.Folder == "extensions" {
 			continue
 		}
 		out = append(out, internalFolderItem(sec))
@@ -235,6 +250,58 @@ func internalFileItems(sec help.Section) []helpBrowseItem {
 		})
 	}
 	return out
+}
+
+func builtinExtensionFileItems(sec help.Section) []helpBrowseItem {
+	out := make([]helpBrowseItem, 0, len(sec.Articles))
+	for _, article := range sec.Articles {
+		out = append(out, helpBrowseItem{
+			Label: article.Title,
+			URL:   help.BuiltinExtensionArticleURL(article.Slug),
+			Kind:  "file",
+		})
+	}
+	return out
+}
+
+func (h *Handler) helpBuiltinExtensionDocs(w http.ResponseWriter, r *http.Request, parts []string, internalSections []help.Section, data map[string]any, title *string) {
+	sec, ok := help.FindSection(internalSections, "extensions")
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	if len(parts) == 2 {
+		if len(sec.Articles) > 0 {
+			redirectList(w, r, help.BuiltinExtensionArticleURL(sec.Articles[0].Slug))
+			return
+		}
+		h.notFound(w, r)
+		return
+	}
+	slug := parts[2]
+	article, ok := help.FindArticle(internalSections, "extensions", slug)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	md, err := help.Fetch("extensions", slug)
+	if err != nil {
+		h.notFound(w, r)
+		return
+	}
+	html, err := markdown.ToHTML(md)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	*title = article.Title
+	data["Breadcrumbs"] = []helpCrumb{
+		{Label: "All Help", URL: helpBase},
+		{Label: "Extensions", URL: help.ExtensionsRootURL()},
+		{Label: article.Title, URL: help.BuiltinExtensionArticleURL(slug), Current: true},
+	}
+	data["ContentHTML"] = template.HTML(html)
+	h.render(w, r, *title, "admin/help.html", data)
 }
 
 func extensionFolderItems(sections []extensions.HelpSection) []helpBrowseItem {

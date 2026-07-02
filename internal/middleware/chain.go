@@ -7,12 +7,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rob121/cannon/internal/accesslog"
+	"github.com/rob121/cannon/internal/applog"
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/router"
 	"github.com/rob121/cannon/internal/session"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 )
@@ -108,15 +111,18 @@ func (c *Chain) InvalidateLang(site *config.SiteConfig) {
 }
 
 func (c *Chain) Site(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return accesslog.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		site, err := c.Sites.Resolve(r)
 		if err != nil {
 			http.Error(w, "site not found", http.StatusNotFound)
 			return
 		}
 		ctx := sites.WithContext(r.Context(), site)
+		if level, err := settings.LogLevel(ctx); err == nil {
+			applog.SetLevel(applog.ParseLevel(level))
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}))
 }
 
 func (c *Chain) Session(next http.Handler) http.Handler {
@@ -148,6 +154,15 @@ func (c *Chain) Session(next http.Handler) http.Handler {
 				SameSite: http.SameSiteLaxMode,
 			})
 		}
+		// Clear legacy Goth session cookie from older Cannon builds.
+		http.SetCookie(w, &http.Cookie{
+			Name:     "_gothic_session",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			SameSite: http.SameSiteLaxMode,
+		})
 
 		svc, err := user.NewService(store, sessionID)
 		if err != nil {

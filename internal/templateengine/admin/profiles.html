@@ -12,12 +12,12 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ProfileID "Label" .Name)}}</td>
           <td>{{len .Fields}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ProfileID)}}
         </tr>
         {{else}}
-        <tr><td colspan="3"><div class="admin-empty">No Records Found</div></td></tr>
+        <tr><td colspan="3" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-person-badge" "Title" "No profiles yet" "Message" "User profiles store author bios, avatars, and custom fields." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

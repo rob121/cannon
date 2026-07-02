@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/hooks"
@@ -28,6 +29,19 @@ type Service struct {
 
 // ContextKey is used to store the user service in request context.
 type ContextKey struct{}
+
+type requestUserKey struct{}
+
+// WithRequestUser attaches the serializable user scope used by templates and extensions.
+func WithRequestUser(ctx context.Context, data map[string]any) context.Context {
+	return context.WithValue(ctx, requestUserKey{}, data)
+}
+
+// RequestUser returns the current request user scope when present.
+func RequestUser(ctx context.Context) (map[string]any, bool) {
+	v, ok := ctx.Value(requestUserKey{}).(map[string]any)
+	return v, ok
+}
 
 // NewService loads session data for a request.
 func NewService(store *session.Store, sessionID string) (*Service, error) {
@@ -138,7 +152,20 @@ func (s *Service) Context(ctx context.Context) (map[string]any, error) {
 		"email":         u.Email,
 		"given_name":    u.GivenName,
 		"family_name":   u.FamilyName,
+		"display_name":  DisplayName(u),
 	}, nil
+}
+
+// DisplayName returns the best label for greeting a user in templates.
+func DisplayName(u *models.User) string {
+	if u == nil {
+		return ""
+	}
+	name := strings.TrimSpace(strings.TrimSpace(u.GivenName + " " + u.FamilyName))
+	if name != "" {
+		return name
+	}
+	return u.Username
 }
 
 // CreateLocalUser creates a bcrypt-authenticated user.
@@ -191,6 +218,28 @@ func CreateLocalUser(ctx context.Context, givenName, familyName, email, username
 	}
 	_, _ = hooks.Fire(ctx, hooks.OnUserSignup, signupArgs)
 	return &u, nil
+}
+
+// EnsureRegisteredGroup adds the registered group when missing (e.g. after login).
+func EnsureRegisteredGroup(ctx context.Context, userID uint) error {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return err
+	}
+	var g models.Group
+	if err := db.Where("name = ?", "registered").First(&g).Error; err != nil {
+		return nil
+	}
+	var u models.User
+	if err := db.Preload("Groups").First(&u, userID).Error; err != nil {
+		return err
+	}
+	for _, group := range u.Groups {
+		if group.GroupID == g.GroupID {
+			return nil
+		}
+	}
+	return db.Model(&u).Association("Groups").Append(&g)
 }
 
 // AuthenticateLocal validates username/password.

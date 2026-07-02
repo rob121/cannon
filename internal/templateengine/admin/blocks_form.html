@@ -1,166 +1,333 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-header">
-    <div class="admin-form-card-heading">
-      <h2 class="admin-form-card-title">{{if .IsNew}}New Block{{else}}Edit Block{{end}}</h2>
-      <p class="admin-form-card-desc">Assign content to a template space. Use <code class="admin-code">{{"{{"}}space "space"{{"}}"}}</code> in frontend templates.</p>
-    </div>
-  </div>
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
-      <input type="hidden" name="space_filter" value="{{.SpaceFilter}}">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="admin-form-label">Name</label>
-          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Space</label>
-          <input class="admin-form-control" name="space" value="{{.Row.Space}}" placeholder="footer" required>
-          <p class="admin-form-help">Template space passed to <code class="admin-code">{{"{{"}}space "…"{{"}}"}}</code>.</p>
-        </div>
-        <div class="col-md-6">
-          <label class="admin-form-label">Type</label>
-          <select class="admin-form-control" name="type" id="block-type">
-            <option value="html" {{if eq .Row.Type "html"}}selected{{end}}>HTML</option>
-            <option value="markdown" {{if eq .Row.Type "markdown"}}selected{{end}}>Markdown</option>
-            <option value="content" {{if eq .Row.Type "content"}}selected{{end}}>Content</option>
-            <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-label">Sort</label>
-          <input class="admin-form-control" name="sort" type="number" value="{{.Row.Sort}}">
-        </div>
-        <div class="col-md-3">
-          <label class="admin-form-label">Status</label>
-          <select class="admin-form-control" name="status">
-            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
-            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
-          </select>
+{{template "form_toolbar" (dict "FormID" "block-form" "BasePath" .BasePath "CancelURL" .CancelURL)}}
+<form method="post" id="block-form" class="admin-block-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+  <input type="hidden" name="space_filter" value="{{.SpaceFilter}}">
+
+  <div class="admin-form-split">
+    <div class="admin-form-split-main">
+      <div class="admin-form-tabbed-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Block configuration">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="content">
+            <i class="bi bi-file-earmark-text"></i> Content
+          </button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="placement">
+            <i class="bi bi-signpost-split"></i> Placement
+          </button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">
+            <i class="bi bi-people"></i> Access
+          </button>
         </div>
 
-        <div class="col-12 block-fields-native" id="block-fields-native">
-          <div class="admin-form-divider"></div>
-          <label class="admin-form-label">Content</label>
-          <textarea class="admin-form-control admin-template-editor" name="content" rows="12">{{.Meta.Content}}</textarea>
-          <p class="admin-form-help">Raw HTML or Markdown source depending on the selected type.</p>
-        </div>
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="content" role="tabpanel">
+          <p class="admin-form-panel-intro">Configure what this block displays. Options depend on the block type set under <strong>General</strong>.</p>
 
-        <div class="col-12 block-fields-content" id="block-fields-content">
-          <div class="admin-form-divider"></div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="admin-form-label">Content Mode</label>
-              <select class="admin-form-control" name="content_mode">
-                <option value="latest" {{if eq .Meta.ContentMode "latest"}}selected{{end}}>Latest Items</option>
-                <option value="featured" {{if eq .Meta.ContentMode "featured"}}selected{{end}}>Featured Items</option>
-                <option value="popular" {{if eq .Meta.ContentMode "popular"}}selected{{end}}>Popular Items</option>
-                <option value="category" {{if eq .Meta.ContentMode "category"}}selected{{end}}>By Category</option>
-                <option value="tag" {{if eq .Meta.ContentMode "tag"}}selected{{end}}>By Tag</option>
-                <option value="author" {{if eq .Meta.ContentMode "author"}}selected{{end}}>By Author</option>
-                <option value="related" {{if eq .Meta.ContentMode "related"}}selected{{end}}>Related Items</option>
-                <option value="tag_cloud" {{if eq .Meta.ContentMode "tag_cloud"}}selected{{end}}>Tag Cloud</option>
-                <option value="category_menu" {{if eq .Meta.ContentMode "category_menu"}}selected{{end}}>Category Menu</option>
-              </select>
+          <div class="block-fields-native" id="block-fields-native">
+            <label class="admin-form-label">Content</label>
+            <div class="admin-code-editor-field admin-code-editor-field-block">
+              <textarea class="admin-form-control admin-template-editor" id="block-content" name="content" rows="14" data-editor-height="18rem" data-editor-mode="{{if eq .Row.Type "markdown"}}markdown{{else}}htmlmixed{{end}}">{{.Meta.Content}}</textarea>
             </div>
-            <div class="col-md-3">
-              <label class="admin-form-label">Limit</label>
-              <input class="admin-form-control" name="content_limit" type="number" value="{{if .Meta.Limit}}{{.Meta.Limit}}{{else}}5{{end}}" min="1" max="50">
-            </div>
-            <div class="col-md-3">
-              <label class="admin-form-label">Layout</label>
-              <select class="admin-form-control" name="content_layout">
-                <option value="list" {{if or (eq .Meta.Layout "") (eq .Meta.Layout "list")}}selected{{end}}>List</option>
-                <option value="grid" {{if eq .Meta.Layout "grid"}}selected{{end}}>Grid</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="admin-form-label">Category Slug</label>
-              <select class="admin-form-control" name="category_slug">
-                <option value="">Select category</option>
-                {{range .Categories}}
-                <option value="{{.Slug}}" {{if eq $.Meta.CategorySlug .Slug}}selected{{end}}>{{.Name}}</option>
-                {{end}}
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="admin-form-label">Tag Slug</label>
-              <select class="admin-form-control" name="tag_slug">
-                <option value="">Select tag</option>
-                {{range .Tags}}
-                <option value="{{.Slug}}" {{if eq $.Meta.TagSlug .Slug}}selected{{end}}>{{.Name}}</option>
-                {{end}}
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="admin-form-label">Author (username or ID)</label>
-              <input class="admin-form-control" name="author_key" value="{{.Meta.AuthorKey}}" placeholder="jane">
-            </div>
-            <div class="col-md-6">
-              <label class="admin-form-label">Item Slug (for related)</label>
-              <input class="admin-form-control" name="item_slug" value="{{.Meta.ItemSlug}}" placeholder="my-article">
+            <p class="admin-form-help">Raw HTML or Markdown source depending on the selected type.</p>
+          </div>
+
+          <div class="block-fields-content" id="block-fields-content" hidden>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="admin-form-label">Content Mode</label>
+                <select class="admin-form-control" name="content_mode">
+                  <option value="latest" {{if eq .Meta.ContentMode "latest"}}selected{{end}}>Latest Items</option>
+                  <option value="featured" {{if eq .Meta.ContentMode "featured"}}selected{{end}}>Featured Items</option>
+                  <option value="popular" {{if eq .Meta.ContentMode "popular"}}selected{{end}}>Popular Items</option>
+                  <option value="category" {{if eq .Meta.ContentMode "category"}}selected{{end}}>By Category</option>
+                  <option value="tag" {{if eq .Meta.ContentMode "tag"}}selected{{end}}>By Tag</option>
+                  <option value="author" {{if eq .Meta.ContentMode "author"}}selected{{end}}>By Author</option>
+                  <option value="related" {{if eq .Meta.ContentMode "related"}}selected{{end}}>Related Items</option>
+                  <option value="tag_cloud" {{if eq .Meta.ContentMode "tag_cloud"}}selected{{end}}>Tag Cloud</option>
+                  <option value="category_menu" {{if eq .Meta.ContentMode "category_menu"}}selected{{end}}>Category Menu</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="admin-form-label">Limit</label>
+                <input class="admin-form-control" name="content_limit" type="number" value="{{if .Meta.Limit}}{{.Meta.Limit}}{{else}}5{{end}}" min="1" max="50">
+              </div>
+              <div class="col-md-3">
+                <label class="admin-form-label">Layout</label>
+                <select class="admin-form-control" name="content_layout">
+                  <option value="list" {{if or (eq .Meta.Layout "") (eq .Meta.Layout "list")}}selected{{end}}>List</option>
+                  <option value="grid" {{if eq .Meta.Layout "grid"}}selected{{end}}>Grid</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label">Category Slug</label>
+                <select class="admin-form-control" name="category_slug">
+                  <option value="">Select category</option>
+                  {{range .Categories}}
+                  <option value="{{.Slug}}" {{if eq $.Meta.CategorySlug .Slug}}selected{{end}}>{{.Name}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label">Tag Slug</label>
+                <select class="admin-form-control" name="tag_slug">
+                  <option value="">Select tag</option>
+                  {{range .Tags}}
+                  <option value="{{.Slug}}" {{if eq $.Meta.TagSlug .Slug}}selected{{end}}>{{.Name}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label">Author (username or ID)</label>
+                <input class="admin-form-control" name="author_key" value="{{.Meta.AuthorKey}}" placeholder="jane">
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label">Item Slug (for related)</label>
+                <input class="admin-form-control" name="item_slug" value="{{.Meta.ItemSlug}}" placeholder="my-article">
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="col-12 block-fields-extension" id="block-fields-extension">
-          <div class="admin-form-divider"></div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="admin-form-label">Extension</label>
-              <select class="admin-form-control" name="extension_name" id="block-extension">
-                <option value="">Select extension</option>
-                {{range .ExtensionOptions}}
-                <option value="{{.Name}}" {{if eq $.Row.ExtensionName .Name}}selected{{end}}>{{.Label}}</option>
-                {{end}}
-              </select>
+          <div class="block-fields-login" id="block-fields-login" hidden>
+            {{template "form_section_header" (dict "Title" "Login Form" "Description" "Renders a sign-in form using active authenticators configured under Accounts → Authenticators.")}}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-login-title">Heading</label>
+                <input class="admin-form-control" id="block-login-title" name="login_title" value="{{.Meta.LoginTitle}}" placeholder="Sign In">
+                <p class="admin-form-help">Optional title shown above the form. Leave blank for no heading.</p>
+              </div>
             </div>
-            <div class="col-md-6">
-              <label class="admin-form-label">Block</label>
-              <select class="admin-form-control" name="extension_block_id" id="block-extension-item">
-                <option value="">Select block</option>
-                {{range .ExtensionOptions}}
-                {{$extName := .Name}}
-                {{$extLabel := .Label}}
-                {{range .Blocks}}
-                <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionBlockID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
-                {{end}}
-                {{end}}
-              </select>
+          </div>
+
+          <div class="block-fields-menu" id="block-fields-menu" hidden>
+            {{template "form_section_header" (dict "Title" "Menu" "Description" "Renders a site menu in this block space. Items respect group visibility and support up to three nested levels.")}}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-menu-name">Menu</label>
+                <select class="admin-form-control" id="block-menu-name" name="menu_name" required>
+                  <option value="">Select menu</option>
+                  {{range .AllMenus}}
+                  <option value="{{.MenuName}}" {{if eq $.Meta.MenuName .MenuName}}selected{{end}}>{{.MenuName}}</option>
+                  {{end}}
+                </select>
+                <p class="admin-form-help">Manage menus under <a href="/admin/menus" data-turbo-frame="_top">Menus</a>.</p>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-menu-class">CSS Class</label>
+                <input class="admin-form-control" id="block-menu-class" name="menu_class" value="{{.Meta.MenuClass}}" placeholder="mb-3 border-bottom pb-2">
+                <p class="admin-form-help">Optional classes added to the menu wrapper element.</p>
+              </div>
             </div>
-            {{range .ExtensionOptions}}
-            {{$extName := .Name}}
-            {{range .Blocks}}
-            {{$blockID := .ID}}
-            {{range .Fields}}
-            {{$fieldName := .Name}}
-            <div class="col-md-6 block-data-field" data-extension-name="{{$extName}}" data-block-id="{{$blockID}}">
-              <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
-              {{if eq .Type "select"}}
-              <select class="admin-form-control" name="block_data_{{.Name}}" {{if .Required}}required{{end}}>
-                <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
-                {{range .Options}}
-                <option value="{{.Value}}" {{if eq (index $.BlockData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+          </div>
+
+          <div class="block-fields-extension" id="block-fields-extension" hidden>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="admin-form-label">Extension</label>
+                <select class="admin-form-control" name="extension_name" id="block-extension">
+                  <option value="">Select extension</option>
+                  {{range .ExtensionOptions}}
+                  <option value="{{.Name}}" {{if eq $.Row.ExtensionName .Name}}selected{{end}}>{{.Label}}</option>
+                  {{end}}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label">Block</label>
+                <select class="admin-form-control" name="extension_block_id" id="block-extension-item">
+                  <option value="">Select block</option>
+                  {{range .ExtensionOptions}}
+                  {{$extName := .Name}}
+                  {{$extLabel := .Label}}
+                  {{range .Blocks}}
+                  <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionBlockID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
+                  {{end}}
+                  {{end}}
+                </select>
+              </div>
+              {{range .ExtensionOptions}}
+              {{$extName := .Name}}
+              {{range .Blocks}}
+              {{$blockID := .ID}}
+              {{range .Fields}}
+              {{$fieldName := .Name}}
+              <div class="col-md-6 block-data-field" data-extension-name="{{$extName}}" data-block-id="{{$blockID}}">
+                <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+                {{if eq .Type "select"}}
+                <select class="admin-form-control" name="block_data_{{.Name}}" {{if .Required}}required{{end}}>
+                  <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
+                  {{range .Options}}
+                  <option value="{{.Value}}" {{if eq (index $.BlockData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                  {{end}}
+                </select>
+                {{else if eq .Type "number"}}
+                <input class="admin-form-control" name="block_data_{{.Name}}" type="number" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
+                {{else}}
+                <input class="admin-form-control" name="block_data_{{.Name}}" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
                 {{end}}
-              </select>
-              {{else if eq .Type "number"}}
-              <input class="admin-form-control" name="block_data_{{.Name}}" type="number" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
-              {{else}}
-              <input class="admin-form-control" name="block_data_{{.Name}}" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
+                {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+              </div>
               {{end}}
-              {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+              {{end}}
+              {{end}}
             </div>
-            {{end}}
-            {{end}}
-            {{end}}
           </div>
         </div>
-        {{template "group_visibility_fields" .}}
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="placement" role="tabpanel">
+          <p class="admin-form-panel-intro">Control which pages render this block in the <code class="admin-code">{{if .Row.Space}}{{.Row.Space}}{{else}}space{{end}}</code> template space. {{.RouteTotal}} routes available.</p>
+          <div class="admin-block-route-panel admin-block-route-panel--embedded" id="block-route-panel">
+            <div class="admin-block-route-header">
+              <div class="admin-block-route-heading">
+                <h3 class="admin-form-section-title">Page Visibility</h3>
+                <p class="admin-form-section-desc">Choose where this block appears when its space is loaded.</p>
+              </div>
+              <div class="admin-block-route-mode">
+                <label class="admin-form-label" for="block-route-mode">Mode</label>
+                <select class="admin-form-control" name="route_mode" id="block-route-mode">
+                  <option value="all" {{if or (eq .RouteMode "") (eq .RouteMode "all")}}selected{{end}}>All Pages</option>
+                  <option value="none" {{if eq .RouteMode "none"}}selected{{end}}>No Pages</option>
+                  <option value="only" {{if eq .RouteMode "only"}}selected{{end}}>Only Selected Pages</option>
+                  <option value="except" {{if eq .RouteMode "except"}}selected{{end}}>All Pages Except Selected</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="admin-block-route-hint" id="block-route-hint-all" {{if or (eq .RouteMode "only") (eq .RouteMode "except")}}hidden{{end}}>
+              {{if eq .RouteMode "none"}}
+              <p class="admin-block-route-hint-text">This block will not render on any page until you change the visibility mode.</p>
+              {{else}}
+              <p class="admin-block-route-hint-text">This block renders on every page that loads its space. Switch to <strong>Only Selected Pages</strong> or <strong>All Pages Except Selected</strong> to limit where it appears.</p>
+              {{end}}
+            </div>
+
+            <div class="admin-block-route-body" id="block-route-body">
+              <div class="admin-block-route-toolbar" id="block-route-toolbar">
+                <div class="admin-block-route-toolbar-main">
+                  <span class="admin-block-route-selected-count" id="block-route-selected-count">{{.RouteSelected}} Selected</span>
+                  <div class="admin-block-route-toolbar-actions">
+                    <button type="button" class="btn-admin-ghost btn-admin-sm" data-block-route-select="all">Select All</button>
+                    <button type="button" class="btn-admin-ghost btn-admin-sm" data-block-route-select="none">Clear</button>
+                  </div>
+                </div>
+                <div class="admin-block-route-search">
+                  <input class="admin-form-control admin-form-control-sm" type="search" id="block-route-search" placeholder="Search by name, path, or controller" autocomplete="off">
+                </div>
+              </div>
+
+              <div class="admin-block-route-list{{if and (ne .RouteMode "only") (ne .RouteMode "except")}} is-disabled{{end}}" id="block-route-list">
+                {{range .RouteSections}}
+                <div class="admin-block-route-section{{if eq .Key "default"}} admin-block-route-section-pinned{{end}}" data-route-section="{{.Key}}">
+                  <button type="button" class="admin-block-route-section-toggle" aria-expanded="false">
+                    <span class="admin-block-route-section-heading">
+                      <span class="admin-block-route-section-title">{{.Label}}</span>
+                      {{if .Desc}}<span class="admin-block-route-section-desc">{{.Desc}}</span>{{end}}
+                    </span>
+                    <span class="admin-block-route-section-count">{{len .Routes}}</span>
+                  </button>
+                  <div class="admin-block-route-rows" hidden>
+                    {{range .Routes}}
+                    <label class="admin-block-route-row" data-route-label="{{.Name}} {{.Path}} {{if .IsDefault}}Default{{end}} {{.Controller}} {{.ControllerAction}}">
+                      <input type="checkbox" class="admin-block-route-checkbox" name="route_ids" value="{{.RouteID}}" {{if inUint $.SelectedRouteIDs .RouteID}}checked{{end}}{{if and (ne $.RouteMode "only") (ne $.RouteMode "except")}} disabled{{end}}>
+                      <span class="admin-block-route-row-main">
+                        <span class="admin-block-route-row-title">
+                          <span class="admin-block-route-item-name">{{.Name}}</span>
+                          {{if .IsDefault}}<span class="admin-badge admin-badge-active admin-block-route-badge">Default</span>{{end}}
+                          {{if ne .Status "active"}}<span class="admin-badge admin-badge-inactive admin-block-route-badge">Inactive</span>{{end}}
+                        </span>
+                        <span class="admin-block-route-row-meta">
+                          <code class="admin-code">{{.Path}}</code>
+                          {{if and .Controller .ControllerAction}}<span class="admin-block-route-row-controller">{{.Controller}}/{{.ControllerAction}}</span>{{end}}
+                        </span>
+                      </span>
+                    </label>
+                    {{end}}
+                  </div>
+                </div>
+                {{else}}
+                <p class="admin-cell-muted admin-block-route-empty">No routes configured yet. Add routes under <a href="/admin/routes" data-turbo-frame="_top">Routes</a>.</p>
+                {{end}}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
+          {{template "group_access_panel" .}}
+        </div>
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
+
+    <aside class="admin-form-split-sidebar">
+      <div class="admin-form-sidebar-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Block details">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="general">General</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="settings">Settings</button>
+        </div>
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="general" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-name">Name</label>
+              <input class="admin-form-control" id="block-name" name="name" value="{{.Row.Name}}" required>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-space">Space</label>
+              <input class="admin-form-control" id="block-space" name="space" value="{{.Row.Space}}" placeholder="sidebar" required>
+              <p class="admin-form-help">Used in <code class="admin-code">{{"{{"}}space "…"{{"}}"}}</code> in templates.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-type">Type</label>
+              <select class="admin-form-control" name="type" id="block-type">
+                <option value="html" {{if eq .Row.Type "html"}}selected{{end}}>HTML</option>
+                <option value="markdown" {{if eq .Row.Type "markdown"}}selected{{end}}>Markdown</option>
+                <option value="content" {{if eq .Row.Type "content"}}selected{{end}}>Content</option>
+                <option value="login" {{if eq .Row.Type "login"}}selected{{end}}>Login</option>
+                <option value="menu-vertical" {{if eq .Row.Type "menu-vertical"}}selected{{end}}>Menu Vertical</option>
+                <option value="menu-horizontal" {{if eq .Row.Type "menu-horizontal"}}selected{{end}}>Menu Horizontal</option>
+                <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-sort">Sort Order</label>
+              <input class="admin-form-control" id="block-sort" name="sort" type="number" value="{{.Row.Sort}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-status">Status</label>
+              <select class="admin-form-control" id="block-status" name="status">
+                <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+                <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="settings" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-template-wrapper">Template Wrapper</label>
+              <select class="admin-form-control" id="block-template-wrapper" name="template_wrapper">
+                <option value="">Default (card)</option>
+                {{range .WrapperTemplates}}
+                <option value="{{.Path}}" {{if eq $.Meta.TemplateWrapper .Path}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Wrappers from <code class="admin-code">partials/blocks/</code> in the default pack and active frontend theme. Use <code class="admin-code">plain</code> for unwrapped output.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">Show Name</span>
+              {{template "form_toggle" (dict "Name" "show_name" "Checked" .Meta.ShowName "OnLabel" "Show block name" "OffLabel" "Hide block name")}}
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-publish-start">Publish Start</label>
+              <input class="admin-form-control" id="block-publish-start" type="datetime-local" name="publish_start" value="{{if .Meta.PublishStart}}{{.Meta.PublishStart.Format "2006-01-02T15:04"}}{{end}}">
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="block-publish-end">Publish End</label>
+              <input class="admin-form-control" id="block-publish-end" type="datetime-local" name="publish_end" value="{{if .Meta.PublishEnd}}{{.Meta.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
+              <p class="admin-form-help">Leave dates empty to publish without a schedule.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
-</div>
+</form>

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Metadata holds type-specific block configuration stored as JSON.
@@ -19,6 +20,15 @@ type Metadata struct {
 	AuthorKey    string `json:"author_key,omitempty"`
 	ItemSlug     string `json:"item_slug,omitempty"`
 	Layout       string `json:"layout,omitempty"`
+	RouteMode        string     `json:"route_mode,omitempty"`
+	RouteIDs         []uint     `json:"route_ids,omitempty"`
+	TemplateWrapper  string     `json:"template_wrapper,omitempty"`
+	ShowName         bool       `json:"show_name,omitempty"`
+	PublishStart     *time.Time `json:"publish_start,omitempty"`
+	PublishEnd       *time.Time `json:"publish_end,omitempty"`
+	LoginTitle       string     `json:"login_title,omitempty"`
+	MenuName         string     `json:"menu_name,omitempty"`
+	MenuClass        string     `json:"menu_class,omitempty"`
 }
 
 // ParseMetadata decodes block metadata JSON.
@@ -111,6 +121,11 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 		meta["author_key"] = strings.TrimSpace(values.Get("author_key"))
 		meta["item_slug"] = strings.TrimSpace(values.Get("item_slug"))
 		meta["layout"] = strings.TrimSpace(values.Get("content_layout"))
+	case "login":
+		meta["login_title"] = strings.TrimSpace(values.Get("login_title"))
+	case "menu-vertical", "menu-horizontal":
+		meta["menu_name"] = strings.TrimSpace(values.Get("menu_name"))
+		meta["menu_class"] = strings.TrimSpace(values.Get("menu_class"))
 	case "extension":
 		for key, vals := range values {
 			if !strings.HasPrefix(key, "block_data_") || len(vals) == 0 {
@@ -134,9 +149,97 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 	if id, err := strconv.Atoi(strings.TrimSpace(values.Get("form_id"))); err == nil && id > 0 {
 		meta["form_id"] = id
 	}
+	applyCommonMeta(meta, values)
+	applyRouteMeta(meta, values)
 	raw, err := json.Marshal(meta)
 	if err != nil {
 		return "", err
 	}
 	return string(raw), nil
+}
+
+func applyCommonMeta(meta map[string]any, values url.Values) {
+	wrapper := strings.TrimSpace(values.Get("template_wrapper"))
+	if wrapper != "" {
+		meta["template_wrapper"] = wrapper
+	} else {
+		delete(meta, "template_wrapper")
+	}
+	if formBool(values.Get("show_name")) {
+		meta["show_name"] = true
+	} else {
+		delete(meta, "show_name")
+	}
+	if t := parseFormTime(values.Get("publish_start")); t != nil {
+		meta["publish_start"] = t.UTC().Format(time.RFC3339)
+	} else {
+		delete(meta, "publish_start")
+	}
+	if t := parseFormTime(values.Get("publish_end")); t != nil {
+		meta["publish_end"] = t.UTC().Format(time.RFC3339)
+	} else {
+		delete(meta, "publish_end")
+	}
+}
+
+func formBool(raw string) bool {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "on", "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseFormTime(raw string) *time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	for _, layout := range []string{"2006-01-02T15:04", "2006-01-02 15:04", "2006-01-02", time.RFC3339} {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return &t
+		}
+	}
+	return nil
+}
+
+func applyRouteMeta(meta map[string]any, values url.Values) {
+	mode := strings.TrimSpace(values.Get("route_mode"))
+	if mode == "" {
+		mode = RouteModeAll
+	}
+	meta["route_mode"] = mode
+	ids := parseRouteIDsFromForm(values)
+	if len(ids) > 0 {
+		meta["route_ids"] = ids
+	} else {
+		delete(meta, "route_ids")
+	}
+}
+
+func parseRouteIDsFromForm(values url.Values) []uint {
+	raw := values["route_ids"]
+	if len(raw) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(raw))
+	seen := map[uint]struct{}{}
+	for _, item := range raw {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		n, err := strconv.ParseUint(item, 10, 64)
+		if err != nil || n == 0 {
+			continue
+		}
+		id := uint(n)
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids
 }

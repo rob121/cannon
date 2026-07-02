@@ -1,0 +1,8 @@
+{{if .ShowName}}
+<div class="card site-block site-block--{{.Space}} mb-3 shadow-sm">
+  <div class="card-header"><h3 class="h6 mb-0">{{.Name}}</h3></div>
+  {{if .Body}}<div class="card-body">{{.Body}}</div>{{end}}
+</div>
+{{else}}
+{{.Body}}
+{{end}}

@@ -104,6 +104,11 @@ func ExtensionsRootURL() string {
 	return "/admin/help/extensions"
 }
 
+// BuiltinExtensionArticleURL builds the admin URL for built-in extension authoring docs.
+func BuiltinExtensionArticleURL(slug string) string {
+	return "/admin/help/extensions/_/" + slug
+}
+
 // FindSection locates a built-in help folder by id.
 func FindSection(sections []Section, folder string) (*Section, bool) {
 	for i := range sections {

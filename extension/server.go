@@ -20,6 +20,7 @@ const (
 	defaultAdminPath    = "/admin"
 	defaultHelpPath     = "/help"
 	defaultHookPath     = "/hooks"
+	defaultTemplatePath = "/templates"
 )
 
 // Server is a Cannon extension HTTP server over a Unix socket.
@@ -34,6 +35,7 @@ type Server struct {
 	dataPath     string
 	adminPath    string
 	hookPath     string
+	templatePath string
 
 	blocks            map[string]blockEntry
 	blockListProvider BlockListProvider
@@ -66,14 +68,15 @@ type Server struct {
 // New creates an extension server with built-in /health, /meta, /capabilities, and /install.
 func New(info Info) *Server {
 	return &Server{
-		info:        info,
-		requestPath: defaultRequestPath,
-		pagePath:    defaultPagePath,
-		blockPath:   defaultBlockPath,
-		adminPath:   defaultAdminPath,
-		custom:      make(map[string]http.HandlerFunc),
-		blocks:      make(map[string]blockEntry),
-		pages:       make(map[string]pageEntry),
+		info:         info,
+		requestPath:  defaultRequestPath,
+		pagePath:     defaultPagePath,
+		blockPath:    defaultBlockPath,
+		adminPath:    defaultAdminPath,
+		templatePath: defaultTemplatePath,
+		custom:       make(map[string]http.HandlerFunc),
+		blocks:       make(map[string]blockEntry),
+		pages:        make(map[string]pageEntry),
 		endpoints:    make(map[string]endpointEntry),
 		dataHandlers: make(map[string]Handler),
 		hookHandlers: make(map[string]HookHandler),
@@ -329,6 +332,10 @@ func (s *Server) mux() *http.ServeMux {
 	if s.help != nil {
 		s.help.register(mux)
 	}
+	if s.templates != nil {
+		mux.HandleFunc(s.templatePath, s.handleTemplates)
+		mux.HandleFunc(s.templatePath+"/", s.handleTemplateSource)
+	}
 	for path, fn := range s.custom {
 		mux.HandleFunc(path, fn)
 	}
@@ -345,6 +352,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, metaResponse{
 		Name:          s.info.Name,
+		Title:         s.info.Title,
+		Description:   s.info.Description,
 		Version:       s.info.Version,
 		UpdateURLBase: s.info.UpdateURLBase,
 		RouteHash:     RouteHash(s.info.Name, s.siteID),
@@ -380,6 +389,9 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if len(s.hookHandlers) > 0 {
 		caps["hooks"] = s.hookPath
 	}
+	if s.templates != nil {
+		caps["templates"] = s.templatePath
+	}
 	writeJSON(w, http.StatusOK, capabilitiesResponse{
 		Capabilities: caps,
 		Defaults: capabilityDefaults{
@@ -387,6 +399,42 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 				MenuName: s.info.AdminMenuName,
 			},
 		},
+	})
+}
+
+func (s *Server) handleTemplates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	templates, err := s.templates.List()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, TemplateListResponse{Templates: templates})
+}
+
+func (s *Server) handleTemplateSource(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, strings.TrimRight(s.templatePath, "/")+"/")
+	content, _, err := s.templates.ReadEmbedded(name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	override, err := TemplateOverridePath(name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, http.StatusOK, TemplateSourceResponse{
+		Path:         normalizeTemplatePath(name),
+		OverridePath: override,
+		Content:      content,
 	})
 }
 

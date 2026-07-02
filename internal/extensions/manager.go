@@ -21,9 +21,9 @@ import (
 
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/config"
-	"github.com/rob121/cannon/internal/user"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -37,6 +37,7 @@ type Capabilities struct {
 	Help          string `json:"help"`
 	Configuration string `json:"configuration"`
 	Hooks         string `json:"hooks"`
+	Templates     string `json:"templates"`
 }
 
 type CapabilitiesResponse struct {
@@ -57,6 +58,7 @@ type Runtime struct {
 	Blocks               []extension.BlockDefinition
 	Pages                []extension.PageDefinition
 	Endpoints            []extension.EndpointDefinition
+	Templates            []extension.TemplateDefinition
 	Hooks                []string
 	DefaultAdminMenuName string
 	Meta                 Meta
@@ -209,6 +211,7 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 	rt.Blocks = nil
 	rt.Pages = nil
 	rt.Endpoints = nil
+	rt.Templates = nil
 	rt.Hooks = nil
 	if payload.Capabilities.Block != "" {
 		if blocks, err := m.fetchBlocks(socketPath, payload.Capabilities.Block); err == nil {
@@ -226,6 +229,11 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 			rt.Hooks = hookNames
 		}
 	}
+	if payload.Capabilities.Templates != "" {
+		if templates, err := m.fetchTemplates(socketPath, payload.Capabilities.Templates); err == nil {
+			rt.Templates = templates
+		}
+	}
 	if err := m.applyDefaultMenuName(ctx, &rt.Model, payload.Defaults.Admin.MenuName); err != nil {
 		return err
 	}
@@ -234,8 +242,35 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 	if meta, err := m.fetchMeta(socketPath); err == nil {
 		rt.Meta = meta
 		rt.MetaAvailable = true
+		if err := m.applyCachedMeta(ctx, &rt.Model, meta); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func (m *Manager) applyCachedMeta(ctx context.Context, row *models.Extension, meta Meta) error {
+	updates := map[string]any{}
+	if v := strings.TrimSpace(meta.Title); v != "" && v != strings.TrimSpace(row.Title) {
+		updates["title"] = v
+		row.Title = v
+	}
+	if v := strings.TrimSpace(meta.Description); v != "" && v != strings.TrimSpace(row.Description) {
+		updates["description"] = v
+		row.Description = v
+	}
+	if v := strings.TrimSpace(meta.Version); v != "" && v != strings.TrimSpace(row.Version) {
+		updates["version"] = v
+		row.Version = v
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return err
+	}
+	return db.Model(&models.Extension{}).Where("name = ?", row.Name).Updates(updates).Error
 }
 
 func (m *Manager) applyDefaultMenuName(ctx context.Context, row *models.Extension, menuName string) error {

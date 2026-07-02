@@ -3,9 +3,12 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/httpx"
+	"github.com/rob121/cannon/internal/routemeta"
+	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 )
 
@@ -80,6 +83,9 @@ func (r htmlResult) Write(w http.ResponseWriter, req *http.Request, ctx *Context
 		r.Data = m
 	}
 	page := templateengine.ControllerTemplatePath(controllerID, actionID)
+	if override := routemeta.MetadataString(ctx.Route.Metadata, "template"); override != "" {
+		page = override
+	}
 	if r.PageTemplate != "" {
 		page = r.PageTemplate
 	}
@@ -100,7 +106,22 @@ func Error(code int, message string) Result {
 	return errorResult{Code: code, Message: message}
 }
 
-func (r errorResult) Write(w http.ResponseWriter, _ *http.Request, _ *Context) error {
+func (r errorResult) Write(w http.ResponseWriter, req *http.Request, ctx *Context) error {
+	if ctx != nil && ctx.Template != nil {
+		homeURL := sites.DefaultRoutePath(req.Context())
+		message := strings.TrimSpace(r.Message)
+		if message == "" {
+			message = templateengine.DefaultErrorMessage(r.Code)
+		}
+		ctx.Template.SetHookContext(req.Context())
+		defer ctx.Template.SetHookContext(nil)
+		return ctx.Template.RenderError(w, r.Code, map[string]any{
+			"Title":        templateengine.ErrorTitle(r.Code),
+			"ErrorCode":    r.Code,
+			"ErrorMessage": message,
+			"HomeURL":      homeURL,
+		})
+	}
 	http.Error(w, r.Message, r.Code)
 	return nil
 }

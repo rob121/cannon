@@ -28,6 +28,18 @@ func TestFetch(t *testing.T) {
 	}
 }
 
+func TestFetchFrontendTemplatesIncludesTemplateJSON(t *testing.T) {
+	md, err := Fetch("templates", "frontend-templates")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phrase := range []string{"template.json", "Frontend Theme", "assets/", "Configuration → General"} {
+		if !strings.Contains(md, phrase) {
+			t.Fatalf("expected frontend-templates help to mention %q", phrase)
+		}
+	}
+}
+
 func TestArticleURL(t *testing.T) {
 	got := ArticleURL("admin", "admin-basics")
 	want := "/admin/help/admin/admin-basics"

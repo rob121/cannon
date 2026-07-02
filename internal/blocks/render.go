@@ -2,8 +2,10 @@ package blocks
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
@@ -15,8 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
+// FragmentRenderer executes a frontend template fragment without layout.
+type FragmentRenderer func(name string, data map[string]any) (string, error)
+
 // RenderSpace renders all active blocks assigned to a template space.
-func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, r *http.Request, userCtx map[string]any) (string, error) {
+func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) (string, error) {
 	space = strings.TrimSpace(space)
 	if space == "" {
 		return "", nil
@@ -37,7 +42,7 @@ func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, 
 
 	var parts []string
 	for _, row := range rows {
-		html, err := renderOne(ctx, extMgr, row, space, r, userCtx)
+		html, err := renderOne(ctx, extMgr, row, space, r, userCtx, render)
 		if err != nil {
 			return "", err
 		}
@@ -64,10 +69,23 @@ func ListForSpace(ctx context.Context, db *gorm.DB, space string) ([]models.Bloc
 	}
 
 	filtered := make([]models.Block, 0, len(rows))
+	routeID := currentRouteID(ctx)
+	now := time.Now()
 	for _, row := range rows {
-		if groups.CanView(viewerGroups, row.Groups) {
-			filtered = append(filtered, row)
+		if !groups.CanView(viewerGroups, row.Groups) {
+			continue
 		}
+		meta, err := ParseMetadata(row.Metadata)
+		if err != nil {
+			return nil, err
+		}
+		if !PublishVisible(meta, now) {
+			continue
+		}
+		if !RouteVisible(meta, routeID) {
+			continue
+		}
+		filtered = append(filtered, row)
 	}
 	return filtered, nil
 }
@@ -79,7 +97,7 @@ func DistinctSpaces(db *gorm.DB) ([]string, error) {
 	return spaces, err
 }
 
-func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block, space string, r *http.Request, userCtx map[string]any) (string, error) {
+func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) (string, error) {
 	meta, err := ParseMetadata(row.Metadata)
 	if err != nil {
 		return "", err
@@ -161,6 +179,21 @@ func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block
 		if err != nil {
 			return "", err
 		}
+	case models.BlockTypeLogin:
+		html, err = RenderLoginBlock(ctx, r, BlockRow{BlockID: row.BlockID, Name: row.Name}, meta, render)
+		if err != nil {
+			return "", err
+		}
+	case models.BlockTypeMenuVertical:
+		html, err = RenderMenuVerticalBlock(ctx, meta, render)
+		if err != nil {
+			return "", err
+		}
+	case models.BlockTypeMenuHorizontal:
+		html, err = RenderMenuHorizontalBlock(ctx, meta, render)
+		if err != nil {
+			return "", err
+		}
 	default:
 		return "", nil
 	}
@@ -175,5 +208,36 @@ func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block
 	} else if v, ok := out["html"].(string); ok {
 		html = v
 	}
-	return html, nil
+	return finishBlockHTML(row, meta, html, render)
+}
+
+func finishBlockHTML(row models.Block, meta Metadata, body string, render FragmentRenderer) (string, error) {
+	body = strings.TrimSpace(body)
+	if body == "" && !meta.ShowName {
+		return "", nil
+	}
+	wrapper := ResolveBlockTemplate(meta.TemplateWrapper)
+	if wrapper == "" {
+		wrapper = CardWrapperTemplate
+	}
+	if render == nil {
+		return body, nil
+	}
+	wrapped, err := render(wrapper, blockWrapperData(row, meta, body))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(wrapped), nil
+}
+
+func blockWrapperData(row models.Block, meta Metadata, body string) map[string]any {
+	return map[string]any{
+		"Name":     row.Name,
+		"Body":     template.HTML(body),
+		"Content":  template.HTML(body),
+		"ShowName": meta.ShowName,
+		"Space":    row.Space,
+		"Type":     string(row.Type),
+		"BlockID":  row.BlockID,
+	}
 }

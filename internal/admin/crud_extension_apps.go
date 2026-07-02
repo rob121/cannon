@@ -22,7 +22,7 @@ func (h *Handler) extensionApps(w http.ResponseWriter, r *http.Request, path str
 	}
 	name, err := url.PathUnescape(parts[0])
 	if err != nil || name == "" {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	suffix := ""
@@ -39,7 +39,7 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 
 	rt, ok := extMgr.Runtime(name)
 	if !ok || rt.Capabilities.Admin == "" {
-		http.NotFound(w, r)
+		h.notFound(w, r)
 		return
 	}
 	userCtx, err := extensionAdminUserContext(r)
