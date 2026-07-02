@@ -1,0 +1,54 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        {{if .IsNew}}
+        <div class="col-md-6">
+          <label class="admin-form-label">Menu</label>
+          <select class="admin-form-control" name="menu_id" required>
+            <option value="">— Select menu —</option>
+            {{range .AllMenus}}
+            <option value="{{.MenuID}}" {{if eq $.Row.MenuID .MenuID}}selected{{end}}>{{.MenuName}}</option>
+            {{end}}
+          </select>
+        </div>
+        {{else}}
+        <div class="col-md-6">
+          <label class="admin-form-label">Menu</label>
+          <input class="admin-form-control" value="{{if .MenuName}}{{.MenuName}}{{else}}—{{end}}" disabled>
+        </div>
+        {{end}}
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Route</label>
+          <select class="admin-form-control" name="route_id">
+            <option value="">— None —</option>
+            {{range .Routes}}
+            <option value="{{.RouteID}}" {{if uintPtrEq $.Row.RouteID .RouteID}}selected{{end}}>{{.Name}} ({{.Path}})</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Sort</label>
+          <input class="admin-form-control" name="sort" type="number" value="{{.Row.Sort}}">
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">CSS Class</label>
+          <input class="admin-form-control" name="class" value="{{.Row.Class}}">
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Target</label>
+          <input class="admin-form-control" name="target" value="{{.Row.Target}}" placeholder="_blank">
+        </div>
+        {{template "group_visibility_fields" .}}
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

@@ -1,0 +1,13 @@
+{
+  "install_enabled": true,
+  "data_root": "./data",
+  "extensions": {
+    "dir": "./data/extensions",
+    "sockets_dir": "./data/sockets"
+  },
+  "session": {
+    "cookie_name": "cannon_session",
+    "max_age": 86400
+  },
+  "sites": []
+}

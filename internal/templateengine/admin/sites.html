@@ -1,0 +1,54 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "id" "Label" "ID")}}
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{template "sort_th" (dict "Root" $ "Key" "host" "Label" "Host")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Sites}}
+        <tr>
+          <td><code class="admin-code">{{.ID}}</code></td>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>
+            {{if .Host}}
+            <a class="admin-site-link" href="{{siteURL .Host}}" target="_blank" rel="noopener noreferrer" title="Visit {{siteHostLabel .Host}}">
+              <span>{{siteHostLabel .Host}}</span>
+              <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+            {{else}}
+            <span class="admin-cell-muted">—</span>
+            {{end}}
+          </td>
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              {{if .Host}}
+              <a class="btn-admin-icon" href="{{siteAdminURL .Host}}" target="_blank" rel="noopener noreferrer" title="Open Site Admin">
+                <i class="bi bi-shield-lock"></i>
+              </a>
+              {{end}}
+              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.ID}}" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{{$.BasePath}}/{{.ID}}/delete" class="admin-inline-form" onsubmit="return confirm('Delete this site?')">
+      {{csrfField}}
+                <button type="submit" class="btn-admin-icon btn-admin-icon-danger" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4"><div class="admin-empty">No Records Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

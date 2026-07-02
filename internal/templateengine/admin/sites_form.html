@@ -1,0 +1,52 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">{{if .IsNew}}Add Site{{else}}Edit Site{{end}}</h2>
+      <p class="admin-form-card-desc">Configure host, database connection, and site identity.</p>
+    </div>
+  </div>
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        {{if not .IsNew}}
+        <div class="col-md-4">
+          <label class="admin-form-label">Site ID</label>
+          <input class="admin-form-control" value="{{.Row.ID}}" disabled>
+        </div>
+        {{end}}
+        <div class="col-md-4">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Host URL</label>
+          <input class="admin-form-control" name="host" value="{{.Row.Host}}" placeholder="http://localhost:8001">
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Database Type</label>
+          <select class="admin-form-control" name="database_type">
+            <option value="sqlite" {{if eq .Row.Database.Type "sqlite"}}selected{{end}}>SQLite</option>
+            <option value="mysql" {{if eq .Row.Database.Type "mysql"}}selected{{end}}>MySQL</option>
+            <option value="postgres" {{if eq .Row.Database.Type "postgres"}}selected{{end}}>PostgreSQL</option>
+          </select>
+        </div>
+        {{if or .IsNew (ne .Row.Database.Type "sqlite")}}
+        <div class="col-md-8">
+          <label class="admin-form-label">Database DSN</label>
+          <input class="admin-form-control" name="database_dsn" value="{{.Row.Database.DSN}}">
+        </div>
+        {{else}}
+        <div class="col-md-8">
+          <label class="admin-form-label">Database Path</label>
+          <input class="admin-form-control" value="{{.Row.Database.DSN}}" disabled>
+        </div>
+        {{end}}
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

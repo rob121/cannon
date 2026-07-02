@@ -1,0 +1,33 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  {{template "error_alert" .}}
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Group")}}
+          {{template "sort_th" (dict "Root" $ "Key" "total" "Label" "Templates")}}
+          {{template "sort_th" (dict "Root" $ "Key" "overridden" "Label" "Overridden")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Groups}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{.Total}}</td>
+          <td>{{.Overridden}}</td>
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+                <a class="btn-admin-ghost btn-admin-sm" href="{{$.TemplatesBase}}/{{.Name}}">Browse</a>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4"><div class="admin-empty">No template groups found.</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

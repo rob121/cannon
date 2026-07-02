@@ -1,0 +1,24 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required {{if .Protected}}readonly{{end}}>
+          {{if .Protected}}<p class="admin-form-help">The admin role name cannot be changed.</p>{{end}}
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

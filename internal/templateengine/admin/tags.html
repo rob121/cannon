@@ -1,0 +1,26 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{template "sort_th" (dict "Root" $ "Key" "slug" "Label" "Slug")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td><code class="admin-code">{{.Slug}}</code></td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .TagID)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="3"><div class="admin-empty">No Tags Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

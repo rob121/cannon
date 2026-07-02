@@ -1,0 +1,82 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Given Name</label>
+          <input class="admin-form-control" name="given_name" value="{{.Row.GivenName}}">
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Family Name</label>
+          <input class="admin-form-control" name="family_name" value="{{.Row.FamilyName}}">
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Email</label>
+          <input class="admin-form-control" type="email" name="email" value="{{.Row.Email}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Username</label>
+          <input class="admin-form-control" name="username" value="{{.Row.Username}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Password</label>
+          <input class="admin-form-control" type="password" name="password" {{if .IsNew}}required{{end}}>
+          {{if not .IsNew}}<p class="admin-form-help">Leave blank to keep the current password.</p>{{end}}
+        </div>
+        {{if not .IsNew}}
+        <div class="col-md-4">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Verified</label>
+          <label class="admin-form-toggle">
+            <input type="checkbox" class="admin-form-toggle-input" name="validated" value="1" {{if .Row.Validated}}checked{{end}}>
+            <span class="admin-form-toggle-track" aria-hidden="true">
+              <span class="admin-form-toggle-thumb"></span>
+            </span>
+            <span class="admin-form-toggle-text" data-on="Verified" data-off="Unverified">{{if .Row.Validated}}Verified{{else}}Unverified{{end}}</span>
+          </label>
+          <p class="admin-form-help">Mark whether this account email is verified.</p>
+          {{if .VerifyURL}}
+          <p class="admin-form-help">Verification link: <code class="admin-code">{{.VerifyURL}}</code></p>
+          {{end}}
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Locked</label>
+          <label class="admin-form-toggle">
+            <input type="checkbox" class="admin-form-toggle-input" name="locked" value="1" {{if .Row.Locked}}checked{{end}}>
+            <span class="admin-form-toggle-track" aria-hidden="true">
+              <span class="admin-form-toggle-thumb"></span>
+            </span>
+            <span class="admin-form-toggle-text" data-on="Locked" data-off="Unlocked">{{if .Row.Locked}}Locked{{else}}Unlocked{{end}}</span>
+          </label>
+          <p class="admin-form-help">Prevent this account from signing in.</p>
+        </div>
+        {{end}}
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Groups</label>
+          <p class="admin-form-help mb-3">Group membership determines which roles apply to this user.</p>
+          <div class="admin-checkbox-grid">
+            {{range .AllGroups}}
+            <label class="admin-form-check">
+              <input type="checkbox" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+              {{groupName .Name}}
+            </label>
+            {{else}}
+            <p class="admin-cell-muted">No groups defined yet. <a href="/admin/groups/new" data-turbo-frame="_top">Add a group</a> first.</p>
+            {{end}}
+          </div>
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

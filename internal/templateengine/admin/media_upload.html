@@ -1,0 +1,24 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post" enctype="multipart/form-data">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">File</label>
+          <input class="admin-form-control" type="file" name="file" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Folder</label>
+          <input class="admin-form-control" name="folder" value="content" placeholder="content">
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Alt Text</label>
+          <input class="admin-form-control" name="alt">
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

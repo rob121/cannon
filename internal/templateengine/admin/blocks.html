@@ -1,0 +1,46 @@
+{{template "page_header" .}}
+<div class="admin-help-toolbar admin-blocks-toolbar">
+  <form class="admin-blocks-filter" method="get" action="{{.BasePath}}">
+    <label class="admin-form-label" for="space-filter">Space</label>
+    <select class="admin-form-control admin-form-control-sm" id="space-filter" name="space" onchange="this.form.submit()">
+      <option value="">All spaces</option>
+      {{range .Spaces}}
+      <option value="{{.}}" {{if eq $.SpaceFilter .}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+    {{if .SpaceFilter}}
+    <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear filter</a>
+    {{end}}
+  </form>
+</div>
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{template "sort_th" (dict "Root" $ "Key" "space" "Label" "Space")}}
+          {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
+          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td><code class="admin-code">{{.Space}}</code></td>
+          <td>{{.TypeLabel}}</td>
+          <td>{{.Sort}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .BlockID "Status" .Status "ListQuery" $.ListQuery)}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="6"><div class="admin-empty">No blocks found. Add a block to fill a template space such as <code class="admin-code">footer</code> (<code class="admin-code">{{"{{"}}space "footer"{{"}}"}}</code>).</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

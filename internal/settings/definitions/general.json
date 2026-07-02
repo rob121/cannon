@@ -1,0 +1,68 @@
+{
+  "title": "General",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "site_name": {
+        "type": "string",
+        "title": "Site Display Name",
+        "description": "Shown in admin headers and system emails."
+      },
+      "site_meta_description": {
+        "type": "string",
+        "title": "Site Meta Description",
+        "description": "Default meta description for public pages without item-specific SEO."
+      },
+      "allow_login": {
+        "type": "boolean",
+        "title": "Allow Login",
+        "default": true,
+        "description": "When disabled, public sign-in is unavailable and login routes return a notice."
+      },
+      "allow_signup": {
+        "type": "boolean",
+        "title": "Allow Signup",
+        "default": true,
+        "description": "When disabled, public account registration is unavailable."
+      },
+      "site_offline": {
+        "type": "boolean",
+        "title": "Site Offline",
+        "default": false,
+        "description": "When enabled, public routes show a maintenance page. Admin remains available."
+      },
+      "maintenance_mode": {
+        "type": "boolean",
+        "title": "Maintenance Mode (legacy)",
+        "default": false,
+        "description": "Alias for Site Offline when site_offline is unset."
+      },
+      "default_list_limit": {
+        "type": "integer",
+        "title": "Default List Limit",
+        "default": 20,
+        "minimum": 5,
+        "maximum": 100,
+        "description": "Rows per page in admin table views."
+      },
+      "debug_template_spaces": {
+        "type": "boolean",
+        "title": "Debug Template Spaces",
+        "default": false,
+        "description": "When enabled, append ?tp=1 to a public URL to outline each {{space \"…\"}} region with a labeled border."
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/site_name"},
+      {"type": "Control", "scope": "#/properties/site_meta_description"},
+      {"type": "Control", "scope": "#/properties/allow_login"},
+      {"type": "Control", "scope": "#/properties/allow_signup"},
+      {"type": "Control", "scope": "#/properties/site_offline"},
+      {"type": "Control", "scope": "#/properties/default_list_limit"},
+      {"type": "Control", "scope": "#/properties/debug_template_spaces"}
+    ]
+  }
+}

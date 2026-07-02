@@ -1,0 +1,76 @@
+{{template "page_header" .}}
+<div class="admin-help-manager">
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Help breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if $c.Current}}
+      <span class="admin-help-breadcrumb-current">{{$c.Label}}</span>
+      {{else}}
+      <a class="admin-help-breadcrumb-link" href="{{$c.URL}}" data-turbo-frame="_top">{{$c.Label}}</a>
+      {{end}}
+      {{end}}
+    </nav>
+    {{if gt (len .Breadcrumbs) 1}}
+    {{with index .Breadcrumbs (sub (len .Breadcrumbs) 2)}}
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{.URL}}" data-turbo-frame="_top">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    {{end}}
+    {{end}}
+  </div>
+
+  {{if eq .ViewMode "extension-reader"}}
+  <div class="admin-help-layout">
+    <aside class="admin-help-sidebar">
+      <div class="admin-help-sidebar-header">
+        <div class="admin-help-sidebar-title">{{.ExtensionLabel}}</div>
+        <p class="admin-help-sidebar-desc">Extension help articles</p>
+      </div>
+      <nav class="admin-help-nav">
+        {{range .ExtensionArticles}}
+        <a class="admin-help-link{{if eq $.ActivePath .Path}} active{{end}}" href="{{helpURL .Extension .Path}}" data-turbo-frame="_top">
+          {{.Title}}
+        </a>
+        {{else}}
+        <div class="admin-help-nav-empty">No articles available.</div>
+        {{end}}
+      </nav>
+    </aside>
+    <div class="admin-help-content">
+      {{if .ContentHTML}}
+      <article class="admin-help-article">{{.ContentHTML}}</article>
+      {{else}}
+      <div class="admin-empty">Select a help article from the menu.</div>
+      {{end}}
+    </div>
+  </div>
+  {{else if .ContentHTML}}
+  <div class="admin-help-article-card">
+    <article class="admin-help-article">{{.ContentHTML}}</article>
+  </div>
+  {{else}}
+  <div class="admin-help-browser">
+    {{if or .Folders .Files}}
+    <div class="admin-help-grid">
+      {{range .Folders}}
+      <a class="admin-help-item admin-help-folder" href="{{.URL}}" data-turbo-frame="_top">
+        <span class="admin-help-item-icon"><i class="bi bi-folder-fill" aria-hidden="true"></i></span>
+        <span class="admin-help-item-name">{{.Label}}</span>
+        <span class="admin-help-item-meta">{{.Count}} {{if eq .Count 1}}item{{else}}items{{end}}</span>
+      </a>
+      {{end}}
+      {{range .Files}}
+      <a class="admin-help-item admin-help-file" href="{{.URL}}" data-turbo-frame="_top">
+        <span class="admin-help-item-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+        <span class="admin-help-item-name">{{.Label}}</span>
+        <span class="admin-help-item-meta">Document</span>
+      </a>
+      {{end}}
+    </div>
+    {{else}}
+    <div class="admin-empty">This folder is empty.</div>
+    {{end}}
+  </div>
+  {{end}}
+</div>

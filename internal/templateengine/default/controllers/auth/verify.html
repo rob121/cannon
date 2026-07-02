@@ -1,0 +1,12 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">{{if .Success}}Account Verified{{else}}Verify Account{{end}}</h1>
+  </header>
+  <div class="site-content">
+    {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
+    {{if .Success}}
+    <p>{{.Message}}</p>
+    <p><a class="site-btn site-btn-primary" href="/login">Sign In</a></p>
+    {{end}}
+  </div>
+</article>

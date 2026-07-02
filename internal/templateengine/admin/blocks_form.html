@@ -1,0 +1,166 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">{{if .IsNew}}New Block{{else}}Edit Block{{end}}</h2>
+      <p class="admin-form-card-desc">Assign content to a template space. Use <code class="admin-code">{{"{{"}}space "space"{{"}}"}}</code> in frontend templates.</p>
+    </div>
+  </div>
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <input type="hidden" name="space_filter" value="{{.SpaceFilter}}">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Space</label>
+          <input class="admin-form-control" name="space" value="{{.Row.Space}}" placeholder="footer" required>
+          <p class="admin-form-help">Template space passed to <code class="admin-code">{{"{{"}}space "…"{{"}}"}}</code>.</p>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Type</label>
+          <select class="admin-form-control" name="type" id="block-type">
+            <option value="html" {{if eq .Row.Type "html"}}selected{{end}}>HTML</option>
+            <option value="markdown" {{if eq .Row.Type "markdown"}}selected{{end}}>Markdown</option>
+            <option value="content" {{if eq .Row.Type "content"}}selected{{end}}>Content</option>
+            <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-label">Sort</label>
+          <input class="admin-form-control" name="sort" type="number" value="{{.Row.Sort}}">
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+
+        <div class="col-12 block-fields-native" id="block-fields-native">
+          <div class="admin-form-divider"></div>
+          <label class="admin-form-label">Content</label>
+          <textarea class="admin-form-control admin-template-editor" name="content" rows="12">{{.Meta.Content}}</textarea>
+          <p class="admin-form-help">Raw HTML or Markdown source depending on the selected type.</p>
+        </div>
+
+        <div class="col-12 block-fields-content" id="block-fields-content">
+          <div class="admin-form-divider"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Content Mode</label>
+              <select class="admin-form-control" name="content_mode">
+                <option value="latest" {{if eq .Meta.ContentMode "latest"}}selected{{end}}>Latest Items</option>
+                <option value="featured" {{if eq .Meta.ContentMode "featured"}}selected{{end}}>Featured Items</option>
+                <option value="popular" {{if eq .Meta.ContentMode "popular"}}selected{{end}}>Popular Items</option>
+                <option value="category" {{if eq .Meta.ContentMode "category"}}selected{{end}}>By Category</option>
+                <option value="tag" {{if eq .Meta.ContentMode "tag"}}selected{{end}}>By Tag</option>
+                <option value="author" {{if eq .Meta.ContentMode "author"}}selected{{end}}>By Author</option>
+                <option value="related" {{if eq .Meta.ContentMode "related"}}selected{{end}}>Related Items</option>
+                <option value="tag_cloud" {{if eq .Meta.ContentMode "tag_cloud"}}selected{{end}}>Tag Cloud</option>
+                <option value="category_menu" {{if eq .Meta.ContentMode "category_menu"}}selected{{end}}>Category Menu</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="admin-form-label">Limit</label>
+              <input class="admin-form-control" name="content_limit" type="number" value="{{if .Meta.Limit}}{{.Meta.Limit}}{{else}}5{{end}}" min="1" max="50">
+            </div>
+            <div class="col-md-3">
+              <label class="admin-form-label">Layout</label>
+              <select class="admin-form-control" name="content_layout">
+                <option value="list" {{if or (eq .Meta.Layout "") (eq .Meta.Layout "list")}}selected{{end}}>List</option>
+                <option value="grid" {{if eq .Meta.Layout "grid"}}selected{{end}}>Grid</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Category Slug</label>
+              <select class="admin-form-control" name="category_slug">
+                <option value="">Select category</option>
+                {{range .Categories}}
+                <option value="{{.Slug}}" {{if eq $.Meta.CategorySlug .Slug}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Tag Slug</label>
+              <select class="admin-form-control" name="tag_slug">
+                <option value="">Select tag</option>
+                {{range .Tags}}
+                <option value="{{.Slug}}" {{if eq $.Meta.TagSlug .Slug}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Author (username or ID)</label>
+              <input class="admin-form-control" name="author_key" value="{{.Meta.AuthorKey}}" placeholder="jane">
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Item Slug (for related)</label>
+              <input class="admin-form-control" name="item_slug" value="{{.Meta.ItemSlug}}" placeholder="my-article">
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 block-fields-extension" id="block-fields-extension">
+          <div class="admin-form-divider"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Extension</label>
+              <select class="admin-form-control" name="extension_name" id="block-extension">
+                <option value="">Select extension</option>
+                {{range .ExtensionOptions}}
+                <option value="{{.Name}}" {{if eq $.Row.ExtensionName .Name}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Block</label>
+              <select class="admin-form-control" name="extension_block_id" id="block-extension-item">
+                <option value="">Select block</option>
+                {{range .ExtensionOptions}}
+                {{$extName := .Name}}
+                {{$extLabel := .Label}}
+                {{range .Blocks}}
+                <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionBlockID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
+                {{end}}
+                {{end}}
+              </select>
+            </div>
+            {{range .ExtensionOptions}}
+            {{$extName := .Name}}
+            {{range .Blocks}}
+            {{$blockID := .ID}}
+            {{range .Fields}}
+            {{$fieldName := .Name}}
+            <div class="col-md-6 block-data-field" data-extension-name="{{$extName}}" data-block-id="{{$blockID}}">
+              <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+              {{if eq .Type "select"}}
+              <select class="admin-form-control" name="block_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
+                {{range .Options}}
+                <option value="{{.Value}}" {{if eq (index $.BlockData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "number"}}
+              <input class="admin-form-control" name="block_data_{{.Name}}" type="number" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
+              {{else}}
+              <input class="admin-form-control" name="block_data_{{.Name}}" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
+              {{end}}
+              {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+            </div>
+            {{end}}
+            {{end}}
+            {{end}}
+          </div>
+        </div>
+        {{template "group_visibility_fields" .}}
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

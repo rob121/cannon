@@ -1,0 +1,36 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "username" "Label" "User")}}
+          <th>Groups</th>
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td>
+            <div class="admin-cell-user">
+              <span class="admin-avatar">{{initials .GivenName .FamilyName .Username}}</span>
+              <span class="admin-cell-stack">
+                <span class="admin-cell-primary">{{.Username}}</span>
+                <span class="admin-cell-muted">{{.Email}}</span>
+              </span>
+            </div>
+          </td>
+          <td><span class="admin-cell-muted">{{if .Groups}}{{joinGroupNames .Groups}}{{else}}—{{end}}</span></td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .UserID "Status" .Status)}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .UserID)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="4"><div class="admin-empty">No Records Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

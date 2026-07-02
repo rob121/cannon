@@ -1,0 +1,60 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+          <p class="admin-form-help">Machine name used in templates.</p>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Label</label>
+          <input class="admin-form-control" name="label" value="{{.Row.Label}}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Type</label>
+          <select class="admin-form-control" name="type">
+            <option value="text" {{if eq .Row.Type "text"}}selected{{end}}>text</option>
+            <option value="textarea" {{if eq .Row.Type "textarea"}}selected{{end}}>textarea</option>
+            <option value="rich_text" {{if eq .Row.Type "rich_text"}}selected{{end}}>rich_text</option>
+            <option value="select" {{if eq .Row.Type "select"}}selected{{end}}>select</option>
+            <option value="multi_select" {{if eq .Row.Type "multi_select"}}selected{{end}}>multi_select</option>
+            <option value="radio" {{if eq .Row.Type "radio"}}selected{{end}}>radio</option>
+            <option value="checkbox" {{if eq .Row.Type "checkbox"}}selected{{end}}>checkbox</option>
+            <option value="date" {{if eq .Row.Type "date"}}selected{{end}}>date</option>
+            <option value="datetime" {{if eq .Row.Type "datetime"}}selected{{end}}>datetime</option>
+            <option value="number" {{if eq .Row.Type "number"}}selected{{end}}>number</option>
+            <option value="url" {{if eq .Row.Type "url"}}selected{{end}}>url</option>
+            <option value="image" {{if eq .Row.Type "image"}}selected{{end}}>image</option>
+            <option value="file" {{if eq .Row.Type "file"}}selected{{end}}>file</option>
+            <option value="boolean" {{if eq .Row.Type "boolean"}}selected{{end}}>boolean</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Sort</label>
+          <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-check">
+            <input type="checkbox" name="required" {{if .Row.Required}}checked{{end}}> Required
+          </label>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Configuration (JSON)</label>
+          <textarea class="admin-form-control" name="configuration" rows="4">{{.Row.Configuration}}</textarea>
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

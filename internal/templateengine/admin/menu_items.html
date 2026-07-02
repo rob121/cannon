@@ -1,0 +1,30 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          <th>Menu</th>
+          <th>Route</th>
+          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{if index $.MenuNames .MenuID}}{{index $.MenuNames .MenuID}}{{else}}—{{end}}</td>
+          <td>{{if .Route}}{{.Route.Name}} <span class="admin-cell-muted">({{.Route.Path}})</span>{{else}}—{{end}}</td>
+          <td>{{.Sort}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .MenuItemID)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="5"><div class="admin-empty">No Records Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

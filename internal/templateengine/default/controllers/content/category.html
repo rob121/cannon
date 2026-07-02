@@ -1,0 +1,18 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">{{.Category.Name}}</h1>
+    {{if .Category.Description}}<p class="site-subtitle">{{.Category.Description}}</p>{{end}}
+  </header>
+  <section class="site-section">
+    <div class="site-item-grid">
+      {{range .Items}}
+      <article class="site-item-card">
+        <h2><a href="/content/item/{{.Slug}}">{{.Title}}</a></h2>
+        {{if .Intro}}<p>{{.Intro}}</p>{{end}}
+      </article>
+      {{else}}
+      <p>No items in this category.</p>
+      {{end}}
+    </div>
+  </section>
+</article>

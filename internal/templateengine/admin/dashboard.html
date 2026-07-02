@@ -1,0 +1,128 @@
+{{template "page_header" .}}
+{{template "success_alert" .}}
+{{template "error_alert" .}}
+
+<div class="admin-stats">
+  <a class="admin-stat-card admin-stat-card-link" href="/admin/users" data-turbo-frame="_top">
+    <div class="admin-stat-card-top">
+      <span class="admin-stat-label">Users</span>
+      <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+    </div>
+    <div class="admin-stat-value">{{if .UserCount}}{{.UserCount}}{{else}}—{{end}}</div>
+    <div class="admin-stat-foot">
+      <span class="admin-stat-badge admin-stat-badge-neutral">Registered accounts</span>
+    </div>
+  </a>
+  <a class="admin-stat-card admin-stat-card-link" href="/admin/routes" data-turbo-frame="_top">
+    <div class="admin-stat-card-top">
+      <span class="admin-stat-label">Routes</span>
+      <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
+    </div>
+    <div class="admin-stat-value">{{if .RouteCount}}{{.RouteCount}}{{else}}—{{end}}</div>
+    <div class="admin-stat-foot">
+      {{if .ActiveRouteCount}}
+      <span class="admin-stat-badge admin-stat-badge-success">{{.ActiveRouteCount}} active</span>
+      {{end}}
+      <span class="admin-stat-meta">URL mappings</span>
+    </div>
+  </a>
+  <a class="admin-stat-card admin-stat-card-link" href="/admin/extensions" data-turbo-frame="_top">
+    <div class="admin-stat-card-top">
+      <span class="admin-stat-label">Extensions</span>
+      <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-puzzle"></i></span>
+    </div>
+    <div class="admin-stat-value">{{if .ExtensionCount}}{{.ExtensionCount}}{{else}}—{{end}}</div>
+    <div class="admin-stat-foot">
+      <span class="admin-stat-badge admin-stat-badge-neutral">Installed processes</span>
+    </div>
+  </a>
+  <a class="admin-stat-card admin-stat-card-link" href="/admin/sites" data-turbo-frame="_top">
+    <div class="admin-stat-card-top">
+      <span class="admin-stat-label">Sites</span>
+      <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-globe2"></i></span>
+    </div>
+    <div class="admin-stat-value">{{if .SiteCount}}{{.SiteCount}}{{else}}1{{end}}</div>
+    <div class="admin-stat-foot">
+      <span class="admin-stat-badge admin-stat-badge-neutral">Configured instances</span>
+    </div>
+  </a>
+</div>
+
+<div class="admin-dashboard-grid">
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Quick Start</h2>
+        <p class="admin-form-card-desc">Jump to common admin tasks for {{if .SiteName}}{{.SiteName}}{{else}}your site{{end}}.</p>
+      </div>
+    </div>
+    <div class="admin-quick-links">
+      <a class="admin-quick-link" href="/admin/items" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-journal-richtext"></i></span>
+        <span class="admin-quick-link-label">Items</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/categories" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-folder2"></i></span>
+        <span class="admin-quick-link-label">Categories</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/routes" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-signpost-split"></i></span>
+        <span class="admin-quick-link-label">Routes</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/templates" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-file-earmark-code"></i></span>
+        <span class="admin-quick-link-label">Templates</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/menus" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-list-ul"></i></span>
+        <span class="admin-quick-link-label">Menus</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/blocks" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-layout-text-window"></i></span>
+        <span class="admin-quick-link-label">Blocks</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/extensions" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-puzzle"></i></span>
+        <span class="admin-quick-link-label">Extensions</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/configuration" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-sliders"></i></span>
+        <span class="admin-quick-link-label">Configuration</span>
+      </a>
+      <a class="admin-quick-link" href="/admin/help" data-turbo-frame="_top">
+        <span class="admin-quick-link-icon"><i class="bi bi-question-circle"></i></span>
+        <span class="admin-quick-link-label">Help</span>
+      </a>
+      {{if .SiteURL}}
+      <a class="admin-quick-link" href="{{.SiteURL}}" target="_blank" rel="noopener noreferrer">
+        <span class="admin-quick-link-icon"><i class="bi bi-box-arrow-up-right"></i></span>
+        <span class="admin-quick-link-label">View Site</span>
+      </a>
+      {{end}}
+    </div>
+  </div>
+
+  <div class="admin-form-card admin-dashboard-side">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">System</h2>
+        <p class="admin-form-card-desc">Refresh configuration after editing files on disk.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body admin-dashboard-system">
+      <div class="admin-dashboard-system-row">
+        <div class="admin-dashboard-system-icon" aria-hidden="true"><i class="bi bi-hdd-network"></i></div>
+        <div>
+          <div class="admin-dashboard-system-title">Reload Application</div>
+          <p class="admin-dashboard-system-desc">Applies changes to <code class="admin-code">sites.json</code>, routes, and extensions without restarting the Cannon process.</p>
+        </div>
+      </div>
+      <form method="post" action="/admin/system/reload" class="admin-inline-form" onsubmit="return confirm('Reload the application now? Active requests may finish; new requests use the updated configuration.')">
+        {{csrfField}}
+        <button type="submit" class="btn-admin-primary w-100">
+          <i class="bi bi-arrow-clockwise"></i> Reload Now
+        </button>
+      </form>
+    </div>
+  </div>
+</div>

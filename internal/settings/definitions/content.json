@@ -1,0 +1,41 @@
+{
+  "title": "Content",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "allow_comments": {
+        "type": "boolean",
+        "title": "Allow Comments",
+        "default": true,
+        "description": "When disabled, comment forms are hidden and new comments are rejected."
+      },
+      "require_login": {
+        "type": "boolean",
+        "title": "Require Login",
+        "default": false,
+        "description": "Only authenticated users may post comments."
+      },
+      "allow_anonymous": {
+        "type": "boolean",
+        "title": "Allow Anonymous Comments",
+        "default": true,
+        "description": "When login is not required, allow guest name/email comments."
+      },
+      "auto_approve": {
+        "type": "boolean",
+        "title": "Auto-Approve Comments",
+        "default": false,
+        "description": "Publish new comments immediately without moderation."
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/allow_comments"},
+      {"type": "Control", "scope": "#/properties/require_login"},
+      {"type": "Control", "scope": "#/properties/allow_anonymous"},
+      {"type": "Control", "scope": "#/properties/auto_approve"}
+    ]
+  }
+}

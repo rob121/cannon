@@ -1,0 +1,72 @@
+{{template "page_header" .}}
+<div class="admin-help-manager">
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if .URL}}
+      <a class="admin-help-breadcrumb-link" href="{{.URL}}">{{.Label}}</a>
+      {{else}}
+      <span class="admin-help-breadcrumb-current">{{.Label}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+    {{if gt (len .Breadcrumbs) 1}}
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{$.TemplatesBase}}">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    {{end}}
+  </div>
+
+  <div class="admin-data-card">
+    {{template "error_alert" .}}
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Template")}}
+            {{template "sort_th" (dict "Root" $ "Key" "source" "Label" "Source")}}
+            {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Entries}}
+          <tr>
+            <td>
+              <span class="admin-cell-primary">{{.Name}}</span>
+              <div class="admin-cell-muted"><code class="admin-code">{{.Path}}</code></div>
+            </td>
+            <td>{{if .Builtin}}Built-in{{else}}Custom{{end}}</td>
+            <td>
+              {{if .Overridden}}
+              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Overridden</span>
+              {{else}}
+              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Built-in</span>
+              {{end}}
+            </td>
+            <td class="admin-col-actions">
+              <div class="admin-row-actions">
+                {{if .Overridden}}
+                <a class="btn-admin-icon" href="{{$.TemplatesBase}}/edit?path={{queryEscape .Path}}" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {{else}}
+                <form method="post" action="{{$.TemplatesBase}}/override{{listQuery $.Page $.Sort $.Dir}}" class="admin-inline-form" data-turbo-frame="main-content">
+      {{csrfField}}
+                  <input type="hidden" name="path" value="{{.Path}}">
+                  <button type="submit" class="btn-admin-ghost btn-admin-sm">Override</button>
+                </form>
+                {{end}}
+              </div>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4"><div class="admin-empty">No templates in this group.</div></td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{template "pagination" .}}
+  </div>
+</div>

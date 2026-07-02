@@ -1,0 +1,78 @@
+{{template "page_header" .}}
+<div class="admin-form-stack">
+  <div class="admin-form-card">
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post">
+      {{csrfField}}
+        {{range $sec := .Sections}}
+        <div class="admin-lang-section">
+          <div class="admin-lang-section-header">
+            <h3 class="admin-lang-section-title">{{if $sec.Name}}{{$sec.Name}}{{else}}Default{{end}}</h3>
+          </div>
+          <div class="admin-table-scroll">
+            <table class="admin-table admin-lang-table">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Value</th>
+                  <th class="admin-col-actions"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {{range $sec.Entries}}
+                <tr>
+                  <td>
+                    <input type="hidden" name="section" value="{{$sec.Name}}">
+                    <input class="admin-form-control" name="key" value="{{.Key}}" required>
+                  </td>
+                  <td>
+                    <input class="admin-form-control" name="value" value="{{.Value}}" required>
+                  </td>
+                  <td class="admin-col-actions">
+                    <label class="admin-form-check admin-lang-remove" title="Remove on save">
+                      <input type="checkbox" name="remove" value="{{$sec.Name}}|{{.Key}}">
+                      <span>Remove</span>
+                    </label>
+                  </td>
+                </tr>
+                {{else}}
+                <tr><td colspan="3"><div class="admin-empty">No Keys In This Section</div></td></tr>
+                {{end}}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {{else}}
+        <div class="admin-empty mb-0">This file has no translation keys yet. Add one below.</div>
+        {{end}}
+
+        <div class="admin-lang-section">
+          <div class="admin-lang-section-header">
+            <h3 class="admin-lang-section-title">Add Entry</h3>
+            <p class="admin-lang-section-desc">New keys are saved with the rest of this file.</p>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="admin-form-label">Section</label>
+              <input class="admin-form-control" name="section" placeholder="dashboard">
+            </div>
+            <div class="col-md-4">
+              <label class="admin-form-label">Key</label>
+              <input class="admin-form-control" name="key" placeholder="title">
+            </div>
+            <div class="col-md-4">
+              <label class="admin-form-label">Value</label>
+              <input class="admin-form-control" name="value" placeholder="Dashboard">
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-form-actions">
+          <button type="submit" class="btn-admin-primary">Save File</button>
+          <a class="btn-admin-outline" href="{{.BasePath}}" data-turbo-frame="_top">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

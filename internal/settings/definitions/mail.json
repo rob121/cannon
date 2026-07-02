@@ -1,0 +1,52 @@
+{
+  "title": "Mail",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "smtp_host": {
+        "type": "string",
+        "title": "SMTP Host"
+      },
+      "smtp_port": {
+        "type": "integer",
+        "title": "SMTP Port",
+        "default": 587
+      },
+      "smtp_username": {
+        "type": "string",
+        "title": "SMTP Username"
+      },
+      "smtp_password": {
+        "type": "string",
+        "title": "SMTP Password"
+      },
+      "from_email": {
+        "type": "string",
+        "title": "From Email",
+        "format": "email"
+      },
+      "from_name": {
+        "type": "string",
+        "title": "From Name",
+        "description": "Display name for outgoing system mail."
+      },
+      "use_tls": {
+        "type": "boolean",
+        "title": "Use TLS",
+        "default": true
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/smtp_host"},
+      {"type": "Control", "scope": "#/properties/smtp_port"},
+      {"type": "Control", "scope": "#/properties/smtp_username"},
+      {"type": "Control", "scope": "#/properties/smtp_password", "options": {"format": "password"}},
+      {"type": "Control", "scope": "#/properties/from_email"},
+      {"type": "Control", "scope": "#/properties/from_name"},
+      {"type": "Control", "scope": "#/properties/use_tls"}
+    ]
+  }
+}

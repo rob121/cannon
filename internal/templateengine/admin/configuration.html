@@ -1,0 +1,60 @@
+{{template "page_header" .}}
+<div class="admin-help-manager" data-turbo="false">
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Configuration breadcrumb">
+      <a class="admin-help-breadcrumb-link" href="{{.ConfigurationBase}}">Configuration</a>
+      {{if eq .Scope "global"}}
+      <span class="admin-help-breadcrumb-sep">/</span>
+      <a class="admin-help-breadcrumb-link" href="{{.ConfigurationBase}}/global/general">Global</a>
+      {{if .SectionTitle}}
+      <span class="admin-help-breadcrumb-sep">/</span>
+      <span class="admin-help-breadcrumb-current">{{.SectionTitle}}</span>
+      {{end}}
+      {{else if .ExtensionName}}
+      <span class="admin-help-breadcrumb-sep">/</span>
+      <a class="admin-help-breadcrumb-link" href="{{.ExtensionURL}}">{{if .ExtensionLabel}}{{.ExtensionLabel}}{{else}}{{.ExtensionName}}{{end}}</a>
+      {{if .SectionTitle}}
+      <span class="admin-help-breadcrumb-sep">/</span>
+      <span class="admin-help-breadcrumb-current">{{.SectionTitle}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+  </div>
+
+  <div class="admin-help-layout">
+    <aside class="admin-help-sidebar">
+      <div class="admin-help-sidebar-header">
+        <div class="admin-help-sidebar-title">Configuration</div>
+        <p class="admin-help-sidebar-desc">Global and extension settings</p>
+      </div>
+      <nav class="admin-help-nav">
+        {{range .NavItems}}
+        {{if .Heading}}
+        <div class="admin-help-nav-heading">{{.Label}}</div>
+        {{else}}
+        <a class="admin-help-link{{if .Active}} active{{end}}" href="{{.URL}}" data-turbo="false">
+          {{.Label}}
+        </a>
+        {{end}}
+        {{end}}
+      </nav>
+    </aside>
+    <div class="admin-help-content">
+      {{template "error_alert" .}}
+      {{if .Saved}}
+      <div class="admin-alert admin-alert-success">Configuration saved.</div>
+      {{end}}
+      <div class="admin-form-card">
+        <div class="admin-form-card-header">
+          <p class="admin-form-card-desc">{{if eq .Scope "global"}}Global schemas ship embedded with Cannon. Saved values are stored per site in the database.{{else}}Extension settings are defined by the extension and stored in its configuration store.{{end}}</p>
+        </div>
+        <div class="admin-form-card-body admin-jsonforms-wrap">
+          {{if .FormHTML}}{{.FormHTML}}{{else}}
+          <div class="admin-empty">Unable to render configuration form.</div>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>

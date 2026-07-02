@@ -1,0 +1,36 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "locale" "Label" "Locale")}}
+          {{template "sort_th" (dict "Root" $ "Key" "file" "Label" "File")}}
+          {{template "sort_th" (dict "Root" $ "Key" "scope" "Label" "Scope")}}
+          {{template "sort_th" (dict "Root" $ "Key" "keys" "Label" "Keys")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Files}}
+        <tr>
+          <td>{{.Locale}}</td>
+          <td><code class="admin-code">{{.Filename}}</code></td>
+          <td><span class="admin-cell-primary">{{.Label}}</span></td>
+          <td>{{.Count}}</td>
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.Scope}}" title="Edit File">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5"><div class="admin-empty">No Language Files Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

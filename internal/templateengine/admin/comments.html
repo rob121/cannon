@@ -1,0 +1,48 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-toolbar">
+    <form method="get" class="admin-inline-form">
+      <select class="admin-form-control admin-form-control-sm" name="filter" onchange="this.form.submit()">
+        <option value="">All Comments</option>
+        <option value="pending" {{if eq .Filter "pending"}}selected{{end}}>Pending</option>
+        <option value="approved" {{if eq .Filter "approved"}}selected{{end}}>Approved</option>
+      </select>
+    </form>
+  </div>
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Author</th>
+          <th>Comment</th>
+          <th>Status</th>
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td>{{if .ItemTitle}}{{.ItemTitle}}{{else}}—{{end}}</td>
+          <td>{{if .AuthorName}}{{.AuthorName}}{{else if .AuthorEmail}}{{.AuthorEmail}}{{else}}Guest{{end}}</td>
+          <td>{{.Body}}</td>
+          <td>{{if .Approved}}Approved{{else}}Pending{{end}}</td>
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              {{if .Approved}}
+              <form method="post" action="{{$.BasePath}}/{{.CommentID}}/unapprove" class="admin-inline-form">{{csrfField}}<button class="btn-admin-icon" title="Unapprove"><i class="bi bi-x-circle"></i></button></form>
+              {{else}}
+              <form method="post" action="{{$.BasePath}}/{{.CommentID}}/approve" class="admin-inline-form">{{csrfField}}<button class="btn-admin-icon" title="Approve"><i class="bi bi-check-circle"></i></button></form>
+              {{end}}
+              <form method="post" action="{{$.BasePath}}/{{.CommentID}}/delete" class="admin-inline-form" onsubmit="return confirm('Delete comment?')">{{csrfField}}<button class="btn-admin-icon btn-admin-icon-danger"><i class="bi bi-trash"></i></button></form>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5"><div class="admin-empty">No Comments Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

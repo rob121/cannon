@@ -1,0 +1,69 @@
+{{template "page_header" .}}
+<div class="admin-help-manager">
+  {{if .Breadcrumbs}}
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if .URL}}
+      <a class="admin-help-breadcrumb-link" href="{{.URL}}">{{.Label}}</a>
+      {{else}}
+      <span class="admin-help-breadcrumb-current">{{.Label}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+    {{if .Group}}
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{if .TemplatesBase}}{{.TemplatesBase}}{{else}}{{.BasePath}}{{end}}/{{.Group}}">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+    {{end}}
+  </div>
+  {{end}}
+
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">{{if .IsNew}}New Template{{else if .IsCreate}}Override Template{{else}}Edit Template{{end}}</h2>
+        <p class="admin-form-card-desc">Raw HTML template source. Saving creates a versioned backup when the file already exists.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post" action="{{if .IsCreate}}{{.BasePath}}/new{{else}}{{.BasePath}}/edit?path={{queryEscape .Path}}{{end}}">
+      {{csrfField}}
+        <div class="row g-3">
+          <div class="col-md-12">
+            <label class="admin-form-label">Path</label>
+            {{if .IsCreate}}
+              {{if .Path}}
+              <div class="admin-form-static"><code class="admin-code">{{.Path}}</code></div>
+              <input type="hidden" name="path" value="{{.Path}}">
+              {{else}}
+              <input class="admin-form-control" name="path" value="{{.Path}}" placeholder="{{if .Group}}{{.Group}}/page.html{{else}}admin/dashboard.html{{end}}" required>
+              <p class="admin-form-help">Use paths like <code class="admin-code">{{if .Group}}{{.Group}}/page.html{{else}}admin/dashboard.html{{end}}</code>.</p>
+              {{end}}
+            {{else}}
+            <div class="admin-form-static"><code class="admin-code">{{.Path}}</code></div>
+            <input type="hidden" name="path" value="{{.Path}}">
+            {{end}}
+          </div>
+          {{if .FromBuiltin}}
+          <div class="col-md-12">
+            <div class="admin-alert admin-alert-info">Editing built-in template source. Saving writes an override to your template directory.</div>
+          </div>
+          {{end}}
+          {{if .Source}}
+          <div class="col-md-12">
+            <p class="admin-form-help">Source: <code class="admin-code">{{.Source}}</code></p>
+          </div>
+          {{end}}
+          <div class="col-md-12">
+            <label class="admin-form-label">Content</label>
+            <textarea class="admin-form-control admin-template-editor" name="content" rows="24" required>{{.Content}}</textarea>
+          </div>
+        </div>
+        {{template "form_actions" .}}
+      </form>
+    </div>
+  </div>
+</div>

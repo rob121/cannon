@@ -1,0 +1,125 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="admin-form-label">Title</label>
+          <input class="admin-form-control" name="title" value="{{.Row.Title}}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Slug</label>
+          <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="draft" {{if eq .Row.Status "draft"}}selected{{end}}>Draft</option>
+            <option value="published" {{if eq .Row.Status "published"}}selected{{end}}>Published</option>
+            <option value="archived" {{if eq .Row.Status "archived"}}selected{{end}}>Archived</option>
+            <option value="trashed" {{if eq .Row.Status "trashed"}}selected{{end}}>Trashed</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Category</label>
+          <select class="admin-form-control" name="category_id">
+            <option value="">None</option>
+            {{range .Categories}}
+            <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.CategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="admin-form-label">Author</label>
+          <select class="admin-form-control" name="author_id">
+            <option value="">None</option>
+            {{range .Users}}
+            <option value="{{.UserID}}" {{if uintPtrEq $.Row.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Intro / Excerpt</label>
+          <textarea class="admin-form-control" name="intro" rows="3">{{.Row.Intro}}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Body</label>
+          <textarea class="admin-form-control admin-template-editor" name="body" rows="12">{{.Row.Body}}</textarea>
+          <p class="admin-form-help">Markdown supported.</p>
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-check mt-4">
+            <input type="checkbox" name="featured" {{if .Row.Featured}}checked{{end}}> Featured
+          </label>
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-label">Sort Order</label>
+          <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-label">Publish Start</label>
+          <input class="admin-form-control" type="datetime-local" name="publish_start" value="{{if .Row.PublishStart}}{{.Row.PublishStart.Format "2006-01-02T15:04"}}{{end}}">
+        </div>
+        <div class="col-md-3">
+          <label class="admin-form-label">Publish End</label>
+          <input class="admin-form-control" type="datetime-local" name="publish_end" value="{{if .Row.PublishEnd}}{{.Row.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Featured Image URL</label>
+          <input class="admin-form-control" name="image" value="{{.Row.Image}}">
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">Tags</h3></div>
+        <div class="col-12">
+          <div class="admin-checkbox-grid">
+            {{range .AllTags}}
+            <label class="admin-form-check">
+              <input type="checkbox" name="tag_ids" value="{{.TagID}}" {{if containsUint $.SelectedTagIDs .TagID}}checked{{end}}>
+              {{.Name}}
+            </label>
+            {{else}}
+            <p class="admin-cell-muted">No tags yet. <a href="/admin/tags/new">Create a tag</a>.</p>
+            {{end}}
+          </div>
+        </div>
+        {{if .CustomFields}}
+        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">Custom Fields</h3></div>
+        {{range .CustomFields}}
+        <div class="col-md-6">
+          <label class="admin-form-label">{{.Label}}{{if .Required}} *{{end}}</label>
+          {{if eq .Type "textarea"}}
+          <textarea class="admin-form-control" name="field_{{.FieldID}}" rows="4">{{index $.FieldValues .FieldID}}</textarea>
+          {{else if eq .Type "boolean"}}
+          <label class="admin-form-check">
+            <input type="checkbox" name="field_{{.FieldID}}" value="1" {{if eq (index $.FieldValues .FieldID) "1"}}checked{{end}}> Yes
+          </label>
+          {{else}}
+          <input class="admin-form-control" name="field_{{.FieldID}}" value="{{index $.FieldValues .FieldID}}">
+          {{end}}
+        </div>
+        {{end}}
+        {{end}}
+        <div class="col-12"><div class="admin-form-divider"></div><h3 class="admin-form-section-title">SEO</h3></div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Meta Title</label>
+          <input class="admin-form-control" name="meta_title" value="{{.Row.MetaTitle}}">
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Meta Keywords</label>
+          <input class="admin-form-control" name="meta_keywords" value="{{.Row.MetaKeywords}}">
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Meta Description</label>
+          <textarea class="admin-form-control" name="meta_description" rows="2">{{.Row.MetaDescription}}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Canonical URL</label>
+          <input class="admin-form-control" name="canonical_url" value="{{.Row.CanonicalURL}}">
+        </div>
+        {{template "group_visibility_fields" .}}
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

@@ -1,0 +1,195 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">{{if .IsNew}}New Route{{else}}Edit Route{{end}}</h2>
+      <p class="admin-form-card-desc">Configure URL paths, dispatch type, and routing targets.</p>
+    </div>
+  </div>
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Path</label>
+          <input class="admin-form-control" name="path" value="{{.Row.Path}}" required>
+          <p class="admin-form-help">Exact path, wildcard suffix <code class="admin-code">/*</code>, or regex pattern.</p>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Type</label>
+          <select class="admin-form-control" name="type" id="route-type">
+            <option value="Url" {{if eq .Row.Type "Url"}}selected{{end}}>Url</option>
+            <option value="Extension" {{if eq .Row.Type "Extension"}}selected{{end}}>Extension</option>
+            <option value="Extension Endpoint" {{if eq .Row.Type "Extension Endpoint"}}selected{{end}}>Extension Endpoint</option>
+            <option value="Local File" {{if eq .Row.Type "Local File"}}selected{{end}}>Local File</option>
+            <option value="Controller" {{if eq .Row.Type "Controller"}}selected{{end}}>Controller</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+
+        <div class="col-12 route-fields-target" id="route-fields-target"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File"))}} hidden{{end}}>
+          <div class="admin-form-divider"></div>
+          <label class="admin-form-label">Target</label>
+          <input class="admin-form-control" name="target" value="{{.Row.Target}}"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File"))}} disabled{{end}}>
+          <p class="admin-form-help route-help-url"{{if ne .Row.Type "Url"}} hidden{{end}}>Redirect destination for URL routes.</p>
+          <p class="admin-form-help route-help-local"{{if ne .Row.Type "Local File"}} hidden{{end}}>Relative path under the site assets directory for local file routes.</p>
+        </div>
+
+        <div class="col-12 route-fields-extension" id="route-fields-extension"{{if ne .Row.Type "Extension"}} hidden{{end}}>
+          <div class="admin-form-divider"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Extension</label>
+              <select class="admin-form-control" name="extension_name" id="route-extension"{{if ne .Row.Type "Extension"}} disabled{{end}}>
+                <option value="">Select extension</option>
+                {{range .ExtensionOptions}}
+                <option value="{{.Name}}" {{if eq $.Row.ExtensionName .Name}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Extensions that expose a <code class="admin-code">/page</code> capability.</p>
+              {{if not .ExtensionOptions}}
+              <p class="admin-form-help">No active page extensions found. Install an extension binary, activate it under <strong>Extensions</strong>, and ensure it registers a page handler.</p>
+              {{end}}
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Page</label>
+              <select class="admin-form-control" name="extension_page_id" id="route-extension-page"{{if ne .Row.Type "Extension"}} disabled{{end}}>
+                <option value="">Select page</option>
+                {{range .ExtensionOptions}}
+                {{$extName := .Name}}
+                {{$extLabel := .Label}}
+                {{range .Pages}}
+                <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionPageID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
+                {{end}}
+                {{end}}
+              </select>
+            </div>
+            {{range .ExtensionOptions}}
+            {{$extName := .Name}}
+            {{range .Pages}}
+            {{$pageID := .ID}}
+            {{range .Fields}}
+            {{$fieldName := .Name}}
+            <div class="col-md-6 route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
+              <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+              {{if eq .Type "select"}}
+              <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
+                {{range .Options}}
+                <option value="{{.Value}}" {{if eq (index $.PageData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "number"}}
+              <input class="admin-form-control" name="page_data_{{.Name}}" type="number" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
+              {{else}}
+              <input class="admin-form-control" name="page_data_{{.Name}}" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
+              {{end}}
+              {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+            </div>
+            {{end}}
+            {{end}}
+            {{end}}
+          </div>
+        </div>
+
+        <div class="col-12 route-fields-endpoint" id="route-fields-endpoint"{{if ne .Row.Type "Extension Endpoint"}} hidden{{end}}>
+          <div class="admin-form-divider"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Extension</label>
+              <select class="admin-form-control" name="extension_name" id="route-endpoint-extension"{{if ne .Row.Type "Extension Endpoint"}} disabled{{end}}>
+                <option value="">Select extension</option>
+                {{range .ExtensionOptions}}
+                <option value="{{.Name}}" {{if eq $.Row.ExtensionName .Name}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Extensions that expose an <code class="admin-code">/endpoint</code> capability.</p>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Endpoint</label>
+              <select class="admin-form-control" name="extension_endpoint_id" id="route-extension-endpoint"{{if ne .Row.Type "Extension Endpoint"}} disabled{{end}}>
+                <option value="">Select endpoint</option>
+                {{range .ExtensionOptions}}
+                {{$extName := .Name}}
+                {{$extLabel := .Label}}
+                {{range .Endpoints}}
+                <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionEndpointID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
+                {{end}}
+                {{end}}
+              </select>
+              <p class="admin-form-help">Handles form posts, JSON APIs, redirects, and other non-page responses with full HTTP passthrough.</p>
+            </div>
+            {{range .ExtensionOptions}}
+            {{$extName := .Name}}
+            {{range .Endpoints}}
+            {{$endpointID := .ID}}
+            {{range .Fields}}
+            {{$fieldName := .Name}}
+            <div class="col-md-6 route-endpoint-data-field" data-extension-name="{{$extName}}" data-endpoint-id="{{$endpointID}}"{{if ne $.Row.Type "Extension Endpoint"}} hidden{{end}}>
+              <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+              {{if eq .Type "select"}}
+              <select class="admin-form-control" name="endpoint_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
+                {{range .Options}}
+                <option value="{{.Value}}" {{if eq (index $.PageData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "number"}}
+              <input class="admin-form-control" name="endpoint_data_{{.Name}}" type="number" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
+              {{else}}
+              <input class="admin-form-control" name="endpoint_data_{{.Name}}" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
+              {{end}}
+              {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+            </div>
+            {{end}}
+            {{end}}
+            {{end}}
+          </div>
+        </div>
+
+        <div class="col-12 route-fields-controller" id="route-fields-controller"{{if ne .Row.Type "Controller"}} hidden{{end}}>
+          <div class="admin-form-divider"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label">Controller</label>
+              <select class="admin-form-control" name="controller" id="route-controller"{{if ne .Row.Type "Controller"}} disabled{{end}}>
+                <option value="">Select controller</option>
+                {{range .ControllerOptions}}
+                <option value="{{.ID}}" {{if eq $.Row.Controller .ID}}selected{{end}}>{{.Title}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Built-in frontend controllers compiled into Cannon.</p>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label">Action</label>
+              <select class="admin-form-control" name="controller_action" id="route-controller-action"{{if ne .Row.Type "Controller"}} disabled{{end}}>
+                <option value="">Select action</option>
+                {{range .ControllerOptions}}
+                {{$ctrlID := .ID}}
+                {{range .Actions}}
+                <option value="{{.ID}}" data-controller-id="{{$ctrlID}}" data-default-path="{{.DefaultPath}}" {{if and (eq $.Row.Controller $ctrlID) (eq $.Row.ControllerAction .ID)}}selected{{end}}>{{.Title}} ({{.ID}})</option>
+                {{end}}
+                {{end}}
+              </select>
+              <p class="admin-form-help">Templates resolve to <code class="admin-code">default/controllers/{controller}/{action}.html</code>.</p>
+            </div>
+          </div>
+        </div>
+
+        {{template "group_visibility_fields" .}}
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{if .Title}}{{.Title}}{{else}}Configure your site{{end}} · Cannon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #ffffff;
+      --fg: #18181b;
+      --muted: #71717a;
+      --border: #e4e4e7;
+      --primary: #059669;
+      --primary-hover: #047857;
+      --primary-soft: rgba(5, 150, 105, 0.1);
+      --radius: 0.75rem;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--fg);
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(5, 150, 105, 0.12), transparent),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+
+    .noroutes-card {
+      width: 100%;
+      max-width: 28rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .noroutes-brand {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 4rem;
+      height: 4rem;
+      margin-bottom: 1.5rem;
+      border-radius: 1rem;
+      background: linear-gradient(145deg, var(--primary) 0%, #047857 100%);
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    }
+
+    .noroutes-brand svg {
+      width: 2rem;
+      height: 2rem;
+    }
+
+    .noroutes-title {
+      margin: 0 0 0.75rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .noroutes-desc {
+      margin: 0 0 1.75rem;
+      color: var(--muted);
+      font-size: 0.9375rem;
+    }
+
+    .noroutes-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.25rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--primary);
+      border: none;
+      border-radius: 0.5rem;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .noroutes-btn:hover {
+      background: var(--primary-hover);
+      color: #fff;
+    }
+
+    .noroutes-btn svg {
+      width: 1rem;
+      height: 1rem;
+      opacity: 0.9;
+    }
+
+    .noroutes-foot {
+      margin-top: 1.75rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8125rem;
+      color: var(--muted);
+    }
+
+    .noroutes-foot strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main class="noroutes-card">
+    <div class="noroutes-brand" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="#ffffff">
+        <path d="M2.6 28.8 9.8 26.6 12.6 22.4 10.8 20.6 4.8 26.2 2.4 28Z"/>
+        <path d="M10.2 16.8 13.4 19.8 14.8 19 12.1 16.2Z"/>
+        <path d="M8.2 16.2 27.8 10.4 29 12.2 9.4 18Z"/>
+        <circle cx="7" cy="16.2" r="1.25"/>
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M17.20,14.00 A6.8,6.8 0 1 1 17.18,14.00 Z M17.20,19.45 A1.35,1.35 0 1 0 17.22,19.45 Z M17.15,19.45 L17.25,19.45 L17.44,14.00 L16.96,14.00 Z M17.83,19.61 L17.92,19.66 L20.80,15.03 L20.39,14.80 Z M18.34,20.08 L18.39,20.17 L23.20,17.61 L22.97,17.20 Z M18.55,20.75 L18.55,20.85 L24.00,21.04 L24.00,20.56 Z M18.39,21.43 L18.34,21.52 L22.97,24.40 L23.20,23.99 Z M17.92,21.94 L17.83,21.99 L20.39,26.80 L20.80,26.57 Z M17.25,22.15 L17.15,22.15 L16.96,27.60 L17.44,27.60 Z M16.57,21.99 L16.48,21.94 L13.60,26.57 L14.01,26.80 Z M16.06,21.52 L16.01,21.43 L11.20,23.99 L11.43,24.40 Z M15.85,20.85 L15.85,20.75 L10.40,20.56 L10.40,21.04 Z M16.01,20.17 L16.06,20.08 L11.43,17.20 L11.20,17.61 Z M16.48,19.66 L16.57,19.61 L14.01,14.80 L13.60,15.03 Z"/>
+      </svg>
+    </div>
+    <h1 class="noroutes-title">Your site is ready to configure</h1>
+    <p class="noroutes-desc">Routes and pages are not set up yet. Open the admin panel to add routes, templates, and content.</p>
+    <a class="noroutes-btn" href="/admin">
+      Open Admin
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"/>
+      </svg>
+    </a>
+    <p class="noroutes-foot">Cannon CMS · configure at <strong>/admin</strong></p>
+  </main>
+</body>
+</html>

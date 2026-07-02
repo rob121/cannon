@@ -1,0 +1,17 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">{{.Author.Username}}</h1>
+  </header>
+  <section class="site-section">
+    <div class="site-item-grid">
+      {{range .Items}}
+      <article class="site-item-card">
+        <h2><a href="/content/item/{{.Slug}}">{{.Title}}</a></h2>
+        {{if .Intro}}<p>{{.Intro}}</p>{{end}}
+      </article>
+      {{else}}
+      <p>No published items by this author.</p>
+      {{end}}
+    </div>
+  </section>
+</article>

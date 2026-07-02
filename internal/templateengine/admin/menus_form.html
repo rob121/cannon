@@ -1,0 +1,23 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Menu Name</label>
+          <input class="admin-form-control" name="menu_name" value="{{.Row.MenuName}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>

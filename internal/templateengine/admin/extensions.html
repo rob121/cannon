@@ -1,0 +1,34 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          <th>Version</th>
+          {{template "sort_th" (dict "Root" $ "Key" "installed" "Label" "Installed")}}
+          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+          <th>Process</th>
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Name}}</span></td>
+          <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+          <td>{{template "installed_badge" .Installed}}</td>
+          <td>{{.Sort}}</td>
+          <td>{{template "process_restart" (dict "BasePath" $.BasePath "ID" .ExtensionID "Running" .Running "Page" $.Page "Sort" $.Sort "Dir" $.Dir)}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .ExtensionID "Status" .Status)}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="7"><div class="admin-empty">No Records Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

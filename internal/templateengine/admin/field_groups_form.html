@@ -1,0 +1,54 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <form method="post">
+      {{csrfField}}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="admin-form-label">Name</label>
+          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+      </div>
+      {{template "form_actions" .}}
+    </form>
+  </div>
+</div>
+{{if not .IsNew}}
+<div class="admin-data-card mt-4">
+  <div class="admin-table-toolbar">
+    <span class="admin-table-count">Custom Fields</span>
+    <a class="btn-admin-outline btn-admin-sm" href="{{.BasePath}}/{{.Row.FieldGroupID}}/fields/new">Add Field</a>
+  </div>
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Label</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Sort</th>
+          <th>Status</th>
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Row.Fields}}
+        <tr>
+          <td>{{.Label}}</td>
+          <td><code class="admin-code">{{.Name}}</code></td>
+          <td>{{.Type}}</td>
+          <td>{{.Sort}}</td>
+          <td>{{.Status}}</td>
+          <td class="admin-col-actions">
+            <a class="btn-admin-icon" href="{{$.BasePath}}/{{$.Row.FieldGroupID}}/fields/{{.FieldID}}" title="Edit"><i class="bi bi-pencil"></i></a>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="6"><div class="admin-empty">No Fields Defined</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,82 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-toolbar">
+    <form method="get" class="admin-inline-form admin-filter-form">
+      <select class="admin-form-control admin-form-control-sm" name="status" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        <option value="draft" {{if eq .StatusFilter "draft"}}selected{{end}}>Draft</option>
+        <option value="published" {{if eq .StatusFilter "published"}}selected{{end}}>Published</option>
+        <option value="archived" {{if eq .StatusFilter "archived"}}selected{{end}}>Archived</option>
+        <option value="trashed" {{if eq .StatusFilter "trashed"}}selected{{end}}>Trashed</option>
+      </select>
+      <select class="admin-form-control admin-form-control-sm" name="category" onchange="this.form.submit()">
+        <option value="">All Categories</option>
+        {{range .Categories}}
+        <option value="{{.CategoryID}}" {{if eq $.CategoryFilterID .CategoryID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+      <input class="admin-form-control admin-form-control-sm" type="search" name="q" value="{{.SearchQuery}}" placeholder="Search title or slug">
+      <button type="submit" class="btn-admin-ghost btn-admin-sm">Filter</button>
+    </form>
+  </div>
+  <form method="post" action="{{.BasePath}}/bulk{{.ListQuery}}">
+    {{csrfField}}
+    <div class="admin-table-toolbar">
+      <select class="admin-form-control admin-form-control-sm" name="bulk_action" id="item-bulk-action">
+        <option value="">Bulk Action</option>
+        <option value="publish">Publish</option>
+        <option value="draft">Mark Draft</option>
+        <option value="archive">Archive</option>
+        <option value="trash">Move To Trash</option>
+        <option value="assign_category">Assign Category</option>
+        <option value="assign_tags">Assign Tags</option>
+        <option value="delete">Delete Permanently</option>
+      </select>
+      <select class="admin-form-control admin-form-control-sm" name="bulk_category_id" id="bulk-category">
+        <option value="">Category…</option>
+        {{range .Categories}}
+        <option value="{{.CategoryID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+      <select class="admin-form-control admin-form-control-sm" name="bulk_tag_ids" id="bulk-tags" multiple size="1">
+        {{range .AllTags}}
+        <option value="{{.TagID}}">{{.Name}}</option>
+        {{end}}
+      </select>
+      <button type="submit" class="btn-admin-outline btn-admin-sm" onclick="return confirm('Apply bulk action to selected items?')">Apply</button>
+    </div>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th class="admin-col-check"><input type="checkbox" data-select-all></th>
+            {{template "sort_th" (dict "Root" $ "Key" "title" "Label" "Title")}}
+            {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+            <th>Category</th>
+            <th>Author</th>
+            {{template "sort_th" (dict "Root" $ "Key" "featured" "Label" "Featured")}}
+            {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Sort")}}
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td><input type="checkbox" name="item_ids" value="{{.ItemID}}"></td>
+            <td><span class="admin-cell-primary">{{.Title}}</span><div class="admin-cell-muted">/{{.Slug}}</div></td>
+            <td><span class="admin-badge">{{.Status}}</span></td>
+            <td>{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+            <td>{{if .AuthorName}}{{.AuthorName}}{{else}}—{{end}}</td>
+            <td>{{if .Featured}}Yes{{else}}—{{end}}</td>
+            <td>{{.Sort}}</td>
+            {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ItemID "ListQuery" $.ListQuery)}}
+          </tr>
+          {{else}}
+          <tr><td colspan="8"><div class="admin-empty">No Items Found</div></td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {{template "pagination" .}}
+</div>

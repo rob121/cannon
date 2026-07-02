@@ -1,0 +1,45 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">{{if .RouteName}}{{.RouteName}}{{else}}Welcome{{end}}</h1>
+    <p class="site-subtitle">Latest content from your site.</p>
+  </header>
+
+  {{if .Featured}}
+  <section class="site-section">
+    <h2 class="site-section-title">Featured</h2>
+    <div class="site-item-grid">
+      {{range .Featured}}
+      <article class="site-item-card">
+        <h3><a href="/content/item/{{.Slug}}">{{.Title}}</a></h3>
+        {{if .Intro}}<p>{{.Intro}}</p>{{end}}
+      </article>
+      {{end}}
+    </div>
+  </section>
+  {{end}}
+
+  <section class="site-section">
+    <h2 class="site-section-title">Latest Items</h2>
+    <div class="site-item-grid">
+      {{range .Items}}
+      <article class="site-item-card">
+        <h3><a href="/content/item/{{.Slug}}">{{.Title}}</a></h3>
+        {{if .Intro}}<p>{{.Intro}}</p>{{end}}
+      </article>
+      {{else}}
+      <p>No published items yet.</p>
+      {{end}}
+    </div>
+  </section>
+
+  {{if .Categories}}
+  <section class="site-section">
+    <h2 class="site-section-title">Categories</h2>
+    <ul class="site-link-list">
+      {{range .Categories}}
+      <li><a href="/content/category/{{.Slug}}">{{.Name}}</a></li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+</article>

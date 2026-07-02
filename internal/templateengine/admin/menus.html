@@ -1,0 +1,28 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
+          <th>Items</th>
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.MenuName}}</span></td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .MenuID "Status" .Status)}}</td>
+          <td>{{len .Items}}</td>
+          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .MenuID)}}
+        </tr>
+        {{else}}
+        <tr><td colspan="4"><div class="admin-empty">No Records Found</div></td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

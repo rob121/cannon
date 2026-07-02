@@ -1,0 +1,8 @@
+<article class="site-page{{if .Wide}} site-page-wide{{end}}">
+  <header class="site-hero">
+    {{if .Eyebrow}}<p class="site-hero-eyebrow">{{.Eyebrow}}</p>{{end}}
+    {{if .Title}}<h1 class="site-title">{{.Title}}</h1>{{end}}
+    {{if .Subtitle}}<p class="site-subtitle">{{.Subtitle}}</p>{{end}}
+  </header>
+  {{if .Content}}<div class="site-content">{{.Content}}</div>{{end}}
+</article>

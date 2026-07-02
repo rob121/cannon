@@ -1,0 +1,244 @@
+{{define "brand_icon"}}
+<span class="admin-brand-icon">
+  <img class="admin-cannon-icon" src="/admin/assets/cannon-icon.svg?v=4" alt="" width="28" height="28">
+</span>
+{{end}}
+
+{{define "auth_config_fields"}}
+<div class="col-12"><div class="admin-form-divider"></div></div>
+<div class="col-12">
+  <h3 class="admin-form-section-title">Configuration</h3>
+  <p class="admin-form-section-desc">Values map to <code>github.com/markbates/goth</code> provider constructor parameters.</p>
+</div>
+{{range .ConfigFields}}
+<div class="col-md-6">
+  <label class="admin-form-label">{{.Label}}</label>
+  {{if .Readonly}}
+  <input class="admin-form-control" value="{{.Value}}" disabled>
+  <input type="hidden" name="cfg_{{.Key}}" value="{{.Value}}">
+  {{else if .Secret}}
+  <input class="admin-form-control" type="password" name="cfg_{{.Key}}" value="{{.Value}}" autocomplete="off">
+  {{else}}
+  <input class="admin-form-control" name="cfg_{{.Key}}" value="{{.Value}}">
+  {{end}}
+  {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+</div>
+{{end}}
+{{end}}
+
+{{define "page_header"}}
+<div class="admin-page-header">
+  <div class="admin-page-header-main">
+    <h1 class="admin-page-title">{{.Title}}</h1>
+    {{if .Subtitle}}<p class="admin-page-desc">{{.Subtitle}}</p>{{end}}
+  </div>
+  {{if .PageActionURL}}
+  <div class="admin-page-actions">
+    <a class="btn-admin-primary" href="{{.PageActionURL}}" data-turbo-frame="_top">
+      <i class="bi bi-plus-lg"></i> {{.PageActionLabel}}
+    </a>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "pagination"}}
+{{if .Total}}
+<div class="admin-pagination">
+  <span class="admin-pagination-summary">
+    Showing
+    <strong>{{add (mul (sub .Page 1) .PageSize) 1}}</strong>–<strong>{{if lt (mul .Page .PageSize) .Total}}{{mul .Page .PageSize}}{{else}}{{.Total}}{{end}}</strong>
+    of <strong>{{.Total}}</strong> results
+  </span>
+  <div class="admin-pagination-actions">
+    {{if gt .Page 1}}
+    <a class="btn-admin-ghost btn-admin-sm" href="{{listQuery (sub .Page 1) .Sort .Dir}}" data-turbo-frame="main-content">Previous</a>
+    {{else}}
+    <span class="btn-admin-ghost btn-admin-sm disabled">Previous</span>
+    {{end}}
+    <span class="admin-pagination-pages">
+      <span class="admin-pagination-page active">{{.Page}}</span>
+      <span class="admin-pagination-sep">/</span>
+      <span class="admin-pagination-total">{{if gt .Total 0}}{{add (div (sub .Total 1) .PageSize) 1}}{{else}}1{{end}}</span>
+    </span>
+    {{if lt (mul .Page .PageSize) .Total}}
+    <a class="btn-admin-ghost btn-admin-sm" href="{{listQuery (add .Page 1) .Sort .Dir}}" data-turbo-frame="main-content">Next</a>
+    {{else}}
+    <span class="btn-admin-ghost btn-admin-sm disabled">Next</span>
+    {{end}}
+  </div>
+</div>
+{{end}}
+{{end}}
+
+{{define "sort_th"}}
+<th class="admin-sort-th{{if eq .Root.Sort .Key}} is-active is-{{.Root.Dir}}{{end}}">
+  <a class="admin-sort-link" href="{{sortLink .Root.BasePath .Root.Page .Root.Sort .Root.Dir .Key}}">
+    <span class="admin-sort-label">{{.Label}}</span>
+    <span class="admin-sort-icons" aria-hidden="true">
+      <i class="bi bi-chevron-up"></i>
+      <i class="bi bi-chevron-down"></i>
+    </span>
+  </a>
+</th>
+{{end}}
+
+{{define "status_badge"}}
+{{if eq . "active"}}
+<span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
+{{else}}
+<span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
+{{end}}
+{{end}}
+
+{{define "status_toggle"}}
+<form method="post" action="{{.BasePath}}/{{.ID}}/toggle-status{{if .ListQuery}}{{.ListQuery}}{{else if .Root}}{{listQuery .Root.Page .Root.Sort .Root.Dir}}{{end}}" class="admin-inline-form admin-status-toggle-form">
+      {{csrfField}}
+  <button type="submit" class="admin-status-toggle-btn" title="Click to toggle status">
+    {{template "status_badge" .Status}}
+  </button>
+</form>
+{{end}}
+
+{{define "process_status"}}
+{{if .}}
+<span class="admin-process-status admin-process-status-running" title="Process running">
+  <i class="bi bi-play-circle-fill" aria-hidden="true"></i>
+  <span>Running</span>
+</span>
+{{else}}
+<span class="admin-process-status admin-process-status-stopped" title="Process stopped">
+  <i class="bi bi-stop-circle" aria-hidden="true"></i>
+  <span>Stopped</span>
+</span>
+{{end}}
+{{end}}
+
+{{define "installed_badge"}}
+{{if .}}
+<span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Installed</span>
+{{else}}
+<span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Pending</span>
+{{end}}
+{{end}}
+
+{{define "extension_process_toolbar"}}
+<div class="admin-extension-toolbar">
+  <div class="admin-extension-toolbar-status">
+    {{template "process_status" .Running}}
+    {{template "installed_badge" .Row.Installed}}
+  </div>
+  <div class="admin-extension-toolbar-actions">
+    {{if not .Row.Installed}}
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/install?redirect=edit" class="admin-inline-form">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-primary btn-admin-sm">
+        <i class="bi bi-download"></i> Install
+      </button>
+    </form>
+    {{end}}
+    {{if .Running}}
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/stop?redirect=edit" class="admin-inline-form" onsubmit="return confirm('Stop this extension process?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline btn-admin-sm">
+        <i class="bi bi-stop-fill"></i> Stop
+      </button>
+    </form>
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/restart?redirect=edit" class="admin-inline-form" onsubmit="return confirm('Restart this extension process?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline btn-admin-sm">
+        <i class="bi bi-arrow-clockwise"></i> Restart
+      </button>
+    </form>
+    {{else}}
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/start?redirect=edit" class="admin-inline-form">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline btn-admin-sm">
+        <i class="bi bi-play-fill"></i> Start
+      </button>
+    </form>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "process_restart"}}
+<form method="post" action="{{.BasePath}}/{{.ID}}/restart{{listQuery .Page .Sort .Dir}}" class="admin-inline-form admin-process-restart-form" onsubmit="return confirm('Restart this extension process?')">
+      {{csrfField}}
+  <button type="submit" class="admin-process-restart-btn" title="Click to restart">
+    {{template "process_status" .Running}}
+  </button>
+</form>
+{{end}}
+
+{{define "error_alert"}}
+{{if .Error}}
+<div class="admin-alert admin-alert-error">{{.Error}}</div>
+{{end}}
+{{end}}
+
+{{define "success_alert"}}
+{{if .Success}}
+<div class="admin-alert admin-alert-success">{{.Success}}</div>
+{{end}}
+{{end}}
+
+{{define "table_toolbar"}}{{end}}
+
+{{define "group_visibility_fields"}}
+<div class="col-12"><div class="admin-form-divider"></div></div>
+<div class="col-12">
+  <label class="admin-form-label">Visible To Groups</label>
+  <p class="admin-form-help mb-3">Only members of the selected groups can see this content. The <code class="admin-code">Public</code> group is assigned to all visitors by default.</p>
+  <div class="admin-checkbox-grid">
+    {{range .AllGroups}}
+    <label class="admin-form-check">
+      <input type="checkbox" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
+      {{groupName .Name}}
+    </label>
+    {{else}}
+    <p class="admin-cell-muted">No groups defined yet.</p>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "row_actions"}}
+<td class="admin-col-actions">
+  <div class="admin-row-actions">
+    <a class="btn-admin-icon" href="{{.BasePath}}/{{.ID}}{{if .ListQuery}}{{.ListQuery}}{{end}}" data-turbo-frame="_top" title="Edit">
+      <i class="bi bi-pencil"></i>
+    </a>
+    <form method="post" action="{{.BasePath}}/{{.ID}}/delete{{if .ListQuery}}{{.ListQuery}}{{end}}" class="admin-inline-form" onsubmit="return confirm('Delete this record?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-icon btn-admin-icon-danger" title="Delete">
+        <i class="bi bi-trash"></i>
+      </button>
+    </form>
+  </div>
+</td>
+{{end}}
+
+{{define "row_actions_edit_only"}}
+<td class="admin-col-actions">
+  <div class="admin-row-actions">
+    <a class="btn-admin-icon" href="{{.BasePath}}/{{.ID}}" data-turbo-frame="_top" title="Edit">
+      <i class="bi bi-pencil"></i>
+    </a>
+  </div>
+</td>
+{{end}}
+
+{{define "form_actions"}}
+<div class="admin-form-actions">
+  <button type="submit" class="btn-admin-primary">Save</button>
+  <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
+</div>
+{{end}}
+
+{{define "form_section_header"}}
+<div class="admin-form-section-header">
+  <h3 class="admin-form-section-title">{{.Title}}</h3>
+  {{if .Description}}<p class="admin-form-section-desc">{{.Description}}</p>{{end}}
+</div>
+{{end}}

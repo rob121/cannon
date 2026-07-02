@@ -1,0 +1,62 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">{{if .IsNew}}Create Item{{else}}Edit Item{{end}}</h1>
+  </header>
+
+  {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
+
+  <form method="post" class="site-form">
+    {{csrfField}}
+    <label>Title
+      <input type="text" name="title" value="{{.Item.Title}}" class="site-form-control" required>
+    </label>
+    <label>Slug
+      <input type="text" name="slug" value="{{.Item.Slug}}" class="site-form-control" placeholder="auto-generated if empty">
+    </label>
+    <label>Intro
+      <textarea name="intro" rows="3" class="site-form-control">{{.Item.Intro}}</textarea>
+    </label>
+    <label>Body
+      <textarea name="body" rows="12" class="site-form-control">{{.Item.Body}}</textarea>
+    </label>
+    <label>Featured Image URL
+      <input type="text" name="image" value="{{.Item.Image}}" class="site-form-control">
+    </label>
+    <label>Category
+      <select name="category_id" class="site-form-control">
+        <option value="">None</option>
+        {{range .Categories}}
+        <option value="{{.CategoryID}}" {{if eq $.SelectedCategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+        {{end}}
+      </select>
+    </label>
+    <fieldset class="site-fieldset">
+      <legend>Tags</legend>
+      {{range .Tags}}
+      <label class="site-check-label">
+        <input type="checkbox" name="tag_ids" value="{{.TagID}}" {{if inUint $.SelectedTagIDs .TagID}}checked{{end}}> {{.Name}}
+      </label>
+      {{end}}
+    </fieldset>
+    {{if .CustomFields}}
+    <fieldset class="site-fieldset">
+      <legend>Custom Fields</legend>
+      {{range .CustomFields}}
+      <label>{{.Label}}
+        <input type="text" name="field_{{.FieldID}}" value="{{index $.FieldValues .FieldID}}" class="site-form-control">
+      </label>
+      {{end}}
+    </fieldset>
+    {{end}}
+    {{if .CanPublish}}
+    <label>Status
+      <select name="status" class="site-form-control">
+        <option value="draft" {{if eq .Item.Status "draft"}}selected{{end}}>Draft</option>
+        <option value="published" {{if eq .Item.Status "published"}}selected{{end}}>Published</option>
+      </select>
+    </label>
+    {{end}}
+    <button type="submit" class="site-btn">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+    {{if not .IsNew}}<a href="{{itemURL .Item.Slug}}" class="site-btn site-btn-ghost">View item</a>{{end}}
+  </form>
+</article>

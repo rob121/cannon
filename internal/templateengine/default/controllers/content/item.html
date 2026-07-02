@@ -1,0 +1,58 @@
+<article class="site-page site-item-detail">
+  <header class="site-hero">
+    <h1 class="site-title">{{.Item.Title}}</h1>
+    {{if .Item.Category}}<p class="site-subtitle"><a href="{{categoryURL .Item.Category.Slug}}">{{.Item.Category.Name}}</a></p>{{end}}
+    {{if .CanEdit}}<p class="site-subtitle"><a href="/content/edit/{{.Item.Slug}}">Edit this item</a></p>{{end}}
+  </header>
+  {{if .Item.Image}}<figure class="site-item-image"><img src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
+  {{if .IntroHTML}}<div class="site-item-intro">{{.IntroHTML}}</div>{{end}}
+  <div class="site-content">{{.BodyHTML}}</div>
+  {{if .Fields}}
+  <section class="site-section">
+    <h2 class="site-section-title">Details</h2>
+    <dl class="site-field-list">
+      {{range $k, $v := .Fields}}
+      <dt>{{$k}}</dt><dd>{{$v}}</dd>
+      {{end}}
+    </dl>
+  </section>
+  {{end}}
+  {{if .Related}}
+  <section class="site-section">
+    <h2 class="site-section-title">Related</h2>
+    <ul class="site-link-list">
+      {{range .Related}}
+      <li><a href="{{itemURL .Slug}}">{{.Title}}</a></li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+  <section class="site-section" id="comments">
+    <h2 class="site-section-title">Comments {{if .CommentCount}}({{.CommentCount}}){{end}}</h2>
+    {{if .CommentSettings.AllowComments}}
+      {{if .Comments}}
+      {{range .Comments}}
+      <article class="site-comment">
+        <p class="site-comment-author">{{if .AuthorName}}{{.AuthorName}}{{else}}Guest{{end}}</p>
+        <p>{{.Body}}</p>
+      </article>
+      {{end}}
+      {{end}}
+      <form method="post" action="{{itemURL .Item.Slug}}" class="site-comment-form">
+        {{csrfField}}
+        {{if and (not .CommentSettings.RequireLogin) .CommentSettings.AllowAnonymous}}
+        <div class="site-form-row">
+          <label>Name <input type="text" name="author_name" class="site-form-control"></label>
+          <label>Email <input type="email" name="author_email" class="site-form-control"></label>
+        </div>
+        {{end}}
+        <label>Comment
+          <textarea name="body" rows="4" class="site-form-control" required></textarea>
+        </label>
+        <button type="submit" class="site-btn">Post Comment</button>
+      </form>
+    {{else}}
+      <p>Comments are closed.</p>
+    {{end}}
+  </section>
+</article>

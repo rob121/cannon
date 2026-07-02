@@ -1,0 +1,32 @@
+{
+  "title": "SEO & Robots",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "robots_txt": {
+        "type": "string",
+        "title": "Robots.txt Body",
+        "description": "Contents served at /robots.txt when set."
+      },
+      "allow_ai_crawlers": {
+        "type": "boolean",
+        "title": "Allow AI Crawlers",
+        "default": true,
+        "description": "When disabled, common AI user-agents are disallowed in robots.txt."
+      },
+      "ai_crawler_policy": {
+        "type": "string",
+        "title": "AI Crawler Policy Note",
+        "description": "Optional comment appended to robots.txt describing AI indexing policy."
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/robots_txt", "options": {"multi": true}},
+      {"type": "Control", "scope": "#/properties/allow_ai_crawlers"},
+      {"type": "Control", "scope": "#/properties/ai_crawler_policy"}
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+<article class="site-page">
+  <header class="site-hero">
+    <h1 class="site-title">Reset Password</h1>
+  </header>
+  <div class="site-content">
+    {{if .Error}}<p class="site-alert site-alert-error">{{.Error}}</p>{{end}}
+    {{if .Token}}
+    <form class="site-form" method="post" action="/account/reset-password/{{.Token}}">
+      {{csrfField}}
+      <div class="site-form-field">
+        <label for="password">New Password</label>
+        <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password">
+      </div>
+      <div class="site-form-field">
+        <label for="password_confirm">Confirm Password</label>
+        <input id="password_confirm" name="password_confirm" type="password" required minlength="8" autocomplete="new-password">
+      </div>
+      <div class="site-form-actions">
+        <button type="submit" class="site-btn site-btn-primary">Update Password</button>
+      </div>
+    </form>
+    {{else}}
+    <p class="site-alert site-alert-error">Reset link is invalid or expired.</p>
+    {{end}}
+  </div>
+</article>
