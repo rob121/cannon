@@ -2,11 +2,17 @@ package content
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
+	"gorm.io/gorm"
 )
+
+const settingAuthorProfileID = "author_profile_id"
 
 // AuthorProfileField is one profile field value for author pages.
 type AuthorProfileField struct {
@@ -24,16 +30,16 @@ type AuthorProfile struct {
 	Fields      []AuthorProfileField
 }
 
-// LoadAuthorProfile loads profile field values for a user.
+// LoadAuthorProfile loads profile field values for a user using the configured author profile schema.
 func LoadAuthorProfile(ctx context.Context, userID uint) (*AuthorProfile, error) {
 	if userID == 0 {
 		return nil, nil
 	}
-	var u models.User
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return nil, err
 	}
+	var u models.User
 	if err := db.First(&u, userID).Error; err != nil {
 		return nil, err
 	}
@@ -41,41 +47,128 @@ func LoadAuthorProfile(ctx context.Context, userID uint) (*AuthorProfile, error)
 		DisplayName: user.DisplayName(&u),
 		Email:       u.Email,
 	}
-	var up models.UserProfile
-	if err := db.Where("user_id = ?", userID).First(&up).Error; err != nil {
+	profileID, err := AuthorProfileID(ctx)
+	if err != nil || profileID == 0 {
 		return out, nil
 	}
-	var profile models.Profile
-	if err := db.Preload("Fields", "status = ?", models.StatusActive).First(&profile, up.ProfileID).Error; err != nil {
-		return out, nil
+	fields, err := ActiveProfileFields(ctx, profileID)
+	if err != nil || len(fields) == 0 {
+		return out, err
 	}
-	if len(profile.Fields) == 0 {
-		return out, nil
+	values, err := ProfileUserFieldValues(db, userID, fields)
+	if err != nil {
+		return out, err
 	}
-	fieldIDs := make([]uint, 0, len(profile.Fields))
-	for _, f := range profile.Fields {
-		fieldIDs = append(fieldIDs, f.ProfileFieldID)
-	}
-	var values []models.ProfileUserFieldValue
-	_ = db.Where("user_id = ? AND field_id IN ?", userID, fieldIDs).Find(&values).Error
-	byField := make(map[uint]string, len(values))
-	for _, v := range values {
-		byField[v.FieldID] = v.Value
-	}
-	for _, f := range profile.Fields {
-		value := byField[f.ProfileFieldID]
+	for _, f := range fields {
+		value := values[f.ProfileFieldID]
 		if value == "" {
 			continue
 		}
-		label := f.Name
-		cf := models.ContentField{Label: f.Name, Type: f.Type, Configuration: f.Configuration}
 		out.Fields = append(out.Fields, AuthorProfileField{
 			Name:  f.Name,
-			Label: label,
+			Label: f.Name,
 			Type:  f.Type,
 			Value: value,
-			HTML:  FormatFieldDisplayHTML(cf, value),
+			HTML:  FormatFieldDisplayHTML(profileFieldAsContentField(f), value),
 		})
 	}
 	return out, nil
+}
+
+// ActiveProfileFields returns active fields for a profile schema.
+func ActiveProfileFields(ctx context.Context, profileID uint) ([]models.ProfileField, error) {
+	if profileID == 0 {
+		return nil, nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var fields []models.ProfileField
+	err = db.Where("profile_id = ? AND status = ?", profileID, models.StatusActive).
+		Order("sort asc, profile_field_id asc").
+		Find(&fields).Error
+	return fields, err
+}
+
+// ProfileUserFieldValues returns stored values keyed by profile field id.
+func ProfileUserFieldValues(db *gorm.DB, userID uint, fields []models.ProfileField) (map[uint]string, error) {
+	out := map[uint]string{}
+	if userID == 0 || len(fields) == 0 {
+		return out, nil
+	}
+	fieldIDs := make([]uint, 0, len(fields))
+	for _, f := range fields {
+		fieldIDs = append(fieldIDs, f.ProfileFieldID)
+	}
+	var rows []models.ProfileUserFieldValue
+	if err := db.Where("user_id = ? AND field_id IN ?", userID, fieldIDs).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		out[row.FieldID] = row.Value
+	}
+	return out, nil
+}
+
+// SaveProfileUserFieldValues stores profile field values from an admin user form.
+func SaveProfileUserFieldValues(db *gorm.DB, userID uint, fields []models.ProfileField, r *http.Request) error {
+	for _, field := range fields {
+		value := ProfileFieldFormValue(field, r)
+		var existing models.ProfileUserFieldValue
+		err := db.Where("user_id = ? AND field_id = ?", userID, field.ProfileFieldID).First(&existing).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if value == "" {
+				continue
+			}
+			if err := db.Create(&models.ProfileUserFieldValue{
+				UserID:  userID,
+				FieldID: field.ProfileFieldID,
+				Value:   value,
+			}).Error; err != nil {
+				return err
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if value == "" {
+			if err := db.Delete(&existing).Error; err != nil {
+				return err
+			}
+			continue
+		}
+		existing.Value = value
+		if err := db.Save(&existing).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ProfileFieldFormValue reads one profile field from a form submission.
+func ProfileFieldFormValue(field models.ProfileField, r *http.Request) string {
+	cf := profileFieldAsContentField(field)
+	return CustomFieldFormValue(cf, r)
+}
+
+func profileFieldAsContentField(field models.ProfileField) models.ContentField {
+	return models.ContentField{
+		FieldID:       field.ProfileFieldID,
+		Name:          field.Name,
+		Label:         field.Name,
+		Type:          field.Type,
+		Configuration: field.Configuration,
+	}
+}
+
+// ProfileFieldAsContentField adapts a profile field for shared field widgets and formatting.
+func ProfileFieldAsContentField(field models.ProfileField) models.ContentField {
+	return profileFieldAsContentField(field)
+}
+
+// ProfileFieldFormKey returns the form input name for a profile field.
+func ProfileFieldFormKey(fieldID uint) string {
+	return fmt.Sprintf("field_%d", fieldID)
 }

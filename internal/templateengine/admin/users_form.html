@@ -75,6 +75,19 @@
             {{end}}
           </div>
         </div>
+        {{if and (not .IsNew) .AuthorProfileName}}
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <h3 class="admin-form-section-title">Author Profile</h3>
+          <p class="admin-form-section-desc">Values for the <strong>{{.AuthorProfileName}}</strong> profile shown on content authored by this user.</p>
+        </div>
+        {{range .ProfileFields}}
+        <div class="col-md-6">
+          <label class="admin-form-label">{{.Label}}{{if eq .Type "rich_text"}} <span class="admin-cell-muted">(rich text)</span>{{end}}</label>
+          {{template "custom_field_input" (dict "Field" . "Value" (index $.ProfileValues .FieldID))}}
+        </div>
+        {{end}}
+        {{end}}
       </div>
       {{template "form_actions" .}}
     </form>

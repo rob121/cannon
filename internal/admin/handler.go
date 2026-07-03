@@ -173,6 +173,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			return content.ParseFieldConfig(raw).Options
 		},
 		"fieldValueContains": content.FieldValueContains,
+		"providerName":       displayProviderName,
 		"uintPtrEq":     uintPtrEq,
 		"siteURL":       siteFrontendURL,
 		"siteAdminURL":  siteAdminURL,
@@ -200,6 +201,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			return false
 		},
 		"groupName": GroupDisplayName,
+		"formatBytes": formatBytes,
 	})), nil
 }
 

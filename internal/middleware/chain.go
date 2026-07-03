@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rob121/cannon/internal/accesslog"
 	"github.com/rob121/cannon/internal/applog"
@@ -111,7 +112,10 @@ func (c *Chain) InvalidateLang(site *config.SiteConfig) {
 }
 
 func (c *Chain) Site(next http.Handler) http.Handler {
-	return accesslog.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &accesslog.ResponseWriter{ResponseWriter: w, Status: http.StatusOK}
+
 		site, err := c.Sites.Resolve(r)
 		if err != nil {
 			http.Error(w, "site not found", http.StatusNotFound)
@@ -121,8 +125,9 @@ func (c *Chain) Site(next http.Handler) http.Handler {
 		if level, err := settings.LogLevel(ctx); err == nil {
 			applog.SetLevel(applog.ParseLevel(level))
 		}
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}))
+		next.ServeHTTP(rw, r.WithContext(ctx))
+		accesslog.Write(site, r, rw.Status, rw.Bytes, time.Since(start))
+	})
 }
 
 func (c *Chain) Session(next http.Handler) http.Handler {

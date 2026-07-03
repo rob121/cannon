@@ -98,6 +98,7 @@ func listExtraFromData(data map[string]any) url.Values {
 	setStringParam(v, "folder", data["FolderFilter"])
 	setStringParam(v, "status", data["StatusFilter"])
 	setStringParam(v, "category", data["CategoryFilter"])
+	setStringParam(v, "featured", data["FeaturedFilter"])
 	setStringParam(v, "q", data["SearchQuery"])
 	setStringParam(v, "filter", data["Filter"])
 	if has, _ := data["HasMenuFilter"].(bool); has {

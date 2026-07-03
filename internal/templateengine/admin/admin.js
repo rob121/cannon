@@ -813,6 +813,68 @@
     initTemplateEditors();
     initMediaPicker();
     initTemplateBrowser();
+    initAccessLogTail();
+  }
+
+  function initAccessLogTail() {
+    var root = document.querySelector('[data-access-log-tail]');
+    if (!root || root.dataset.bound) {
+      return;
+    }
+    root.dataset.bound = '1';
+    var tailURL = root.getAttribute('data-tail-url') || '';
+    var pre = root.querySelector('.admin-access-log-pre');
+    var fileSelect = root.querySelector('[data-access-log-file]');
+    var refreshBtn = root.querySelector('[data-access-log-refresh]');
+    var autoRefresh = root.querySelector('[data-access-log-autorefresh]');
+    var timer = null;
+
+    function selectedFile() {
+      return fileSelect ? fileSelect.value : 'access.log';
+    }
+
+    function refresh() {
+      if (!tailURL || !pre) {
+        return;
+      }
+      var url = tailURL + '?file=' + encodeURIComponent(selectedFile());
+      fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (resp) {
+          if (!resp.ok) {
+            throw new Error('Failed to load log tail');
+          }
+          return resp.text();
+        })
+        .then(function (text) {
+          pre.textContent = text || '(empty)';
+          pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
+        })
+        .catch(function () {
+          pre.textContent = 'Unable to load access log.';
+        });
+    }
+
+    function resetTimer() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (autoRefresh && autoRefresh.checked) {
+        timer = setInterval(refresh, 3000);
+      }
+    }
+
+    if (fileSelect) {
+      fileSelect.addEventListener('change', refresh);
+    }
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', refresh);
+    }
+    if (autoRefresh) {
+      autoRefresh.addEventListener('change', resetTimer);
+    }
+    refresh();
+    resetTimer();
   }
 
   function initTemplateBrowser() {

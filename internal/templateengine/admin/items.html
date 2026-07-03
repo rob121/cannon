@@ -22,6 +22,14 @@
           {{end}}
         </select>
       </div>
+      <div class="admin-filter-field">
+        <label class="admin-filter-label" for="items-featured-filter">Featured</label>
+        <select class="admin-form-control admin-form-control-sm" id="items-featured-filter" name="featured" onchange="this.form.submit()">
+          <option value="">All Items</option>
+          <option value="1" {{if eq .FeaturedFilter "1"}}selected{{end}}>Featured only</option>
+          <option value="0" {{if eq .FeaturedFilter "0"}}selected{{end}}>Not featured</option>
+        </select>
+      </div>
       <div class="admin-filter-field admin-filter-field-search">
         <label class="admin-filter-label" for="items-search">Search</label>
         <input class="admin-form-control admin-form-control-sm" id="items-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Title or slug">
@@ -30,7 +38,7 @@
         <span class="admin-filter-label admin-filter-label-spacer" aria-hidden="true">&nbsp;</span>
         <div class="admin-filter-actions">
           <button type="submit" class="btn-admin-outline btn-admin-sm">Filter</button>
-          {{if or .StatusFilter .CategoryFilter .SearchQuery}}
+          {{if or .StatusFilter .CategoryFilter .FeaturedFilter .SearchQuery}}
           <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear</a>
           {{end}}
         </div>
@@ -77,7 +85,8 @@
             <th>Category</th>
             <th>Author</th>
             {{template "sort_th" (dict "Root" $ "Key" "featured" "Label" "Featured")}}
-            <th>Order</th>
+            {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Category Order")}}
+            {{template "sort_th" (dict "Root" $ "Key" "featured_sort" "Label" "Featured Order")}}
             <th class="admin-col-actions"></th>
           </tr>
         </thead>
@@ -94,10 +103,11 @@
             <td>{{if .AuthorName}}{{.AuthorName}}{{else}}—{{end}}</td>
             <td>{{if .Featured}}Yes{{else}}—{{end}}</td>
             <td>{{template "sort_controls" (dict "Root" $ "ID" .ItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
+            <td>{{if .Featured}}{{template "sort_controls" (dict "Root" $ "ID" .ItemID "CanMoveUp" .CanFeaturedMoveUp "CanMoveDown" .CanFeaturedMoveDown "MoveUpAction" "move-featured-up" "MoveDownAction" "move-featured-down")}}{{else}}<span class="admin-cell-muted">—</span>{{end}}</td>
             {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ItemID "ListQuery" $.ListQuery)}}
           </tr>
           {{else}}
-          <tr><td colspan="8" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-journal-richtext" "Title" "No items yet" "Message" "Create your first content item to start publishing." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+          <tr><td colspan="9" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-journal-richtext" "Title" "No items yet" "Message" "Create your first content item to start publishing." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
           {{end}}
         </tbody>
       </table>

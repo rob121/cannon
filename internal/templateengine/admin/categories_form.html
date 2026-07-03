@@ -133,14 +133,24 @@
         <div class="admin-sidebar-panel" data-sidebar-panel="permissions" role="tabpanel">
           <div class="admin-sidebar-fields">
             <div class="admin-sidebar-field">
+              <label class="admin-form-label">Inherit Permissions</label>
+              {{template "form_toggle" (dict "Name" "inherit_permissions" "Checked" .Row.InheritPermissions "OnLabel" "Inherit from parent" "OffLabel" "Custom permissions")}}
+              <p class="admin-form-help mb-0">When enabled, parent category or global configuration permissions apply.</p>
+            </div>
+            <div class="admin-sidebar-field">
               <label class="admin-form-label">Create Items</label>
-              <p class="admin-form-help">Limit which groups may create items in this category. Leave empty to allow anyone with global create permission.</p>
+              <p class="admin-form-help">Override which groups may create items in this category. Leave empty to use inherited or global permissions.</p>
               {{template "group_permission_toggles" (dict "AllGroups" .AllGroups "FieldName" "create_group_ids" "SelectedIDs" .CreateGroupIDs)}}
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Edit Items</label>
-              <p class="admin-form-help">Limit which groups may edit items in this category. Leave empty to use global edit permissions only.</p>
+              <p class="admin-form-help">Override which groups may edit items in this category. Leave empty to use inherited or global permissions.</p>
               {{template "group_permission_toggles" (dict "AllGroups" .AllGroups "FieldName" "edit_group_ids" "SelectedIDs" .EditGroupIDs)}}
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Publish Items</label>
+              <p class="admin-form-help">Override which groups may publish or feature items in this category. Leave empty to use inherited or global permissions.</p>
+              {{template "group_permission_toggles" (dict "AllGroups" .AllGroups "FieldName" "publish_group_ids" "SelectedIDs" .PublishGroupIDs)}}
             </div>
           </div>
         </div>

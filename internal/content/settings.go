@@ -19,6 +19,7 @@ type Settings struct {
 	ShowPublishedDate  bool
 	ShowAuthorBio      bool
 	ShowComments       bool
+	AuthorProfileID    uint
 }
 
 // LoadSettings reads content settings from the global settings store.
@@ -38,7 +39,41 @@ func LoadSettings(ctx context.Context) (Settings, error) {
 		ShowPublishedDate: settingsBool(data, "show_published_date", true),
 		ShowAuthorBio:     settingsBool(data, "show_author_bio", true),
 		ShowComments:      settingsBool(data, "show_comments", true),
+		AuthorProfileID:   settingsUint(data, "author_profile_id"),
 	}, nil
+}
+
+// AuthorProfileID returns the configured profile schema used for item authors.
+func AuthorProfileID(ctx context.Context) (uint, error) {
+	settings, err := LoadSettings(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return settings.AuthorProfileID, nil
+}
+
+func settingsUint(data map[string]any, key string) uint {
+	v, ok := data[key]
+	if !ok || v == nil {
+		return 0
+	}
+	switch n := v.(type) {
+	case float64:
+		if n > 0 {
+			return uint(n)
+		}
+	case int:
+		if n > 0 {
+			return uint(n)
+		}
+	case uint:
+		return n
+	case int64:
+		if n > 0 {
+			return uint(n)
+		}
+	}
+	return 0
 }
 
 func settingsBool(data map[string]any, key string, def bool) bool {

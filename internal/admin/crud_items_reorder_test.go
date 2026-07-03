@@ -61,6 +61,40 @@ func TestItemSortPositions(t *testing.T) {
 	}
 }
 
+func TestItemFeaturedReorder(t *testing.T) {
+	db := testItemDB(t)
+	rows := []models.Item{
+		{ItemID: 1, Title: "A", Slug: "a", Featured: true, FeaturedSort: 0},
+		{ItemID: 2, Title: "B", Slug: "b", Featured: true, FeaturedSort: 1},
+		{ItemID: 3, Title: "C", Slug: "c", Featured: false, FeaturedSort: 0, Sort: 0},
+	}
+	for _, row := range rows {
+		if err := db.Create(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := itemFeaturedReorder(db, 2, -1); err != nil {
+		t.Fatal(err)
+	}
+	var featured []models.Item
+	if err := db.Where("featured = ?", true).Order("featured_sort asc, item_id asc").Find(&featured).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(featured) != 2 || featured[0].Slug != "b" || featured[1].Slug != "a" {
+		t.Fatalf("featured order = %#v", featured)
+	}
+}
+
+func TestItemFeaturedSortPositions(t *testing.T) {
+	pos := itemFeaturedSortPositions([]models.Item{
+		{ItemID: 1, FeaturedSort: 0},
+		{ItemID: 2, FeaturedSort: 1},
+	})
+	if !pos[2].canMoveUp || pos[2].canMoveDown {
+		t.Fatalf("last featured item = %#v", pos[2])
+	}
+}
+
 func testItemDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})

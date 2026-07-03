@@ -49,7 +49,7 @@
         "type": "boolean",
         "title": "Show Author Bio",
         "default": true,
-        "description": "Display author profile information when available."
+        "description": "Display the configured author profile on item pages when an author profile schema is selected in this section."
       },
       "show_comments": {
         "type": "boolean",

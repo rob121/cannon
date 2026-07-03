@@ -2,20 +2,22 @@ package accesslog
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/rob121/cannon/internal/config"
-	"github.com/rob121/cannon/internal/sites"
 )
 
 const (
-	maxFileBytes = 10 * 1024 * 1024 // 10 MiB
-	maxBackups   = 5
+	maxFileBytes    = 10 * 1024 * 1024 // 10 MiB
+	maxBackups      = 5
+	defaultTailSize = 128 * 1024 // 128 KiB
 )
 
 type writer struct {
@@ -25,9 +27,16 @@ type writer struct {
 	size int64
 }
 
-var (
-	writers sync.Map // hostKey -> *writer
-)
+var writers sync.Map // hostKey -> *writer
+
+// File describes one access log file on disk.
+type File struct {
+	Name    string
+	Label   string
+	Path    string
+	Size    int64
+	ModTime time.Time
+}
 
 // HostKey returns a filesystem-safe key from a site host URL or host header.
 func HostKey(host string) string {
@@ -61,13 +70,21 @@ func HostKey(host string) string {
 	return out
 }
 
-func logPath(site *config.SiteConfig) string {
+// Path returns the active access log path for a site.
+func Path(site *config.SiteConfig) string {
+	return logPath(site)
+}
+
+func logDir(site *config.SiteConfig) string {
 	key := HostKey(site.Host)
 	if key == "" {
 		key = HostKey(site.ID)
 	}
-	dir := filepath.Join(site.TmpDir, "logs", key)
-	return filepath.Join(dir, "access.log")
+	return filepath.Join(site.TmpDir, "logs", key)
+}
+
+func logPath(site *config.SiteConfig) string {
+	return filepath.Join(logDir(site), "access.log")
 }
 
 func getWriter(site *config.SiteConfig) (*writer, error) {
@@ -175,37 +192,128 @@ func Write(site *config.SiteConfig, r *http.Request, status, bytes int, duration
 	_ = w.writeLine(line)
 }
 
+// Files lists the active and rotated access log files for a site, newest first.
+func Files(site *config.SiteConfig) ([]File, error) {
+	if site == nil {
+		return nil, fmt.Errorf("site is required")
+	}
+	dir := logDir(site)
+	names := []string{"access.log"}
+	for i := 1; i <= maxBackups; i++ {
+		names = append(names, fmt.Sprintf("access.log.%d", i))
+	}
+	out := make([]File, 0, len(names))
+	for _, name := range names {
+		path := filepath.Join(dir, name)
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		if info.IsDir() {
+			continue
+		}
+		out = append(out, File{
+			Name:    name,
+			Label:   fileLabel(name),
+			Path:    path,
+			Size:    info.Size(),
+			ModTime: info.ModTime(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name == "access.log" {
+			return true
+		}
+		if out[j].Name == "access.log" {
+			return false
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out, nil
+}
+
+func fileLabel(name string) string {
+	if name == "access.log" {
+		return "Current"
+	}
+	return name
+}
+
+// ResolveFile returns a log file path from a site and requested file name.
+func ResolveFile(site *config.SiteConfig, name string) (File, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "access.log"
+	}
+	files, err := Files(site)
+	if err != nil {
+		return File{}, err
+	}
+	for _, file := range files {
+		if file.Name == name {
+			return file, nil
+		}
+	}
+	return File{}, os.ErrNotExist
+}
+
+// Tail reads up to maxBytes from the end of a log file.
+func Tail(path string, maxBytes int64) (string, error) {
+	if maxBytes <= 0 {
+		maxBytes = defaultTailSize
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if info.Size() == 0 {
+		return "", nil
+	}
+	start := int64(0)
+	if info.Size() > maxBytes {
+		start = info.Size() - maxBytes
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return "", err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	if start > 0 {
+		if idx := strings.IndexByte(string(data), '\n'); idx >= 0 {
+			data = data[idx+1:]
+		}
+	}
+	return string(data), nil
+}
+
 // ResponseWriter wraps http.ResponseWriter to capture status and size.
 type ResponseWriter struct {
 	http.ResponseWriter
-	status int
-	bytes  int
+	Status int
+	Bytes  int
 }
 
 func (w *ResponseWriter) WriteHeader(code int) {
-	w.status = code
+	w.Status = code
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *ResponseWriter) Write(p []byte) (int, error) {
-	if w.status == 0 {
-		w.status = http.StatusOK
+	if w.Status == 0 {
+		w.Status = http.StatusOK
 	}
 	n, err := w.ResponseWriter.Write(p)
-	w.bytes += n
+	w.Bytes += n
 	return n, err
-}
-
-// Middleware logs requests for the resolved site.
-func Middleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		rw := &ResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		next.ServeHTTP(rw, r)
-		site, err := sites.FromContext(r.Context())
-		if err != nil {
-			return
-		}
-		Write(site, r, rw.status, rw.bytes, time.Since(start))
-	})
 }

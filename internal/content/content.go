@@ -240,21 +240,35 @@ func ListItems(ctx context.Context, viewerGroups []uint, opts ListOptions) ([]mo
 		return nil, 0, err
 	}
 	order := "sort ASC, created_at DESC"
-	switch opts.Sort {
-	case "title":
-		if opts.Dir == "desc" {
-			order = "title DESC"
+	if opts.Featured && (opts.Sort == "" || opts.Sort == "sort" || opts.Sort == "featured_sort") {
+		if opts.Sort == "featured_sort" && opts.Dir == "desc" {
+			order = "featured_sort DESC, created_at DESC"
 		} else {
-			order = "title ASC"
+			order = "featured_sort ASC, created_at DESC"
 		}
-	case "sort":
-		if opts.Dir == "desc" {
-			order = "sort DESC, created_at DESC"
+	} else {
+		switch opts.Sort {
+		case "title":
+			if opts.Dir == "desc" {
+				order = "title DESC"
+			} else {
+				order = "title ASC"
+			}
+		case "sort":
+			if opts.Dir == "desc" {
+				order = "sort DESC, created_at DESC"
+			}
+		case "featured":
+			order = "featured DESC, featured_sort ASC, created_at DESC"
+		case "featured_sort":
+			if opts.Dir == "desc" {
+				order = "featured_sort DESC, created_at DESC"
+			} else {
+				order = "featured_sort ASC, created_at DESC"
+			}
+		case "popular":
+			order = "(SELECT COUNT(*) FROM comments WHERE comments.item_id = items.item_id AND comments.approved = 1) DESC, created_at DESC"
 		}
-	case "featured":
-		order = "featured DESC, created_at DESC"
-	case "popular":
-		order = "(SELECT COUNT(*) FROM comments WHERE comments.item_id = items.item_id AND comments.approved = 1) DESC, created_at DESC"
 	}
 	page := opts.Page
 	if page < 1 {

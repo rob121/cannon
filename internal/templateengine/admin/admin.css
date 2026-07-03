@@ -2960,6 +2960,51 @@ select.admin-form-control {
   margin-top: 0.5rem;
 }
 
+.admin-jsonforms-wrap .admin-jsonforms-extra {
+  margin-top: 0.25rem;
+}
+
+.admin-jsonforms-wrap .admin-jsonforms-extra + .btn-admin-primary,
+.admin-jsonforms-wrap .admin-jsonforms-extra + button[type="submit"] {
+  margin-top: 1.25rem;
+}
+
+.admin-access-log-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.admin-access-log-meta dt {
+  color: var(--admin-muted-fg);
+  font-weight: 500;
+}
+
+.admin-access-log-meta dd {
+  margin-bottom: 0.5rem;
+}
+
+.admin-access-log-view {
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-md);
+  background: #0f172a;
+  overflow: auto;
+  max-height: 32rem;
+}
+
+.admin-access-log-pre {
+  margin: 0;
+  padding: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .admin-help-nav-empty {
   padding: 0.5rem 0.625rem;
   font-size: 0.8125rem;

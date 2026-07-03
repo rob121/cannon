@@ -284,7 +284,7 @@ func contentNavOpen(nav string) bool {
 
 func systemNavOpen(nav string) bool {
 	switch nav {
-	case "sites", "extension_registry", "blocks", "configuration", "notifications":
+	case "sites", "extension_registry", "blocks", "configuration", "notifications", "access_log":
 		return true
 	default:
 		return false
@@ -299,6 +299,23 @@ type AdminExtensionNav struct {
 	Name      string
 	URL       string
 	ActiveKey string
+}
+
+func formatBytes(n int64) string {
+	switch {
+	case n >= 1024*1024:
+		return fmt.Sprintf("%.1f MiB", float64(n)/(1024*1024))
+	case n >= 1024:
+		return fmt.Sprintf("%.1f KiB", float64(n)/1024)
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
+}
+
+func loadActiveProfiles(db *gorm.DB) []models.Profile {
+	var rows []models.Profile
+	db.Order("name asc").Find(&rows)
+	return rows
 }
 
 func loadActiveGroups(db *gorm.DB) []models.Group {

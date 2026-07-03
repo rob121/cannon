@@ -2,7 +2,7 @@
   {{template "pageHeader" (dict "Title" (printf "Tag: %s" .Tag.Name))}}
   <section>
     <div class="row g-3">
-      {{range .Items}}{{template "itemCard" .}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
       <div class="col-12"><p class="text-muted mb-0">No items with this tag yet.</p></div>
       {{end}}
     </div>

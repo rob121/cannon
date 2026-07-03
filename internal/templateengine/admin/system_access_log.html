@@ -1,0 +1,43 @@
+{{template "page_header" .}}
+<div class="admin-form-card" data-access-log-tail data-tail-url="{{.TailURL}}">
+  <div class="admin-form-card-header">
+    <h2 class="admin-form-card-title">Access Log</h2>
+    <p class="admin-form-card-desc">Tails the HTTP access log for this site. Logs rotate automatically at 10&nbsp;MiB.</p>
+  </div>
+  <div class="admin-form-card-body">
+    {{template "error_alert" .}}
+    <dl class="row admin-access-log-meta mb-3">
+      <dt class="col-sm-3">Host key</dt>
+      <dd class="col-sm-9"><code class="admin-code">{{.LogHostKey}}</code></dd>
+      <dt class="col-sm-3">Log file</dt>
+      <dd class="col-sm-9"><code class="admin-code">{{.LogPath}}</code></dd>
+    </dl>
+    <div class="admin-access-log-toolbar">
+      {{if .Files}}
+      <div style="min-width: 14rem;">
+        <label class="admin-form-label" for="access-log-file">Log segment</label>
+        <select class="admin-form-control" id="access-log-file" data-access-log-file>
+          {{range .Files}}
+          <option value="{{.Name}}" {{if eq $.SelectedFile .Name}}selected{{end}}>{{.Label}} ({{formatBytes .Size}})</option>
+          {{end}}
+        </select>
+      </div>
+      {{else}}
+      <p class="admin-cell-muted mb-0">No access log entries yet. Browse the site to generate traffic, then refresh this page.</p>
+      {{end}}
+      <div class="admin-access-log-toolbar-actions ms-auto d-flex align-items-end gap-2">
+        <button type="button" class="btn-admin-outline btn-admin-sm" data-access-log-refresh>
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+        <label class="admin-form-toggle admin-form-toggle-inline mb-0">
+          <input type="checkbox" class="admin-form-toggle-input" data-access-log-autorefresh checked>
+          <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+          <span class="admin-form-toggle-label">Auto-refresh</span>
+        </label>
+      </div>
+    </div>
+    <div class="admin-access-log-view" data-access-log-output>
+      <pre class="admin-access-log-pre">{{if .LogContent}}{{.LogContent}}{{else if not .Files}}Waiting for the first request…{{end}}</pre>
+    </div>
+  </div>
+</div>

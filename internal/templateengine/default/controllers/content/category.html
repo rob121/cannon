@@ -2,6 +2,7 @@
   {{if .ShowCategoryTitle}}{{template "pageHeader" (dict "Title" .Category.Name)}}{{end}}
   {{if and .ShowCategoryDescription .Category.Description}}<div class="lead text-muted mb-4">{{richText .Category.Description}}</div>{{end}}
   {{if .Category.Image}}<figure class="figure mb-4"><img class="figure-img img-fluid rounded" src="{{.Category.Image}}" alt="{{.Category.Name}}"></figure>{{end}}
+  {{if .CanCreate}}<p class="mb-3"><a class="btn btn-sm btn-primary" href="/content/edit/new?category_id={{.Category.CategoryID}}">Create item in this category</a></p>{{end}}
   <section>
     <div class="row g-3">
       {{range .Items}}{{template "itemCard" (dict "Item" . "ColClass" $.ItemColClass)}}{{else}}

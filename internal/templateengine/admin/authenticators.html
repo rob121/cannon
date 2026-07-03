@@ -12,7 +12,7 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .AuthID "Label" .Name)}}</td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .AuthID "Label" (providerName .Name))}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .AuthID "Status" .Status)}}</td>
           {{template "row_actions_edit_only" (dict "BasePath" $.BasePath "ID" .AuthID)}}
         </tr>

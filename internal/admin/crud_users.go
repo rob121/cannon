@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers/auth"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
@@ -122,6 +123,15 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
 			return
 		}
+		if !isNew {
+			if profileID, err := content.AuthorProfileID(r.Context()); err == nil && profileID > 0 {
+				fields, _ := content.ActiveProfileFields(r.Context(), profileID)
+				if err := content.SaveProfileUserFieldValues(db, row.UserID, fields, r); err != nil {
+					h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
+					return
+				}
+			}
+		}
 		if !row.Validated {
 			_, _ = auth.EnsureVerifyToken(r.Context(), row.UserID)
 		}
@@ -136,6 +146,26 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 	for _, group := range row.Groups {
 		selected = append(selected, group.GroupID)
 	}
+	profileFields := []models.ProfileField{}
+	profileInputs := []models.ContentField{}
+	profileValues := map[uint]string{}
+	authorProfileName := ""
+	if profileID, err := content.AuthorProfileID(r.Context()); err == nil && profileID > 0 {
+		profileFields, _ = content.ActiveProfileFields(r.Context(), profileID)
+		for _, field := range profileFields {
+			profileInputs = append(profileInputs, content.ProfileFieldAsContentField(field))
+		}
+		if !isNew && row.UserID > 0 {
+			db, _ := sites.DB(r.Context())
+			profileValues, _ = content.ProfileUserFieldValues(db, row.UserID, profileFields)
+		}
+		var profile models.Profile
+		if db, err := sites.DB(r.Context()); err == nil {
+			if db.First(&profile, profileID).Error == nil {
+				authorProfileName = profile.Name
+			}
+		}
+	}
 	title := "Add Account"
 	subtitle := "Create a new account with local authentication."
 	if !isNew {
@@ -148,8 +178,11 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 		"IsNew":       isNew,
 		"BasePath":    usersBase,
 		"Subtitle":    subtitle,
-		"AllGroups":   allGroups,
-		"SelectedIDs": selected,
+		"AllGroups":         allGroups,
+		"SelectedIDs":       selected,
+		"AuthorProfileName": authorProfileName,
+		"ProfileFields":     profileInputs,
+		"ProfileValues":     profileValues,
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

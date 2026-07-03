@@ -45,7 +45,7 @@
                   {{end}}
                 </div>
                 <div class="admin-media-field-controls">
-                  <input class="admin-form-control" type="url" name="image" id="item-image" value="{{.Row.Image}}" placeholder="/assets/media/content/photo.jpg">
+                  <input class="admin-form-control" type="text" name="image" id="item-image" value="{{.Row.Image}}" placeholder="/assets/media/content/photo.jpg" inputmode="url" autocomplete="off">
                   <div class="admin-media-field-actions">
                     <button type="button" class="btn-admin-outline btn-admin-sm" data-media-picker-open>
                       <i class="bi bi-images"></i> Choose From Media
@@ -98,14 +98,14 @@
             <div class="admin-repeat-list" data-repeat-list="gallery">
               {{range .Gallery}}
               <div class="admin-repeat-row" data-repeat-row="gallery">
-                <input class="admin-form-control" type="url" name="gallery_url" value="{{.URL}}" placeholder="Image URL">
+                <input class="admin-form-control" type="text" name="gallery_url" value="{{.URL}}" placeholder="Image URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="gallery_alt" value="{{.Alt}}" placeholder="Alt text">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="gallery">
-                <input class="admin-form-control" type="url" name="gallery_url" value="" placeholder="Image URL">
+                <input class="admin-form-control" type="text" name="gallery_url" value="" placeholder="Image URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="gallery_alt" value="" placeholder="Alt text">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
@@ -121,7 +121,7 @@
             <div class="admin-repeat-list" data-repeat-list="embed">
               {{range .Embeds}}
               <div class="admin-repeat-row" data-repeat-row="embed">
-                <input class="admin-form-control" type="url" name="embed_url" value="{{.URL}}" placeholder="Media URL">
+                <input class="admin-form-control" type="text" name="embed_url" value="{{.URL}}" placeholder="Media URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="embed_title" value="{{.Title}}" placeholder="Title (optional)">
                 <select class="admin-form-control" name="embed_kind">
                   <option value="iframe" {{if or (eq .Kind "") (eq .Kind "iframe")}}selected{{end}}>Embed (iframe)</option>
@@ -132,7 +132,7 @@
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="embed">
-                <input class="admin-form-control" type="url" name="embed_url" value="" placeholder="Media URL">
+                <input class="admin-form-control" type="text" name="embed_url" value="" placeholder="Media URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="embed_title" value="" placeholder="Title (optional)">
                 <select class="admin-form-control" name="embed_kind">
                   <option value="iframe" selected>Embed (iframe)</option>
@@ -152,13 +152,13 @@
             <div class="admin-repeat-list" data-repeat-list="attachment">
               {{range .Attachments}}
               <div class="admin-repeat-row" data-repeat-row="attachment">
-                <input class="admin-form-control" type="url" name="attachment_url" value="{{.URL}}" placeholder="File URL">
+                <input class="admin-form-control" type="text" name="attachment_url" value="{{.URL}}" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="{{.Label}}" placeholder="Label">
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="attachment">
-                <input class="admin-form-control" type="url" name="attachment_url" value="" placeholder="File URL">
+                <input class="admin-form-control" type="text" name="attachment_url" value="" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="" placeholder="Label">
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
               </div>

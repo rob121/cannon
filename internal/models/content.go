@@ -21,7 +21,8 @@ type Category struct {
 	Image           string `gorm:"size:1024"`
 	Template        string `gorm:"size:256"`
 	FieldGroupID    *uint  `gorm:"index"`
-	InheritSettings bool   `gorm:"not null;default:true"`
+	InheritSettings     bool `gorm:"not null;default:true"`
+	InheritPermissions  bool `gorm:"not null;default:true"`
 	ShowTitle       bool   `gorm:"not null;default:true"`
 	ShowDescription bool   `gorm:"not null;default:true"`
 	ListColumns     int    `gorm:"not null;default:3"`
@@ -34,6 +35,7 @@ type Category struct {
 	Groups          []Group `gorm:"many2many:category_groups;"`
 	CreateGroups    []Group `gorm:"many2many:category_create_groups;"`
 	EditGroups      []Group `gorm:"many2many:category_edit_groups;"`
+	PublishGroups   []Group `gorm:"many2many:category_publish_groups;"`
 }
 
 // Tag is a reusable content label.
@@ -54,6 +56,7 @@ type Item struct {
 	Body            string     `gorm:"type:text"`
 	Status          ItemStatus `gorm:"size:16;not null;default:draft;index"`
 	Featured        bool       `gorm:"not null;default:false;index"`
+	FeaturedSort    int        `gorm:"not null;default:0;index"`
 	PublishStart    *time.Time `gorm:"index"`
 	PublishEnd      *time.Time `gorm:"index"`
 	AuthorID        *uint      `gorm:"index"`

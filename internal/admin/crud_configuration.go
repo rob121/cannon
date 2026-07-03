@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/extension"
+	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -92,6 +93,9 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 			return
 		}
 		data := settings.FormDataFromRequest(r, def.Schema)
+		if sectionID == content.SettingsSection {
+			data = content.MergeConfigurationPermissionFormData(data, r)
+		}
 		if err := settings.Save(r.Context(), store, settings.ScopeGlobal, sectionID, data); err != nil {
 			h.renderConfigurationError(w, r, extMgr, "global", sectionID, def.Title, "", err.Error())
 			return
@@ -129,6 +133,12 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if sectionID == content.SettingsSection {
+		db, _ := sites.DB(r.Context())
+		createIDs, editIDs, publishIDs, _ := content.LoadPermissionGroupIDs(r.Context())
+		settings, _ := content.LoadSettings(r.Context())
+		formHTML = content.InjectConfigurationPermissionFields(formHTML, loadActiveGroups(db), loadActiveProfiles(db), createIDs, editIDs, publishIDs, settings.AuthorProfileID)
 	}
 	h.renderConfiguration(w, r, extMgr, section.Title, "global", section.ID, section.Title, "", formHTML, r.URL.Query().Get("saved") == "1", "", nil)
 }

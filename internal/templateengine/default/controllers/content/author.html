@@ -22,7 +22,7 @@
   <section>
     <h2 class="h4 mb-3">Items</h2>
     <div class="row g-3">
-      {{range .Items}}{{template "itemCard" .}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
       <div class="col-12"><p class="text-muted mb-0">No items by this author yet.</p></div>
       {{end}}
     </div>

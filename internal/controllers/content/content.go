@@ -156,6 +156,13 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 	categories, _ := cms.CategoryTree(ctx.GoContext())
 	showTitle, _ := cms.CategoryShowTitle(ctx.GoContext(), cat)
 	showDescription, _ := cms.CategoryShowDescription(ctx.GoContext(), cat)
+	canCreate := false
+	if ctx.Authenticated() {
+		if user, err := ctx.CurrentUser(); err == nil {
+			catID := cat.CategoryID
+			canCreate, _ = cms.CanCreateItemInCategory(ctx.GoContext(), user.UserID, &catID)
+		}
+	}
 	data := map[string]any{
 		"Category":          cat,
 		"Items":             items,
@@ -170,6 +177,7 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		"Categories":        categories,
 		"ShowCategoryTitle":       showTitle,
 		"ShowCategoryDescription": showDescription,
+		"CanCreate":               canCreate,
 	}
 	if tpl, err := cms.CategoryTemplate(ctx.GoContext(), cat); err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
@@ -216,10 +224,14 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
 	canEdit := false
+	var authorProfile *cms.AuthorProfile
 	if ctx.Authenticated() {
 		if user, err := ctx.CurrentUser(); err == nil {
 			canEdit, _ = cms.CanEditItem(ctx.GoContext(), user.UserID, item)
 		}
+	}
+	if settings.ShowAuthorBio && item.AuthorID != nil {
+		authorProfile, _ = cms.LoadAuthorProfile(ctx.GoContext(), *item.AuthorID)
 	}
 	displaySettings := settings
 	data := map[string]any{
@@ -230,6 +242,7 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 		"CommentCount":    commentCount,
 		"CommentSettings": settings,
 		"ContentSettings": displaySettings,
+		"AuthorProfile":   authorProfile,
 		"CanEdit":         canEdit,
 		"BodyHTML":        template.HTML(bodyHTML),
 		"IntroHTML":       template.HTML(introHTML),

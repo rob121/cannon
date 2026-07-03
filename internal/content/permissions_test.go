@@ -10,9 +10,127 @@ import (
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/roles"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
+
+func TestCanCreateItemUsesGlobalGroups(t *testing.T) {
+	ctx, db := permissionsTestContext(t)
+
+	createGroup := models.Group{Name: "Creators", Kind: models.GroupKindFrontend, Status: models.StatusActive}
+	if err := db.Create(&createGroup).Error; err != nil {
+		t.Fatal(err)
+	}
+	store := settings.NewStore()
+	if err := store.Save(ctx, settings.ScopeGlobal, content.SettingsSection, map[string]any{
+		"create_group_ids": []any{createGroup.GroupID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	allowed := models.User{Username: "creator", Email: "creator@test", Status: models.StatusActive}
+	denied := models.User{Username: "guest", Email: "guest@test", Status: models.StatusActive}
+	for _, u := range []*models.User{&allowed, &denied} {
+		if err := db.Create(u).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Model(&allowed).Association("Groups").Replace([]models.Group{createGroup}); err != nil {
+		t.Fatal(err)
+	}
+
+	ok, err := content.CanCreateItem(ctx, allowed.UserID)
+	if err != nil || !ok {
+		t.Fatalf("allowed user: ok=%v err=%v", ok, err)
+	}
+	ok, err = content.CanCreateItem(ctx, denied.UserID)
+	if err != nil || ok {
+		t.Fatalf("denied user: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestCategoryInheritsGlobalCreateGroups(t *testing.T) {
+	ctx, db := permissionsTestContext(t)
+
+	createGroup := models.Group{Name: "Global Creators", Kind: models.GroupKindFrontend, Status: models.StatusActive}
+	if err := db.Create(&createGroup).Error; err != nil {
+		t.Fatal(err)
+	}
+	store := settings.NewStore()
+	if err := store.Save(ctx, settings.ScopeGlobal, content.SettingsSection, map[string]any{
+		"create_group_ids": []any{createGroup.GroupID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cat := models.Category{Name: "News", Slug: "news", Status: models.StatusActive, InheritPermissions: true}
+	if err := db.Create(&cat).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	user := models.User{Username: "creator2", Email: "creator2@test", Status: models.StatusActive}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&user).Association("Groups").Replace([]models.Group{createGroup}); err != nil {
+		t.Fatal(err)
+	}
+
+	catID := cat.CategoryID
+	ok, err := content.CanCreateItemInCategory(ctx, user.UserID, &catID)
+	if err != nil || !ok {
+		t.Fatalf("expected global create permission in category: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestCategoryOverridesGlobalCreateGroups(t *testing.T) {
+	ctx, db := permissionsTestContext(t)
+
+	globalGroup := models.Group{Name: "Global", Kind: models.GroupKindFrontend, Status: models.StatusActive}
+	localGroup := models.Group{Name: "Local Only", Kind: models.GroupKindFrontend, Status: models.StatusActive}
+	for _, g := range []*models.Group{&globalGroup, &localGroup} {
+		if err := db.Create(g).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := settings.NewStore()
+	if err := store.Save(ctx, settings.ScopeGlobal, content.SettingsSection, map[string]any{
+		"create_group_ids": []any{globalGroup.GroupID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cat := models.Category{Name: "Restricted", Slug: "restricted-local", Status: models.StatusActive, InheritPermissions: false}
+	if err := db.Create(&cat).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&cat).Association("CreateGroups").Replace([]models.Group{localGroup}); err != nil {
+		t.Fatal(err)
+	}
+
+	globalUser := models.User{Username: "global-user", Email: "global-user@test", Status: models.StatusActive}
+	localUser := models.User{Username: "local-user", Email: "local-user@test", Status: models.StatusActive}
+	for _, u := range []*models.User{&globalUser, &localUser} {
+		if err := db.Create(u).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Model(&globalUser).Association("Groups").Replace([]models.Group{globalGroup}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&localUser).Association("Groups").Replace([]models.Group{localGroup}); err != nil {
+		t.Fatal(err)
+	}
+
+	catID := cat.CategoryID
+	ok, err := content.CanCreateItemInCategory(ctx, localUser.UserID, &catID)
+	if err != nil || !ok {
+		t.Fatalf("local user: ok=%v err=%v", ok, err)
+	}
+	ok, err = content.CanCreateItemInCategory(ctx, globalUser.UserID, &catID)
+	if err != nil || ok {
+		t.Fatalf("global-only user should be denied: ok=%v err=%v", ok, err)
+	}
+}
 
 func TestCanCreateItemInCategoryRequiresGroup(t *testing.T) {
 	ctx, db := permissionsTestContext(t)
@@ -21,7 +139,7 @@ func TestCanCreateItemInCategoryRequiresGroup(t *testing.T) {
 	if err := db.Create(&writerGroup).Error; err != nil {
 		t.Fatal(err)
 	}
-	cat := models.Category{Name: "Restricted", Slug: "restricted", Status: models.StatusActive}
+	cat := models.Category{Name: "Restricted", Slug: "restricted", Status: models.StatusActive, InheritPermissions: false}
 	if err := db.Create(&cat).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +184,7 @@ func TestCanEditItemRespectsCategoryEditGroups(t *testing.T) {
 	if err := db.Create(&editGroup).Error; err != nil {
 		t.Fatal(err)
 	}
-	cat := models.Category{Name: "Edit Restricted", Slug: "edit-restricted", Status: models.StatusActive}
+	cat := models.Category{Name: "Edit Restricted", Slug: "edit-restricted", Status: models.StatusActive, InheritPermissions: false}
 	if err := db.Create(&cat).Error; err != nil {
 		t.Fatal(err)
 	}

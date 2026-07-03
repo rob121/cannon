@@ -27,7 +27,15 @@
   <section class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h5 card-title">About the author</h2>
-      <p class="mb-0"><a href="{{authorURL .Item.Author.Username}}">{{if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></p>
+      <p class="mb-3"><a href="{{authorURL .Item.Author.Username}}">{{if and .AuthorProfile .AuthorProfile.DisplayName}}{{.AuthorProfile.DisplayName}}{{else if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></p>
+      {{if and .AuthorProfile .AuthorProfile.Fields}}
+      <dl class="row mb-0">
+        {{range .AuthorProfile.Fields}}
+        <dt class="col-sm-3">{{.Label}}</dt>
+        <dd class="col-sm-9">{{safeHTML .HTML}}</dd>
+        {{end}}
+      </dl>
+      {{end}}
     </div>
   </section>
   {{end}}

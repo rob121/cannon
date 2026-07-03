@@ -188,9 +188,13 @@
 {{end}}
 
 {{define "sort_controls"}}
+{{$moveUp := "move-up"}}
+{{$moveDown := "move-down"}}
+{{if .MoveUpAction}}{{$moveUp = .MoveUpAction}}{{end}}
+{{if .MoveDownAction}}{{$moveDown = .MoveDownAction}}{{end}}
 <div class="admin-sort-controls">
   {{if .CanMoveUp}}
-  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/move-up{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/{{$moveUp}}{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
     {{csrfField}}
     <button type="submit" class="btn-admin-icon" title="Move up">
       <i class="bi bi-chevron-up"></i>
@@ -200,7 +204,7 @@
   <span class="btn-admin-icon disabled" aria-hidden="true"><i class="bi bi-chevron-up"></i></span>
   {{end}}
   {{if .CanMoveDown}}
-  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/move-down{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+  <form method="post" action="{{.Root.BasePath}}/{{.ID}}/{{$moveDown}}{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
     {{csrfField}}
     <button type="submit" class="btn-admin-icon" title="Move down">
       <i class="bi bi-chevron-down"></i>
@@ -517,14 +521,14 @@
 {{else if eq $field.Type "number"}}
 <input class="admin-form-control" type="number" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{else if eq $field.Type "url"}}
-<input class="admin-form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
+<input class="admin-form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" inputmode="url" autocomplete="off">
 {{else if eq $field.Type "date"}}
 <input class="admin-form-control" type="date" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{else if eq $field.Type "datetime"}}
 <input class="admin-form-control" type="datetime-local" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{else if eq $field.Type "image" "file"}}
 <div class="admin-media-field">
-  <input class="admin-form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="/assets/media/...">
+  <input class="admin-form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="/assets/media/..." inputmode="url" autocomplete="off">
   <button type="button" class="btn-admin-outline btn-admin-sm mt-2" data-media-picker-open data-media-picker-target="{{$id}}">
     <i class="bi bi-images"></i> Choose From Media
   </button>

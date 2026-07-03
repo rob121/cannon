@@ -2,7 +2,7 @@
   {{template "pageHeader" (dict "Title" "Featured" "Subtitle" "Highlighted items from your site.")}}
   <section>
     <div class="row g-3">
-      {{range .Items}}{{template "itemCard" .}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" . "ColClass" "col-12")}}{{else}}
       <div class="col-12"><p class="text-muted mb-0">No featured items yet.</p></div>
       {{end}}
     </div>

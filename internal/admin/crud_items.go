@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/hooks"
@@ -15,10 +16,12 @@ const itemsBase = "/admin/items"
 
 type itemListRow struct {
 	models.Item
-	CategoryName string
-	AuthorName   string
-	CanMoveUp    bool
-	CanMoveDown  bool
+	CategoryName        string
+	AuthorName          string
+	CanMoveUp           bool
+	CanMoveDown         bool
+	CanFeaturedMoveUp   bool
+	CanFeaturedMoveDown bool
 }
 
 func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
@@ -36,6 +39,10 @@ func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
 		h.itemMoveSort(w, r, parts[0], -1)
 	case len(parts) == 2 && parts[1] == "move-down":
 		h.itemMoveSort(w, r, parts[0], 1)
+	case len(parts) == 2 && parts[1] == "move-featured-up":
+		h.itemMoveFeaturedSort(w, r, parts[0], -1)
+	case len(parts) == 2 && parts[1] == "move-featured-down":
+		h.itemMoveFeaturedSort(w, r, parts[0], 1)
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -51,6 +58,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	page := parsePage(r)
 	statusFilter := r.URL.Query().Get("status")
 	categoryFilter := r.URL.Query().Get("category")
+	featuredFilter := r.URL.Query().Get("featured")
 	query := r.URL.Query().Get("q")
 
 	q := db.Model(&models.Item{})
@@ -61,6 +69,11 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		if id, ok := parseID(categoryFilter); ok {
 			q = q.Where("category_id = ?", id)
 		}
+	}
+	if featuredFilter == "1" {
+		q = q.Where("featured = ?", true)
+	} else if featuredFilter == "0" {
+		q = q.Where("featured = ?", false)
 	}
 	if query != "" {
 		like := "%" + query + "%"
@@ -73,8 +86,13 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		"Create and manage structured content items.",
 		"Add Item", map[string]any{"ActiveNav": "items"})
 	order := applyListSort(r, data, map[string]string{
-		"title": "title", "status": "status", "sort": "sort", "featured": "featured",
+		"title": "title", "status": "status", "sort": "sort", "featured": "featured", "featured_sort": "featured_sort",
 	}, "sort")
+	if featuredFilter == "1" && strings.TrimSpace(r.URL.Query().Get("sort")) == "" {
+		data["Sort"] = "featured_sort"
+		data["Dir"] = "asc"
+		order = "featured_sort asc"
+	}
 
 	listQ := db.Model(&models.Item{})
 	if statusFilter != "" {
@@ -85,6 +103,11 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 			listQ = listQ.Where("category_id = ?", id)
 		}
 	}
+	if featuredFilter == "1" {
+		listQ = listQ.Where("featured = ?", true)
+	} else if featuredFilter == "0" {
+		listQ = listQ.Where("featured = ?", false)
+	}
 	if query != "" {
 		like := "%" + query + "%"
 		listQ = listQ.Where("title LIKE ? OR slug LIKE ?", like, like)
@@ -94,8 +117,12 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
 	var ordered []models.Item
-	db.Select("item_id", "category_id", "sort").Order("sort asc, item_id asc").Find(&ordered)
+	db.Select("item_id", "category_id", "featured", "featured_sort", "sort").Order("sort asc, item_id asc").Find(&ordered)
 	sortPos := itemSortPositions(ordered)
+
+	var featuredOrdered []models.Item
+	db.Select("item_id", "featured_sort").Where("featured = ?", true).Order("featured_sort asc, item_id asc").Find(&featuredOrdered)
+	featuredSortPos := itemFeaturedSortPositions(featuredOrdered)
 
 	listRows := make([]itemListRow, 0, len(rows))
 	for _, row := range rows {
@@ -109,6 +136,12 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		if pos, ok := sortPos[row.ItemID]; ok {
 			lr.CanMoveUp = pos.canMoveUp
 			lr.CanMoveDown = pos.canMoveDown
+		}
+		if row.Featured {
+			if pos, ok := featuredSortPos[row.ItemID]; ok {
+				lr.CanFeaturedMoveUp = pos.canMoveUp
+				lr.CanFeaturedMoveDown = pos.canMoveDown
+			}
 		}
 		listRows = append(listRows, lr)
 	}
@@ -125,6 +158,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	data["Rows"] = listRows
 	data["StatusFilter"] = statusFilter
 	data["CategoryFilter"] = categoryFilter
+	data["FeaturedFilter"] = featuredFilter
 	data["CategoryFilterID"] = categoryFilterID
 	data["SearchQuery"] = query
 	data["Categories"] = categories
@@ -182,7 +216,30 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 	row.Intro = r.FormValue("intro")
 	row.Body = r.FormValue("body")
 	row.Status = formItemStatus(r)
+	wasFeatured := false
+	if !isNew {
+		var prev models.Item
+		if err := db.Select("featured", "featured_sort").First(&prev, row.ItemID).Error; err == nil {
+			wasFeatured = prev.Featured
+		}
+	}
 	row.Featured = formBool(r, "featured")
+	if row.Featured {
+		if wasFeatured && !isNew {
+			var prev models.Item
+			if err := db.Select("featured_sort").First(&prev, row.ItemID).Error; err == nil {
+				row.FeaturedSort = prev.FeaturedSort
+			}
+		} else {
+			var count int64
+			q := db.Model(&models.Item{}).Where("featured = ?", true)
+			if !isNew {
+				q = q.Where("item_id <> ?", row.ItemID)
+			}
+			_ = q.Count(&count).Error
+			row.FeaturedSort = int(count)
+		}
+	}
 	row.Sort = formInt(r, "sort", 0)
 	row.Image = formString(r, "image")
 	galleryJSON, embedsJSON, attachmentsJSON := content.ItemMediaFromForm(r)
@@ -481,6 +538,84 @@ func itemReorder(db *gorm.DB, id uint, direction int) error {
 			continue
 		}
 		if err := db.Model(&models.Item{}).Where("item_id = ?", item.ItemID).Update("sort", i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func itemFeaturedSortPositions(items []models.Item) map[uint]itemSortPosition {
+	out := make(map[uint]itemSortPosition, len(items))
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].FeaturedSort != items[j].FeaturedSort {
+			return items[i].FeaturedSort < items[j].FeaturedSort
+		}
+		return items[i].ItemID < items[j].ItemID
+	})
+	last := len(items) - 1
+	for i, row := range items {
+		out[row.ItemID] = itemSortPosition{
+			canMoveUp:   i > 0,
+			canMoveDown: i < last,
+		}
+	}
+	return out
+}
+
+func (h *Handler) itemMoveFeaturedSort(w http.ResponseWriter, r *http.Request, idStr string, direction int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	if err := itemFeaturedReorder(db, id, direction); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, itemsBase+listRedirectQuery(r))
+}
+
+func itemFeaturedReorder(db *gorm.DB, id uint, direction int) error {
+	if direction == 0 {
+		return nil
+	}
+	var row models.Item
+	if err := db.First(&row, id).Error; err != nil {
+		return err
+	}
+	if !row.Featured {
+		return nil
+	}
+	var siblings []models.Item
+	if err := db.Model(&models.Item{}).Where("featured = ?", true).
+		Order("featured_sort asc, item_id asc").Find(&siblings).Error; err != nil {
+		return err
+	}
+	idx := -1
+	for i, item := range siblings {
+		if item.ItemID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return gorm.ErrRecordNotFound
+	}
+	target := idx + direction
+	if target < 0 || target >= len(siblings) {
+		return nil
+	}
+	siblings[idx], siblings[target] = siblings[target], siblings[idx]
+	for i, item := range siblings {
+		if item.FeaturedSort == i {
+			continue
+		}
+		if err := db.Model(&models.Item{}).Where("item_id = ?", item.ItemID).Update("featured_sort", i).Error; err != nil {
 			return err
 		}
 	}

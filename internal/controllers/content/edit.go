@@ -25,8 +25,17 @@ func (c *Controller) handleEditNew(ctx *controllers.Context) controllers.Result 
 	if !ok {
 		return controllers.Error(http.StatusForbidden, "permission denied")
 	}
-	canPublish, _ := cms.CanPublishItem(ctx.GoContext(), user.UserID)
+	canPublish, _ := cms.CanPublishItem(ctx.GoContext(), user.UserID, nil)
 	item := models.Item{Status: models.ItemStatusDraft, AuthorID: &user.UserID}
+	if catID := formUintPtr(ctx.Request, "category_id"); catID != nil {
+		item.CategoryID = catID
+		if ok, err := cms.CanCreateItemInCategory(ctx.GoContext(), user.UserID, catID); err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		} else if !ok {
+			return controllers.Error(http.StatusForbidden, "permission denied")
+		}
+		canPublish, _ = cms.CanPublishItem(ctx.GoContext(), user.UserID, catID)
+	}
 	if ctx.Request.Method == http.MethodPost {
 		if err := ctx.Request.ParseForm(); err != nil {
 			return controllers.Error(http.StatusBadRequest, err.Error())
@@ -71,7 +80,7 @@ func (c *Controller) handleEdit(ctx *controllers.Context) controllers.Result {
 	if !ok {
 		return controllers.Error(http.StatusForbidden, "permission denied")
 	}
-	canPublish, _ := cms.CanPublishItem(ctx.GoContext(), user.UserID)
+	canPublish, _ := cms.CanPublishItem(ctx.GoContext(), user.UserID, item.CategoryID)
 	categories, _ := cms.CategoryTree(ctx.GoContext())
 	tags, _ := cms.ListTags(ctx.GoContext())
 	fields, fieldValues := frontendCustomFields(ctx, db, &item)
