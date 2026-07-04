@@ -1,4 +1,4 @@
 <article class="mb-4">
-  {{template "pageHeader" (dict "AlwaysShow" true "Title" "Site Offline" "Subtitle" "We are performing maintenance. Please check back soon.")}}
-  <div class="alert alert-info mb-0" role="alert">Thank you for your patience.</div>
+  {{template "pageHeader" (dict "AlwaysShow" true "Title" (lang "maintenance.title") "Subtitle" (lang "maintenance.subtitle"))}}
+  <div class="alert alert-info mb-0" role="alert">{{lang "maintenance.thanks"}}</div>
 </article>

@@ -5,6 +5,7 @@
       <thead>
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          <th>Direct Assignments</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
         </tr>
@@ -12,12 +13,13 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .RoleID "Label" .Name)}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .RoleID "Status" .Status)}}</td>
+          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .RoleID "Label" (roleName .Name))}}</td>
+          <td class="admin-cell-muted">{{.PermissionCount}}</td>
+          <td>{{if .SystemRole}}{{template "status_badge" .Status}}{{else}}{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .RoleID "Status" .Status)}}{{end}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .RoleID)}}
         </tr>
         {{else}}
-        <tr><td colspan="3" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-shield-check" "Title" "No roles yet" "Message" "Define roles to control what each user can access in the admin." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-shield-check" "Title" "No roles yet" "Message" "Define roles, assign permissions, and attach them to groups or users." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

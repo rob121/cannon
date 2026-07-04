@@ -20,12 +20,12 @@ func (s *Server) serveSitemapXML(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := strings.TrimRight(siteBaseURL(r, site), "/")
-	items, _, err := content.ListItems(ctx, nil, content.ListOptions{Page: 1, Limit: 5000})
+	items, _, err := content.ListItems(ctx, nil, content.ListOptions{Page: 1, Limit: 5000, AllLocales: true})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	categories, _ := content.CategoryTree(ctx)
+	categories, _ := content.CategoryTreeAll(ctx)
 	tags, _ := content.ListTags(ctx)
 
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
@@ -40,10 +40,10 @@ func (s *Server) serveSitemapXML(w http.ResponseWriter, r *http.Request) {
 		if lastMod.IsZero() {
 			lastMod = item.CreatedAt
 		}
-		writeSitemapURL(w, base+content.ItemURL(item.Slug), lastMod)
+		writeSitemapURL(w, base+content.ItemURLForContext(content.WithLocale(ctx, item.Locale), item.Slug), lastMod)
 	}
 	for _, cat := range categories {
-		writeSitemapURL(w, base+content.CategoryURL(cat.Slug), cat.UpdatedAt)
+		writeSitemapURL(w, base+content.CategoryURLForContext(content.WithLocale(ctx, cat.Locale), cat.Slug), cat.UpdatedAt)
 	}
 	for _, tag := range tags {
 		writeSitemapURL(w, base+content.TagURL(tag.Slug), tag.UpdatedAt)

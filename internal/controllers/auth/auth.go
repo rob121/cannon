@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/auth"
+	"github.com/rob121/cannon/internal/auth/mfa"
+	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
@@ -28,6 +30,12 @@ const (
 	ActionVerifyResend  = "verify-resend"
 	ActionResetRequest  = "reset-request"
 	ActionResetSubmit   = "reset-submit"
+	ActionMFAChallenge  = "mfa-challenge"
+	ActionSecurity      = "security"
+	ActionSecurityTOTP  = "security-totp"
+	ActionSecurityPasskey = "security-passkey"
+	ActionPasskeyLogin    = "passkey-login"
+	ActionProfile         = "profile"
 )
 
 type Controller struct{}
@@ -47,6 +55,12 @@ func Definition() controllers.Definition {
 			{ID: ActionVerifyResend, Title: "Verification Pending", Methods: []string{http.MethodGet}, DefaultPath: paths.AccountVerifyResend, AllowUnverified: true},
 			{ID: ActionResetRequest, Title: "Reset Password Request", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountResetRequest, AllowUnverified: true},
 			{ID: ActionResetSubmit, Title: "Reset Password Submit", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountResetSubmit, AllowUnverified: true},
+			{ID: ActionMFAChallenge, Title: "MFA Challenge", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountMFAChallenge, RequireGuest: true, AllowUnverified: true},
+			{ID: ActionSecurity, Title: "Account Security", Methods: []string{http.MethodGet}, DefaultPath: paths.AccountSecurity, RequireAuth: true},
+			{ID: ActionSecurityTOTP, Title: "TOTP Setup", Methods: []string{http.MethodPost}, DefaultPath: paths.AccountSecurityTOTP, RequireAuth: true},
+			{ID: ActionSecurityPasskey, Title: "Passkey Setup", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountSecurityPasskey, RequireAuth: true},
+			{ID: ActionPasskeyLogin, Title: "Passkey Login", Methods: []string{http.MethodPost}, DefaultPath: paths.AuthPasskeyLogin, RequireGuest: true, AllowUnverified: true},
+			{ID: ActionProfile, Title: "Account Profile", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: paths.AccountProfile, RequireAuth: true},
 		},
 	}
 }
@@ -67,6 +81,18 @@ func (c *Controller) Handle(ctx *controllers.Context, actionID string) controlle
 		return c.resetRequest(ctx)
 	case ActionResetSubmit:
 		return c.resetSubmit(ctx)
+	case ActionMFAChallenge:
+		return c.mfaChallenge(ctx)
+	case ActionSecurity:
+		return c.security(ctx)
+	case ActionSecurityTOTP:
+		return c.securityTOTP(ctx)
+	case ActionSecurityPasskey:
+		return c.securityPasskey(ctx)
+	case ActionPasskeyLogin:
+		return c.passkeyLogin(ctx)
+	case ActionProfile:
+		return c.profile(ctx)
 	default:
 		return controllers.Error(http.StatusNotFound, "unknown auth action")
 	}
@@ -89,6 +115,9 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 
 	if err := r.ParseForm(); err != nil {
 		return loginError(ctx, "Invalid form submission.")
+	}
+	if err := captcha.VerifySubmit(ctx.GoContext(), r, captcha.CaptchaContextLogin); err != nil {
+		return loginError(ctx, captcha.UserFacingError(err))
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
@@ -120,19 +149,6 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 	if u.Locked {
 		return loginError(ctx, "This account is locked.")
 	}
-	if err := ctx.User.Login(u.UserID); err != nil {
-		return controllers.Error(http.StatusInternalServerError, "could not start session")
-	}
-	_ = user.EnsureRegisteredGroup(ctx.GoContext(), u.UserID)
-	afterArgs := map[string]any{
-		"context":  "frontend",
-		"user_id":  u.UserID,
-		"username": u.Username,
-		"email":    u.Email,
-	}
-	if _, err := hooks.Fire(ctx.GoContext(), hooks.OnUserAfterLogin, afterArgs); err != nil {
-		return controllers.Error(http.StatusInternalServerError, err.Error())
-	}
 
 	dest := returnPathFromRequest(ctx, r)
 	if encoded := strings.TrimSpace(r.FormValue("return")); encoded != "" {
@@ -140,6 +156,26 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 			dest = path
 		}
 	}
+
+	needsMFA, err := mfa.UserRequiresMFA(ctx.GoContext(), u.UserID)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	if needsMFA {
+		if err := mfa.SetPendingMFA(ctx.User, mfa.PendingMFA{
+			UserID:  u.UserID,
+			Context: "frontend",
+			Return:  dest,
+		}); err != nil {
+			return controllers.Error(http.StatusInternalServerError, "could not start MFA session")
+		}
+		return controllers.Redirect(http.StatusSeeOther, routepath.Controller(ctx.GoContext(), "auth", ActionMFAChallenge))
+	}
+
+	if err := completeFrontendLogin(ctx, u.UserID, "frontend"); err != nil {
+		return controllers.Error(http.StatusInternalServerError, "could not start session")
+	}
+
 	return controllers.Redirect(http.StatusSeeOther, dest)
 }
 
@@ -169,19 +205,67 @@ func renderLoginPage(ctx *controllers.Context, message, verified string) control
 }
 
 func (c *Controller) oauth(ctx *controllers.Context) controllers.Result {
-	name := strings.Trim(strings.Trim(ctx.PathSuffix(), "/"), "/")
-	if name == "" {
+	suffix := strings.Trim(strings.Trim(ctx.PathSuffix(), "/"), "/")
+	parts := strings.Split(suffix, "/")
+	providerName := strings.TrimSpace(parts[0])
+	if providerName == "" {
 		return controllers.Error(http.StatusNotFound, "unknown oauth provider")
 	}
-	_, ok, err := auth.IsActiveProvider(ctx.GoContext(), name)
+	isCallback := len(parts) > 1 && parts[1] == "callback"
+	if isCallback {
+		return c.oauthCallback(ctx, providerName)
+	}
+	if len(parts) > 1 {
+		return controllers.Error(http.StatusNotFound, "unknown oauth path")
+	}
+	allowed, err := settings.AllowLogin(ctx.GoContext())
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
-	if !ok {
-		return loginError(ctx, "That sign-in provider is not available.")
+	if !allowed {
+		return loginError(ctx, "Sign in is currently disabled on this site.")
 	}
-	label := auth.ProviderDisplayName(name)
-	return loginError(ctx, "Sign in with "+label+" is not available yet. Use local sign-in or contact the site administrator.")
+	returnPath := returnPathFromRequest(ctx, ctx.Request)
+	authURL, err := auth.BeginOAuth(ctx.GoContext(), ctx.Request, ctx.User, providerName, returnPath)
+	if err != nil {
+		return loginError(ctx, "Could not start sign in with "+auth.ProviderDisplayName(providerName)+".")
+	}
+	return controllers.Redirect(http.StatusTemporaryRedirect, authURL)
+}
+
+func (c *Controller) oauthCallback(ctx *controllers.Context, providerName string) controllers.Result {
+	u, returnPath, err := auth.CompleteOAuth(ctx.GoContext(), ctx.Request, ctx.User, providerName)
+	if err != nil {
+		return loginError(ctx, "Sign in with "+auth.ProviderDisplayName(providerName)+" failed. Try again or use local sign-in.")
+	}
+	if u.Locked {
+		return loginError(ctx, "This account is locked.")
+	}
+	if !u.Validated {
+		return controllers.Redirect(http.StatusSeeOther, "/account/verify/resend")
+	}
+	dest := strings.TrimSpace(returnPath)
+	if dest == "" {
+		dest = sites.DefaultRoutePath(ctx.GoContext())
+	}
+	needsMFA, err := mfa.UserRequiresMFA(ctx.GoContext(), u.UserID)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	if needsMFA {
+		if err := mfa.SetPendingMFA(ctx.User, mfa.PendingMFA{
+			UserID:  u.UserID,
+			Context: "frontend",
+			Return:  dest,
+		}); err != nil {
+			return controllers.Error(http.StatusInternalServerError, "could not start MFA session")
+		}
+		return controllers.Redirect(http.StatusSeeOther, routepath.Controller(ctx.GoContext(), "auth", ActionMFAChallenge))
+	}
+	if err := completeFrontendLogin(ctx, u.UserID, "frontend"); err != nil {
+		return controllers.Error(http.StatusInternalServerError, "could not start session")
+	}
+	return controllers.Redirect(http.StatusSeeOther, dest)
 }
 
 func appendQueryParam(path, key, value string) string {

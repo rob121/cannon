@@ -38,9 +38,11 @@
 {{end}}
 {{else if eq $field.Type "number"}}
 <input class="form-control" type="number" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
-{{else if eq $field.Type "url" "image" "file"}}
-<input class="form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="https:// or /assets/media/...">
-{{else if eq $field.Type "date"}}
+{{else if eq $field.Type "image"}}
+{{template "mediaFieldInput" (dict "ID" $id "Name" (printf "field_%d" $field.FieldID) "FileName" (printf "field_%d_file" $field.FieldID) "Value" $value "Label" $field.Label "FieldLabel" (lang "profile.image_url") "Help" (lang "profile.image_help"))}}
+{{else if eq $field.Type "file"}}
+<input class="form-control" type="url" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="/assets/media/...">
+{{else if eq $field.Type "url"}}
 <input class="form-control" type="date" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{else if eq $field.Type "datetime"}}
 <input class="form-control" type="datetime-local" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">

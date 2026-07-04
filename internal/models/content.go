@@ -6,6 +6,7 @@ type ItemStatus string
 
 const (
 	ItemStatusDraft     ItemStatus = "draft"
+	ItemStatusPending   ItemStatus = "pending"
 	ItemStatusPublished ItemStatus = "published"
 	ItemStatusArchived  ItemStatus = "archived"
 	ItemStatusTrashed   ItemStatus = "trashed"
@@ -13,10 +14,12 @@ const (
 
 // Category is a nested content taxonomy node.
 type Category struct {
-	CategoryID      uint   `gorm:"primaryKey"`
-	ParentID        *uint  `gorm:"index"`
-	Name            string `gorm:"size:256;not null"`
-	Slug            string `gorm:"size:256;uniqueIndex;not null"`
+	CategoryID           uint   `gorm:"primaryKey"`
+	ParentID             *uint  `gorm:"index"`
+	Locale               string `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_category_locale_slug,priority:1"`
+	TranslationGroupID   *uint  `gorm:"index"`
+	Name                 string `gorm:"size:256;not null"`
+	Slug                 string `gorm:"size:256;not null;uniqueIndex:idx_category_locale_slug,priority:2"`
 	Description     string `gorm:"type:text"`
 	Image           string `gorm:"size:1024"`
 	Template        string `gorm:"size:256"`
@@ -49,9 +52,11 @@ type Tag struct {
 
 // Item is the primary CMS content unit.
 type Item struct {
-	ItemID          uint       `gorm:"primaryKey"`
-	Title           string     `gorm:"size:512;not null"`
-	Slug            string     `gorm:"size:512;uniqueIndex;not null"`
+	ItemID               uint       `gorm:"primaryKey"`
+	Locale               string     `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_item_locale_slug,priority:1;index"`
+	TranslationGroupID   *uint      `gorm:"index"`
+	Title                string     `gorm:"size:512;not null"`
+	Slug                 string     `gorm:"size:512;not null;uniqueIndex:idx_item_locale_slug,priority:2"`
 	Intro           string     `gorm:"type:text"`
 	Body            string     `gorm:"type:text"`
 	Status          ItemStatus `gorm:"size:16;not null;default:draft;index"`
@@ -69,6 +74,8 @@ type Item struct {
 	MetaDescription string     `gorm:"type:text"`
 	MetaKeywords    string     `gorm:"size:512"`
 	CanonicalURL    string     `gorm:"size:1024"`
+	PreviewToken    string     `gorm:"size:64;index"`
+	PreviewExpiresAt *time.Time `gorm:"index"`
 	Sort            int        `gorm:"not null;default:0;index"`
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -77,6 +84,19 @@ type Item struct {
 	Tags            []Tag      `gorm:"many2many:item_tags;"`
 	Groups          []Group    `gorm:"many2many:item_groups;"`
 	FieldValues     []ItemFieldValue `gorm:"foreignKey:ItemID;constraint:-"`
+	Revisions       []ItemRevision   `gorm:"foreignKey:ItemID;constraint:-"`
+}
+
+// ItemRevision stores a point-in-time snapshot of an item for rollback and audit.
+type ItemRevision struct {
+	RevisionID     uint      `gorm:"primaryKey"`
+	ItemID         uint      `gorm:"index;not null"`
+	RevisionNumber int       `gorm:"not null;index"`
+	SnapshotJSON   string    `gorm:"type:text;not null"`
+	EditorID       *uint     `gorm:"index"`
+	EditorName     string    `gorm:"size:128"`
+	Note           string    `gorm:"size:512"`
+	CreatedAt      time.Time
 }
 
 // ContentFieldGroup groups custom fields assignable to categories.

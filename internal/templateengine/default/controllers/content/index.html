@@ -1,36 +1,38 @@
-<article class="mb-4">
+<div class="site-page mb-4">
   {{if .RouteName}}
-  {{template "pageHeader" (dict "Title" .RouteName "Subtitle" "Latest content from your site.")}}
+  {{template "pageHeader" (dict "Title" .RouteName "Subtitle" (lang "content.latest_subtitle"))}}
   {{else}}
-  {{template "pageHeader" (dict "Title" "Welcome" "Subtitle" "Latest content from your site.")}}
+  {{template "pageHeader" (dict "Title" (lang "content.welcome") "Subtitle" (lang "content.latest_subtitle"))}}
   {{end}}
 
   {{if .Featured}}
-  <section class="mb-5">
-    <h2 class="h4 mb-3"><a href="{{featuredURL}}" class="text-decoration-none">Featured</a></h2>
-    <div class="row g-3">
-      {{range .Featured}}{{template "itemCard" (dict "Item" . "ColClass" "col-12")}}{{end}}
+  <section class="mb-5" aria-labelledby="home-featured-heading">
+    <h2 id="home-featured-heading" class="h4 mb-3"><a href="{{featuredURL}}" class="text-decoration-none">{{lang "content.featured"}}</a></h2>
+    <div class="site-item-list">
+      {{range .Featured}}{{template "itemCard" (dict "Item" .)}}{{end}}
     </div>
   </section>
   {{end}}
 
-  <section class="mb-5">
-    <h2 class="h4 mb-3">Latest Items</h2>
-    <div class="row g-3">
+  <section class="mb-5" aria-labelledby="home-latest-heading">
+    <h2 id="home-latest-heading" class="h4 mb-3">{{lang "content.latest_items"}}</h2>
+    <div class="site-item-list site-item-list--grid">
       {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
-      <div class="col-12"><p class="text-muted mb-0">No published items yet.</p></div>
+      <p class="text-muted mb-0">{{lang "content.no_items"}}</p>
       {{end}}
     </div>
   </section>
 
   {{if .Categories}}
-  <section>
-    <h2 class="h4 mb-3">Categories</h2>
-    <ul class="list-group list-group-flush">
-      {{range .Categories}}
-      <li class="list-group-item px-0"><a href="/content/category/{{.Slug}}">{{.Name}}</a></li>
-      {{end}}
-    </ul>
+  <section aria-labelledby="home-categories-heading">
+    <h2 id="home-categories-heading" class="h4 mb-3">{{lang "content.categories"}}</h2>
+    <nav aria-label="{{lang "content.categories_nav"}}">
+      <ul class="list-unstyled site-category-list mb-0">
+        {{range .Categories}}
+        <li><a href="{{categoryURL .Slug}}">{{.Name}}</a></li>
+        {{end}}
+      </ul>
+    </nav>
   </section>
   {{end}}
-</article>
+</div>

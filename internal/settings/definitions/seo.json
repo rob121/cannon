@@ -3,6 +3,48 @@
   "schema": {
     "type": "object",
     "properties": {
+      "site_meta_description": {
+        "type": "string",
+        "title": "Default Meta Description",
+        "description": "Default meta description for public pages without item-specific SEO."
+      },
+      "site_meta_keywords": {
+        "type": "string",
+        "title": "Default Meta Keywords",
+        "description": "Comma-separated keywords for pages without item-specific keywords."
+      },
+      "site_og_title": {
+        "type": "string",
+        "title": "Default Open Graph Title",
+        "description": "Social share title when a page does not set its own. Falls back to the site display name."
+      },
+      "site_og_image": {
+        "type": "string",
+        "title": "Default Open Graph Image URL",
+        "description": "Absolute URL to the default social share image (recommended 1200×630)."
+      },
+      "site_twitter_card": {
+        "type": "string",
+        "title": "Twitter Card Type",
+        "default": "summary_large_image",
+        "enum": ["summary", "summary_large_image"],
+        "description": "Default Twitter card layout for public pages."
+      },
+      "site_twitter_site": {
+        "type": "string",
+        "title": "Twitter Site Handle",
+        "description": "Site @username for Twitter cards, e.g. @example (optional)."
+      },
+      "site_twitter_creator": {
+        "type": "string",
+        "title": "Twitter Creator Handle",
+        "description": "Default author @username for Twitter cards (optional)."
+      },
+      "site_head_extra": {
+        "type": "string",
+        "title": "Additional Head Markup",
+        "description": "Extra meta, link, or script tags inserted before </head> on public pages."
+      },
       "robots_txt": {
         "type": "string",
         "title": "Robots.txt Body",
@@ -24,9 +66,23 @@
   "ui_schema": {
     "type": "VerticalLayout",
     "elements": [
+      {
+        "type": "Group",
+        "label": "Default Meta Tags",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/site_meta_description", "options": {"multi": true}},
+          {"type": "Control", "scope": "#/properties/site_meta_keywords", "options": {"multi": true}},
+          {"type": "Control", "scope": "#/properties/site_og_title"},
+          {"type": "Control", "scope": "#/properties/site_og_image"},
+          {"type": "Control", "scope": "#/properties/site_twitter_card"},
+          {"type": "Control", "scope": "#/properties/site_twitter_site"},
+          {"type": "Control", "scope": "#/properties/site_twitter_creator"},
+          {"type": "Control", "scope": "#/properties/site_head_extra", "options": {"multi": true}}
+        ]
+      },
       {"type": "Control", "scope": "#/properties/robots_txt", "options": {"multi": true}},
       {"type": "Control", "scope": "#/properties/allow_ai_crawlers"},
-      {"type": "Control", "scope": "#/properties/ai_crawler_policy"}
+      {"type": "Control", "scope": "#/properties/ai_crawler_policy", "options": {"multi": true}}
     ]
   }
 }

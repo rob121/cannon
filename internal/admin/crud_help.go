@@ -121,9 +121,9 @@ func (h *Handler) helpExtensionsPath(w http.ResponseWriter, r *http.Request, par
 			{Label: "All Help", URL: helpBase},
 			{Label: "Extensions", URL: help.ExtensionsRootURL(), Current: true},
 		}
-		data["Folders"] = extensionFolderItems(sections)
+		data["ExtensionFolders"] = extensionFolderItems(sections)
 		if sec, ok := help.FindSection(internalSections, "extensions"); ok {
-			data["Files"] = builtinExtensionFileItems(*sec)
+			data["BuiltinGuides"] = builtinExtensionFileItems(*sec)
 		}
 		h.render(w, r, "Extensions", "admin/help.html", data)
 		return
@@ -213,7 +213,7 @@ func buildRootFolders(internal []help.Section, ext []extensions.HelpSection) []h
 			count = extDocCount
 		}
 		out = append(out, helpBrowseItem{
-			Label: "Extensions",
+			Label: "Extension Docs",
 			URL:   help.ExtensionsRootURL(),
 			Count: count,
 			Kind:  "folder",

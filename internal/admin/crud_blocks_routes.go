@@ -31,7 +31,7 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 			defaultRoutes = append(defaultRoutes, route)
 		case route.Type == models.RouteTypeExtension || route.Type == models.RouteTypeExtensionEndpoint:
 			extensions = append(extensions, route)
-		case route.Type == models.RouteTypeURL || route.Type == models.RouteTypeLocalFile:
+		case route.Type == models.RouteTypeURL || route.Type == models.RouteTypeLocalFile || route.Type == models.RouteTypeIframe:
 			urlsFiles = append(urlsFiles, route)
 		case route.Type == models.RouteTypeController:
 			if router.IsBuiltinControllerRoute(route) {
@@ -101,7 +101,7 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 		sections = append(sections, blockRouteSection{
 			Key:    "urls",
 			Label:  "URLs & Files",
-			Desc:   "Redirects, external URLs, and local file routes.",
+			Desc:   "Redirects, external URLs, embedded iframe pages, and local file routes.",
 			Routes: urlsFiles,
 		})
 	}

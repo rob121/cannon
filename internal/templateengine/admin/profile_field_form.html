@@ -16,7 +16,8 @@
         </div>
         <div class="col-md-4">
           <label class="admin-form-label">Type</label>
-          <input class="admin-form-control" name="type" value="{{.Field.Type}}" required>
+          {{template "field_type_select" (dict "Name" "type" "Value" .Field.Type "Required" true)}}
+          <p class="admin-form-help">Use <strong>Image</strong> for avatar or photo fields. Options for select/radio/checkbox go in Configuration JSON.</p>
         </div>
         <div class="col-md-2">
           <label class="admin-form-label">Sort</label>

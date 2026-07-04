@@ -25,8 +25,8 @@
           <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
           <td>{{template "installed_badge" .Installed}}</td>
           <td>{{template "extension_sort_controls" (dict "Root" $ "Row" .)}}</td>
-          <td>{{template "process_restart" (dict "BasePath" $.BasePath "ID" .ExtensionID "Running" .Running "Page" $.Page "Sort" $.Sort "Dir" $.Dir)}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .ExtensionID "Status" .Status)}}</td>
+          <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+          <td>{{template "extension_list_status_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
         </tr>
         {{else}}

@@ -1,7 +1,7 @@
 <article class="mb-4">
-  {{template "pageHeader" (dict "Title" "Sign In" "Subtitle" "")}}
+  {{template "pageHeader" (dict "Title" (lang "auth.sign_in_title") "Subtitle" "")}}
   {{if eq .Verified "0"}}
-  <div class="alert alert-info mb-3" role="alert">Your account must be verified before you can sign in. Contact a site administrator for a verification link.</div>
+  <div class="alert alert-info mb-3" role="alert">{{lang "auth.verify_required"}}</div>
   {{end}}
   <div class="card shadow-sm site-login-block">
     <div class="card-body">

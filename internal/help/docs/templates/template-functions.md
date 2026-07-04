@@ -85,7 +85,7 @@ Added when rendering admin templates (`internal/admin/handler.go`).
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `lang` | `lang "key"` or `lang "key" "name" "value" …` | Looks up a translation from the locale manager. Returns the key when no translation exists. Optional key/value pairs substitute placeholders. |
+| `lang` | `lang "key"` or `lang "key" "name" "value" …` | Looks up a translation from the locale manager. Returns the key when no translation exists. Optional key/value pairs substitute placeholders. Append `?tp=1` to the URL (or pass `"tp" "1"` as the first pair) to show the key in parentheses after the translated text, e.g. `Sign in (nav.sign_in)`. |
 | `internalHelpURL` | `internalHelpURL "templates" "frontend-templates"` | Admin URL for a built-in help article (`/admin/help/{folder}/{slug}`). |
 | `helpURL` | `helpURL "extension-name" "article/path"` | Admin URL for an extension-provided help article. |
 | `siteURL` | `siteURL .Host` | Full frontend URL for a site host entry (from site configuration). |

@@ -23,6 +23,9 @@ Cannon dispatches Joomla-style event hooks during routing, rendering, authentica
 | `onUserBeforeLogin` | Before credential check (frontend + admin login) | `username`, `context` (`frontend` or `admin`), request fields |
 | `onUserAfterLogin` | After successful auth, before session commit | `user_id`, `username`, `email`, `context` |
 | `onUserLogout` | Before session is cleared | `user_id`, `username`, `email`, `context` |
+| `onUserSignup` | After public registration creates a user | `user_id`, `username`, `email` |
+| `onUserVerified` | After email verification completes | `user_id`, `username`, `email` |
+| `onUserLocked` | After admin locks an account | `user_id`, `username`, `email` |
 
 Set `allowed: false` and optional `error` in returned arguments (or use `extension.HookAbort`) to block login.
 
@@ -40,6 +43,20 @@ Set `allowed: false` and optional `error` in returned arguments (or use `extensi
 | `onContentPrepare` | Before markdown/HTML/extension content is processed | `content`, `content_type`, context fields |
 | `onContentBeforeDisplay` | Before content is wrapped in layout / controller view | `title`, `content`, `controller`, `action`, `data`, route fields |
 | `onContentAfterDisplay` | After page body template executes, before layout wrap | `layout`, `page`, `body` (mutable) |
+| `onItemBeforeSave` | Before item persist (admin or frontend) | `item`, `is_new`, `form` |
+| `onItemAfterSave` | After item persist | `item_id`, `item` |
+| `onItemBeforeRender` | Before item page render | `item`, viewer context |
+| `onCommentBeforeSave` | Before comment persist | `item_id`, `body`, … |
+| `onCommentAfterSave` | After comment persist | `item_id`, `comment_id`, `approved`, … |
+
+## Notifications
+
+Cannon’s notification system listens to hooks in-process and delivers messages via configured channels. See `.info/specs/notifications.md`.
+
+- **Layer 1 (today):** Admin-defined Shoutrrr destinations subscribed to hook events (`internal/notifications`, System → Notifications).
+- **Layer 2 (planned):** Per-user and per-role email subscriptions with optional event filters.
+
+In-process listeners register with `hooks.Register` the same way as notifications; dispatch runs after local listeners, before extension hooks.
 
 ## In-process registration
 
@@ -119,3 +136,4 @@ Extensions are invoked in extension sort order after in-process listeners. `stop
 
 - `EXTENSIONS.md` — wire protocol and capability overview
 - `.info/specs/extensions.md` — `/hooks` capability endpoint
+- `.info/specs/notifications.md` — Layer 1 admin destinations and Layer 2 user/role subscriptions

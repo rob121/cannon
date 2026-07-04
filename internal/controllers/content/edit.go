@@ -51,7 +51,7 @@ func (c *Controller) handleEditNew(ctx *controllers.Context) controllers.Result 
 		if err := saveFrontendItem(ctx, &item, true, canPublish); err != nil {
 			return renderEditForm(ctx, item, nil, nil, true, canPublish, err.Error())
 		}
-		return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(item.Slug))
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), item.Slug))
 	}
 	return renderEditForm(ctx, item, nil, nil, true, canPublish, "")
 }
@@ -92,7 +92,7 @@ func (c *Controller) handleEdit(ctx *controllers.Context) controllers.Result {
 		if err := saveFrontendItem(ctx, &item, false, canPublish); err != nil {
 			return renderEditForm(ctx, item, categories, tags, false, canPublish, err.Error())
 		}
-		return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(item.Slug))
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), item.Slug))
 	}
 	data := editFormData(item, categories, tags, fields, fieldValues, false, canPublish, "")
 	return controllers.HTMLPage("Edit Item", "default/controllers/content/edit.html", data)
@@ -136,6 +136,9 @@ func saveFrontendItem(ctx *controllers.Context, item *models.Item, isNew, canPub
 		}
 	} else if isNew {
 		item.Status = models.ItemStatusDraft
+	}
+	if strings.TrimSpace(ctx.Request.FormValue("workflow_action")) == "submit_review" {
+		item.Status = models.ItemStatusPending
 	}
 
 	var cat *models.Category

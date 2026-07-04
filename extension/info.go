@@ -21,6 +21,7 @@ type metaResponse struct {
 
 type capabilitiesResponse struct {
 	Capabilities map[string]string  `json:"capabilities"`
+	Permissions  []PermissionDef    `json:"permissions,omitempty"`
 	Defaults     capabilityDefaults `json:"defaults"`
 }
 

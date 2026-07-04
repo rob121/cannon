@@ -152,8 +152,18 @@
   <div class="admin-extension-toolbar-status">
     {{template "process_status" .Running}}
     {{template "installed_badge" .Row.Installed}}
+    {{if eq .Row.Status "active"}}
+    <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
+    {{else}}
+    <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
+    {{end}}
   </div>
   <div class="admin-extension-toolbar-actions">
+    {{if .HasConfiguration}}
+    <a class="btn-admin-primary btn-admin-sm" href="{{.ConfigurationURL}}" data-turbo-frame="_top">
+      <i class="bi bi-sliders"></i> Configure
+    </a>
+    {{end}}
     {{if not .Row.Installed}}
     <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/install?redirect=edit" class="admin-inline-form">
       {{csrfField}}
@@ -220,6 +230,27 @@
 {{template "sort_controls" (dict "Root" .Root "ID" .Row.ExtensionID "CanMoveUp" .Row.CanMoveUp "CanMoveDown" .Row.CanMoveDown)}}
 {{end}}
 
+{{define "extension_list_process_cell"}}
+{{if .Row.Installed}}
+{{template "process_restart" (dict "BasePath" .BasePath "ID" .Row.ExtensionID "Running" .Row.Running "Page" .Root.Page "Sort" .Root.Sort "Dir" .Root.Dir)}}
+{{else}}
+<form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/install{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+  {{csrfField}}
+  <button type="submit" class="btn-admin-primary btn-admin-sm">
+    <i class="bi bi-download"></i> Install
+  </button>
+</form>
+{{end}}
+{{end}}
+
+{{define "extension_list_status_cell"}}
+{{if .Row.Installed}}
+{{template "status_toggle" (dict "Root" .Root "BasePath" .BasePath "ID" .Row.ExtensionID "Status" .Row.Status)}}
+{{else}}
+<span class="admin-capability-none">—</span>
+{{end}}
+{{end}}
+
 {{define "process_restart"}}
 <form method="post" action="{{.BasePath}}/{{.ID}}/restart{{listQuery .Page .Sort .Dir}}" class="admin-inline-form admin-process-restart-form" data-turbo-frame="main-content" onsubmit="return confirm('Restart this extension process?')">
       {{csrfField}}
@@ -241,7 +272,65 @@
 {{end}}
 {{end}}
 
-{{define "table_toolbar"}}{{end}}
+{{define "list_toolbar_open"}}
+<div class="admin-list-card-header">
+  <div class="admin-table-toolbar{{if .Secondary}} admin-table-toolbar-secondary{{end}}">
+{{end}}
+
+{{define "list_toolbar_close"}}
+  </div>
+</div>
+{{end}}
+
+{{define "list_toolbar_action"}}
+<div class="admin-list-card-header">
+  <div class="admin-table-toolbar">
+    {{if .Title}}<span class="admin-table-count">{{.Title}}</span>{{end}}
+    <div class="admin-table-toolbar-spacer"></div>
+    {{if .ActionURL}}
+    <a class="btn-admin-outline btn-admin-sm" href="{{.ActionURL}}" data-turbo-frame="_top">{{if .ActionIcon}}<i class="bi {{.ActionIcon}}"></i> {{end}}{{.ActionLabel}}</a>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "toggle_value_grid"}}
+<div class="admin-toggle-grid{{if .Class}} {{.Class}}{{end}}">
+  {{range .Values}}
+  <label class="admin-form-toggle admin-form-toggle-inline">
+    <input type="checkbox" class="admin-form-toggle-input" name="{{$.InputName}}" value="{{.}}" {{if inString $.Selected .}}checked{{end}}>
+    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+    <span class="admin-form-toggle-label">{{.}}</span>
+  </label>
+  {{end}}
+</div>
+{{end}}
+
+{{define "role_access_toggles"}}
+<div class="admin-toggle-grid admin-toggle-grid-sidebar">
+  {{range .AllRoles}}
+  <label class="admin-form-toggle admin-form-toggle-inline">
+    <input type="checkbox" class="admin-form-toggle-input" name="role_ids" value="{{.RoleID}}" {{if containsUint $.SelectedRoleIDs .RoleID}}checked{{end}}>
+    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+    <span class="admin-form-toggle-label">{{roleName .Name}}</span>
+  </label>
+  {{else}}
+  <p class="admin-cell-muted">No roles defined yet.</p>
+  {{end}}
+</div>
+{{end}}
+
+{{define "group_membership_toggles"}}
+<label class="admin-form-label">Member Of</label>
+<p class="admin-form-help mb-3">Assign organizational groups. Members inherit each group's roles and capabilities.</p>
+{{template "group_access_toggles" .}}
+{{end}}
+
+{{define "group_visibility_sidebar"}}
+<label class="admin-form-label">Visible To Groups</label>
+<p class="admin-form-help mb-3">Controls who can <strong>see</strong> this content on the frontend. The <code class="admin-code">Public</code> group includes all visitors. Frontend create, edit, and publish actions are managed under <a href="/admin/roles" data-turbo-frame="_top">Roles</a> (Content Frontend permissions).</p>
+{{template "group_access_toggles" .}}
+{{end}}
 
 {{define "group_access_toggles"}}
 <div class="admin-toggle-grid admin-toggle-grid-sidebar">
@@ -257,23 +346,63 @@
 </div>
 {{end}}
 
-{{define "group_permission_toggles"}}
-<div class="admin-toggle-grid admin-toggle-grid-sidebar">
-  {{range .AllGroups}}
-  <label class="admin-form-toggle admin-form-toggle-inline">
-    <input type="checkbox" class="admin-form-toggle-input" name="{{$.FieldName}}" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
-    <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
-    <span class="admin-form-toggle-label">{{groupName .Name}}</span>
-  </label>
-  {{else}}
-  <p class="admin-cell-muted">No groups defined yet.</p>
+{{define "permission_picker"}}
+<div class="admin-permission-picker" data-permission-picker>
+  <div class="admin-permission-picker-toolbar">
+    <label class="admin-permission-picker-search">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" class="admin-form-control" placeholder="Filter permissions…" autocomplete="off" data-permission-filter aria-label="Filter permissions">
+    </label>
+    <p class="admin-permission-picker-hint admin-cell-muted">Search by name or permission id. Allow and deny are mutually exclusive per permission.</p>
+  </div>
+  {{range .Categories}}
+  <details class="admin-permission-group" data-permission-group open>
+    <summary class="admin-permission-group-summary">
+      <span class="admin-permission-group-title">{{.}}</span>
+      <span class="admin-permission-group-count">{{len (index $.PermsByCategory .)}} permissions</span>
+    </summary>
+    <div class="admin-table-scroll">
+      <table class="admin-permission-table">
+        <thead>
+          <tr>
+            <th scope="col">Permission</th>
+            <th scope="col" class="admin-permission-effect-col">Allow</th>
+            <th scope="col" class="admin-permission-effect-col">Deny</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range index $.PermsByCategory .}}
+          <tr class="admin-permission-row{{if .Dangerous}} is-dangerous{{end}}" data-permission-row data-permission-label="{{.DisplayName}} {{.ID}}">
+            <td class="admin-permission-info">
+              <span class="admin-permission-copy">
+                <span class="admin-permission-name">{{.DisplayName}}</span>
+                <code class="admin-permission-key">{{.ID}}</code>
+              </span>
+            </td>
+            <td class="admin-permission-effect-col">
+              <label class="admin-permission-effect">
+                <input type="checkbox" class="admin-permission-checkbox" name="permission_keys" value="{{.ID}}" data-permission-allow {{if containsString $.SelectedPermKeys .ID}}checked{{end}}>
+              </label>
+            </td>
+            <td class="admin-permission-effect-col">
+              <label class="admin-permission-effect">
+                <input type="checkbox" class="admin-permission-deny-checkbox" name="deny_permission_keys" value="{{.ID}}" data-permission-deny {{if containsString $.SelectedDeniedPermKeys .ID}}checked{{end}}>
+              </label>
+            </td>
+          </tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </details>
   {{end}}
+  <p class="admin-permission-picker-empty admin-cell-muted" data-permission-empty hidden>No permissions match your filter.</p>
 </div>
 {{end}}
 
 {{define "group_access_panel"}}
 <label class="admin-form-label">Visible To Groups</label>
-<p class="admin-form-help mb-3">Only members of the selected groups can see this block. The <code class="admin-code">Public</code> group is assigned to all visitors by default.</p>
+<p class="admin-form-help mb-3">Only members of the selected groups can see this block. The <code class="admin-code">Public</code> group includes all visitors.</p>
 <div class="admin-toggle-grid">
   {{range .AllGroups}}
   <label class="admin-form-toggle admin-form-toggle-inline">
@@ -287,11 +416,15 @@
 </div>
 {{end}}
 
+{{define "row_edit_link"}}
+<a class="admin-cell-link" href="{{if .Href}}{{.Href}}{{else}}{{.BasePath}}/{{.ID}}{{if .ListQuery}}{{.ListQuery}}{{end}}{{end}}" data-turbo-frame="_top">{{.Label}}</a>
+{{end}}
+
 {{define "group_visibility_fields"}}
 <div class="col-12"><div class="admin-form-divider"></div></div>
 <div class="col-12">
   <label class="admin-form-label">Visible To Groups</label>
-  <p class="admin-form-help mb-3">Only members of the selected groups can see this content. The <code class="admin-code">Public</code> group is assigned to all visitors by default.</p>
+  <p class="admin-form-help mb-3">Only members of the selected groups can see this content. The <code class="admin-code">Public</code> group includes all visitors.</p>
   <div class="admin-toggle-grid">
     {{range .AllGroups}}
     <label class="admin-form-toggle admin-form-toggle-inline">
@@ -306,10 +439,6 @@
 </div>
 {{end}}
 
-{{define "row_edit_link"}}
-<a class="admin-cell-link" href="{{if .Href}}{{.Href}}{{else}}{{.BasePath}}/{{.ID}}{{if .ListQuery}}{{.ListQuery}}{{end}}{{end}}" data-turbo-frame="_top">{{.Label}}</a>
-{{end}}
-
 {{define "menu_item_tree_name"}}
 <span class="admin-tree-cell{{if .Current}} is-current{{end}}" style="--tree-depth: {{.Depth}};">
   {{if gt .Depth 0}}<i class="bi bi-arrow-return-right admin-tree-icon" aria-hidden="true"></i>{{end}}
@@ -319,6 +448,28 @@
   {{template "row_edit_link" (dict "BasePath" .BasePath "ID" .ID "ListQuery" .ListQuery "Label" .Label)}}
   {{end}}
 </span>
+{{end}}
+
+{{define "row_actions_item"}}
+<td class="admin-col-actions">
+  <div class="admin-row-actions">
+    <a class="btn-admin-icon" href="{{.BasePath}}/{{.ID}}{{if .ListQuery}}{{.ListQuery}}{{end}}" data-turbo-frame="_top" title="Edit">
+      <i class="bi bi-pencil"></i>
+    </a>
+    <form method="post" action="{{.BasePath}}/{{.ID}}/clone{{if .ListQuery}}{{.ListQuery}}{{end}}" class="admin-inline-form" onsubmit="return confirm('Duplicate this item as a new draft?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-icon" title="Duplicate">
+        <i class="bi bi-copy"></i>
+      </button>
+    </form>
+    <form method="post" action="{{.BasePath}}/{{.ID}}/delete{{if .ListQuery}}{{.ListQuery}}{{end}}" class="admin-inline-form" onsubmit="return confirm('Delete this record?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-icon btn-admin-icon-danger" title="Delete">
+        <i class="bi bi-trash"></i>
+      </button>
+    </form>
+  </div>
+</td>
 {{end}}
 
 {{define "row_actions"}}
@@ -394,7 +545,7 @@
 {{define "form_toolbar"}}
 <div class="admin-form-sticky-toolbar">
   <div class="admin-form-sticky-toolbar-inner">
-    <button type="submit" class="btn-admin-primary" {{if .FormID}}form="{{.FormID}}"{{end}}>Save</button>
+    <button type="submit" class="btn-admin-primary" id="{{if .SubmitID}}{{.SubmitID}}{{else}}form-toolbar-submit{{end}}" {{if .FormID}}form="{{.FormID}}"{{end}}{{if .SubmitDisabled}} disabled{{end}}>{{if .SubmitIcon}}<i class="bi {{.SubmitIcon}}"></i> {{end}}{{if .SubmitLabel}}{{.SubmitLabel}}{{else}}Save{{end}}</button>
     <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
   </div>
 </div>
@@ -475,6 +626,55 @@
 </tr>
 {{end}}
 
+{{define "media_field_input"}}
+{{$id := .ID}}
+{{$name := .Name}}
+{{$value := .Value}}
+{{$label := .Label}}{{if not $label}}{{$label = "Image"}}{{end}}
+<div class="admin-media-field" data-media-field>
+  <div class="admin-media-field-preview{{if not $value}} is-empty{{end}}" data-media-field-preview>
+    {{if $value}}
+    <img src="{{$value}}" alt="{{$label}}">
+    {{else}}
+    <span class="admin-media-field-placeholder"><i class="bi bi-image"></i> No image selected</span>
+    {{end}}
+  </div>
+  <div class="admin-media-field-controls">
+    <input class="admin-form-control" type="text" id="{{$id}}" name="{{$name}}" value="{{$value}}" placeholder="/assets/media/..." inputmode="url" autocomplete="off">
+    <div class="admin-media-field-actions">
+      <button type="button" class="btn-admin-outline btn-admin-sm" data-media-picker-open data-media-picker-target="{{$id}}">
+        <i class="bi bi-images"></i> Choose From Media
+      </button>
+      <button type="button" class="btn-admin-ghost btn-admin-sm" data-media-picker-clear>
+        Clear
+      </button>
+    </div>
+    {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "field_type_select"}}
+{{$name := .Name}}
+{{$value := .Value}}
+<select class="admin-form-control" name="{{$name}}"{{if .ID}} id="{{.ID}}"{{end}}{{if .Required}} required{{end}}>
+  <option value="text" {{if eq $value "text"}}selected{{end}}>Text</option>
+  <option value="textarea" {{if eq $value "textarea"}}selected{{end}}>Textarea</option>
+  <option value="rich_text" {{if eq $value "rich_text"}}selected{{end}}>Rich text</option>
+  <option value="select" {{if eq $value "select"}}selected{{end}}>Select</option>
+  <option value="multi_select" {{if eq $value "multi_select"}}selected{{end}}>Multi select</option>
+  <option value="radio" {{if eq $value "radio"}}selected{{end}}>Radio</option>
+  <option value="checkbox" {{if eq $value "checkbox"}}selected{{end}}>Checkbox</option>
+  <option value="date" {{if eq $value "date"}}selected{{end}}>Date</option>
+  <option value="datetime" {{if eq $value "datetime"}}selected{{end}}>Date &amp; time</option>
+  <option value="number" {{if eq $value "number"}}selected{{end}}>Number</option>
+  <option value="url" {{if eq $value "url"}}selected{{end}}>URL</option>
+  <option value="image" {{if eq $value "image"}}selected{{end}}>Image</option>
+  <option value="file" {{if eq $value "file"}}selected{{end}}>File</option>
+  <option value="boolean" {{if eq $value "boolean"}}selected{{end}}>Boolean</option>
+</select>
+{{end}}
+
 {{define "custom_field_input"}}
 {{$field := .Field}}
 {{$value := .Value}}
@@ -484,9 +684,7 @@
 {{else if eq $field.Type "rich_text"}}
 <textarea class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}" rows="6" data-ckeditor="field-{{$field.FieldID}}">{{$value}}</textarea>
 {{else if eq $field.Type "boolean"}}
-<label class="admin-form-check">
-  <input type="checkbox" id="{{$id}}" name="field_{{$field.FieldID}}" value="1" {{if eq $value "1"}}checked{{end}}> Yes
-</label>
+{{template "form_toggle" (dict "Name" (printf "field_%d" $field.FieldID) "Checked" (eq $value "1") "OnLabel" "Yes" "OffLabel" "No")}}
 {{else if eq $field.Type "select"}}
 <select class="admin-form-control" id="{{$id}}" name="field_{{$field.FieldID}}">
   <option value="">—</option>
@@ -526,14 +724,61 @@
 <input class="admin-form-control" type="date" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{else if eq $field.Type "datetime"}}
 <input class="admin-form-control" type="datetime-local" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
-{{else if eq $field.Type "image" "file"}}
-<div class="admin-media-field">
+{{else if eq $field.Type "image"}}
+{{template "media_field_input" (dict "ID" $id "Name" (printf "field_%d" $field.FieldID) "Value" $value "Label" $field.Label)}}
+{{else if eq $field.Type "file"}}
+<div class="admin-media-field admin-media-field--file">
   <input class="admin-form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}" placeholder="/assets/media/..." inputmode="url" autocomplete="off">
   <button type="button" class="btn-admin-outline btn-admin-sm mt-2" data-media-picker-open data-media-picker-target="{{$id}}">
-    <i class="bi bi-images"></i> Choose From Media
+    <i class="bi bi-folder2-open"></i> Choose From Media
   </button>
 </div>
 {{else}}
 <input class="admin-form-control" type="text" id="{{$id}}" name="field_{{$field.FieldID}}" value="{{$value}}">
 {{end}}
+{{end}}
+
+{{define "asset_file_table_head"}}
+<thead>
+  <tr>
+    {{template "sort_th" (dict "Root" .Root "Key" "name" "Label" "File")}}
+    {{template "sort_th" (dict "Root" .Root "Key" "type" "Label" "Type")}}
+    {{template "sort_th" (dict "Root" .Root "Key" "editable" "Label" "Editor")}}
+    <th class="admin-col-actions"></th>
+  </tr>
+</thead>
+{{end}}
+
+{{define "asset_file_row"}}
+<tr class="admin-template-file-row">
+  <td>
+    <span class="admin-cell-primary">{{.Entry.Name}}</span>
+    {{if .Entry.Ext}}<span class="admin-cell-muted">.{{.Entry.Ext}}</span>{{end}}
+  </td>
+  <td>{{if .Entry.Ext}}{{.Entry.Ext}}{{else}}—{{end}}</td>
+  <td>
+    {{if .Entry.Editable}}
+    <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Editable</span>
+    {{else}}
+    <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Static</span>
+    {{end}}
+  </td>
+  <td class="admin-col-actions">
+    <div class="admin-row-actions">
+      {{if .Entry.Editable}}
+      <a class="btn-admin-icon" href="{{.Root.BasePath}}/edit?path={{.Entry.Path}}" data-turbo-frame="_top" title="Edit">
+        <i class="bi bi-pencil"></i>
+      </a>
+      {{end}}
+      <a class="btn-admin-ghost btn-admin-sm" href="/theme/{{.Entry.Relative}}" target="_blank" rel="noopener">View</a>
+      <form method="post" action="{{.Root.BasePath}}/delete" class="admin-inline-form" onsubmit="return confirm('Delete this asset permanently?')">
+        {{csrfField}}
+        <input type="hidden" name="path" value="{{.Entry.Path}}">
+        <button type="submit" class="btn-admin-icon btn-admin-icon-danger" title="Delete">
+          <i class="bi bi-trash"></i>
+        </button>
+      </form>
+    </div>
+  </td>
+</tr>
 {{end}}

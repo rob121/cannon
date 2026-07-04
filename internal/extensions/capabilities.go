@@ -78,6 +78,12 @@ var capabilityCatalog = []struct {
 		desc:  "Lists embedded templates that can be copied into the site template override folder.",
 		get:   func(c Capabilities) string { return c.Templates },
 	},
+	{
+		key:   "captcha",
+		label: "Captcha",
+		desc:  "Renders and verifies captcha widgets for protected forms. Only one extension is active per site.",
+		get:   func(c Capabilities) string { return c.Captcha },
+	},
 }
 
 // CapabilitiesSummary returns capability details for a running extension.

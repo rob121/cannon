@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rob121/cannon/internal/admin"
+	"github.com/rob121/cannon/internal/api"
 	"github.com/rob121/cannon/internal/blocks"
 	"github.com/rob121/cannon/internal/config"
 	cms "github.com/rob121/cannon/internal/content"
@@ -23,6 +24,7 @@ import (
 	"github.com/rob121/cannon/internal/database"
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/install"
+	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/roles"
@@ -138,7 +140,7 @@ func (s *Server) activate() error {
 }
 
 func (s *Server) registerRoutes() {
-	loginHandler := s.chain.Site(s.chain.Session(s.chain.CSRF(s.chain.Hooks(&admin.LoginHandler{Chain: s.chain}))))
+	loginHandler := s.chain.Site(s.chain.Session(s.chain.CSRF(s.chain.Hooks(s.chain.ExtensionRequest(&admin.LoginHandler{Chain: s.chain})))))
 	adminHandler := s.wrap(admin.NewHandler(s.chain, s.Activate, s.Reload))
 
 	s.mux.Handle("/admin/login", loginHandler)
@@ -147,6 +149,11 @@ func (s *Server) registerRoutes() {
 	s.mux.Handle("/assets/", s.wrap(http.StripPrefix("/assets/", s.assetsHandler())))
 	s.mux.Handle("/robots.txt", s.wrap(http.HandlerFunc(s.serveRobotsTXT)))
 	s.mux.Handle("/sitemap.xml", s.wrap(http.HandlerFunc(s.serveSitemapXML)))
+
+	apiHandler := api.NewHandler(s.chain)
+	apiStack := s.chain.Site(s.chain.Hooks(s.chain.ExtensionRequest(apiHandler)))
+	s.mux.Handle("/api/v1/", apiStack)
+	s.mux.Handle("/api/v1", apiStack)
 
 	// Completed installs should not expose the installer again.
 	s.mux.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +167,7 @@ func (s *Server) registerRoutes() {
 }
 
 func (s *Server) wrap(next http.Handler) http.Handler {
-	return s.chain.Site(s.chain.Session(s.chain.CSRF(s.chain.Locale(s.chain.Hooks(s.chain.ExtensionRequest(next))))))
+	return s.chain.Site(s.chain.Session(s.chain.CSRF(s.chain.Locale(s.chain.ContentLocale(s.chain.Hooks(s.chain.ExtensionRequest(next)))))))
 }
 
 func (s *Server) frontendHandler() http.Handler {
@@ -208,6 +215,7 @@ func (s *Server) frontendHandler() http.Handler {
 		sel, _ := themes.SelectionFromContext(r.Context())
 		eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
 			templateengine.CSRFFuncs(r),
+			lang.FuncMap(middleware.LocaleFromContext(r.Context()), lang.TranslationPreviewActive(r)),
 			template.FuncMap{
 			"menu": func(name string) ([]map[string]any, error) {
 				return router.MenuData(renderCtx(), name)
@@ -265,6 +273,34 @@ func (s *Server) frontendHandler() http.Handler {
 				desc, _ := settings.SiteMetaDescription(r.Context())
 				return desc
 			},
+			"siteMetaKeywords": func() string {
+				keywords, _ := settings.SiteMetaKeywords(r.Context())
+				return keywords
+			},
+			"siteOGTitle": func() string {
+				title, _ := settings.SiteOGTitle(r.Context())
+				return title
+			},
+			"siteOGImage": func() string {
+				image, _ := settings.SiteOGImage(r.Context())
+				return image
+			},
+			"siteTwitterCard": func() string {
+				card, _ := settings.SiteTwitterCard(r.Context())
+				return card
+			},
+			"siteTwitterSite": func() string {
+				site, _ := settings.SiteTwitterSite(r.Context())
+				return site
+			},
+			"siteTwitterCreator": func() string {
+				creator, _ := settings.SiteTwitterCreator(r.Context())
+				return creator
+			},
+			"siteHeadExtra": func() template.HTML {
+				raw, _ := settings.SiteHeadExtra(r.Context())
+				return template.HTML(raw)
+			},
 			"year": func() int {
 				return time.Now().Year()
 			},
@@ -290,12 +326,24 @@ func (s *Server) frontendHandler() http.Handler {
 				items, _, err := cms.ListItems(r.Context(), viewerGroups, opts)
 				return items, err
 			},
-			"itemURL": cms.ItemURL,
-			"categoryURL": cms.CategoryURL,
-			"tagURL": cms.TagURL,
-			"authorURL": cms.AuthorURL,
-			"searchURL": cms.SearchURL,
-			"featuredURL": cms.FeaturedURL,
+			"itemURL": func(slug string) string {
+				return cms.ItemURLForContext(r.Context(), slug)
+			},
+			"categoryURL": func(slug string) string {
+				return cms.CategoryURLForContext(r.Context(), slug)
+			},
+			"tagURL": func(slug string) string {
+				return cms.TagURLForContext(r.Context(), slug)
+			},
+			"authorURL": func(key string) string {
+				return cms.AuthorURLForContext(r.Context(), key)
+			},
+			"searchURL": func(query string) string {
+				return cms.SearchURLForContext(r.Context(), query)
+			},
+			"featuredURL": func() string {
+				return cms.FeaturedURLForContext(r.Context())
+			},
 			"categories": func() ([]models.Category, error) {
 				return cms.CategoryTree(r.Context())
 			},

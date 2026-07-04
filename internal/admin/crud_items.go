@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/hooks"
@@ -33,6 +35,16 @@ func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
 		h.itemForm(w, r, 0)
 	case parts[0] == "bulk":
 		h.itemBulk(w, r)
+	case len(parts) == 2 && parts[1] == "revisions":
+		h.itemRevisions(w, r, parts[0])
+	case len(parts) == 4 && parts[1] == "revisions" && parts[3] == "restore":
+		h.itemRevisionRestore(w, r, parts[0], parts[2])
+	case len(parts) == 2 && parts[1] == "preview-token":
+		h.itemPreviewToken(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "submit-review":
+		h.itemSubmitReview(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "clone":
+		h.itemClone(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "delete":
 		h.itemDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "move-up":
@@ -146,7 +158,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		listRows = append(listRows, lr)
 	}
 
-	categories, _ := content.CategoryTree(r.Context())
+	categories, _ := content.CategoryTreeAll(r.Context())
 	var allTags []models.Tag
 	db.Order("name asc").Find(&allTags)
 	var categoryFilterID uint
@@ -178,11 +190,12 @@ func (h *Handler) itemForm(w http.ResponseWriter, r *http.Request, id uint) {
 		}
 	} else {
 		row.Status = models.ItemStatusDraft
+		row.Locale = content.LocaleFromContext(r.Context())
 	}
-	allGroups := loadActiveGroups(db)
+	allGroups := loadFrontendGroups(db)
 	var allTags []models.Tag
 	db.Order("name asc").Find(&allTags)
-	categories, _ := content.CategoryTree(r.Context())
+	categories, _ := content.CategoriesByLocale(r.Context(), row.Locale)
 	var users []models.User
 	db.Where("status = ?", models.StatusActive).Order("username asc").Find(&users)
 	customFields, fieldValues := itemCustomFields(r, db, &row)
@@ -194,20 +207,23 @@ func (h *Handler) itemForm(w http.ResponseWriter, r *http.Request, id uint) {
 		}
 		if err := h.saveItemFromForm(r, db, &row, isNew); err != nil {
 			customFields, fieldValues = itemCustomFields(r, db, &row)
-			h.renderItemForm(w, r, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, err.Error())
+			h.renderItemForm(w, r, db, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, err.Error())
 			return
 		}
 		redirectList(w, r, itemsBase+listRedirectQuery(r))
 		return
 	}
-	h.renderItemForm(w, r, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, "")
+	h.renderItemForm(w, r, db, row, allGroups, allTags, categories, users, customFields, fieldValues, isNew, "")
 }
 
 func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Item, isNew bool) error {
 	row.Title = formString(r, "title")
+	row.Locale = formString(r, "locale")
+	content.NormalizeItemLocale(r.Context(), row)
 	row.Slug = formString(r, "slug")
+	slugCtx := content.WithLocale(r.Context(), row.Locale)
 	if row.Slug == "" {
-		slug, err := content.UniqueItemSlug(r.Context(), row.Title, row.ItemID)
+		slug, err := content.UniqueItemSlug(slugCtx, row.Title, row.ItemID)
 		if err != nil {
 			return err
 		}
@@ -277,10 +293,14 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 	}
 
 	var saveErr error
-	if isNew {
-		saveErr = db.Create(row).Error
-	} else {
+	if !isNew {
+		editorID, editorName := currentEditor(r)
+		if err := content.CreateItemRevision(r.Context(), db, row.ItemID, editorID, editorName); err != nil {
+			return err
+		}
 		saveErr = db.Save(row).Error
+	} else {
+		saveErr = db.Create(row).Error
 	}
 	if saveErr != nil {
 		return saveErr
@@ -292,6 +312,14 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 		return err
 	}
 	if err := saveItemFieldValues(db, row, customFields, r); err != nil {
+		return err
+	}
+	if linkID, ok := parseID(formString(r, "translation_of_item_id")); ok {
+		if err := content.LinkTranslation(r.Context(), row.ItemID, linkID); err != nil {
+			return err
+		}
+	}
+	if err := content.UpsertSearchIndex(r.Context(), db, row); err != nil {
 		return err
 	}
 	afterArgs := map[string]any{"item_id": row.ItemID, "item": row}
@@ -333,7 +361,7 @@ func itemCustomFields(r *http.Request, db *gorm.DB, row *models.Item) ([]models.
 	return fields, values
 }
 
-func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, row models.Item, allGroups []models.Group, allTags []models.Tag, categories []models.Category, users []models.User, customFields []models.ContentField, fieldValues map[uint]string, isNew bool, errMsg string) {
+func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, db *gorm.DB, row models.Item, allGroups []models.Group, allTags []models.Tag, categories []models.Category, users []models.User, customFields []models.ContentField, fieldValues map[uint]string, isNew bool, errMsg string) {
 	title := "Add Item"
 	subtitle := "Create a new content item."
 	if !isNew {
@@ -351,7 +379,7 @@ func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, row mod
 		"BasePath":      itemsBase,
 		"Subtitle":      subtitle,
 		"AllGroups":     allGroups,
-		"SelectedIDs":   groupSelectedIDs(row.Groups),
+		"SelectedIDs":   defaultGroupSelectedIDs(db, row.Groups, isNew),
 		"AllTags":       allTags,
 		"SelectedTagIDs": tagIDs,
 		"Categories":    categories,
@@ -361,11 +389,54 @@ func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, row mod
 		"Gallery":       content.ParseGalleryJSON(row.GalleryJSON),
 		"Embeds":        content.ParseEmbedsJSON(row.EmbedJSON),
 		"Attachments":   content.ParseAttachmentsJSON(row.AttachmentsJSON),
+		"PreviewURL":    itemPreviewURL(r, row),
+		"ShowPreview":   r.URL.Query().Get("preview") == "1",
+		"RevisionsURL":  fmt.Sprintf("%s/%d/revisions", itemsBase, row.ItemID),
+		"ContentLocales": adminContentLocales(r),
+		"Translations":  itemTranslations(r, row),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
 	h.render(w, r, title, "admin/items_form.html", data)
+}
+
+func itemPreviewURL(r *http.Request, row models.Item) string {
+	if row.ItemID == 0 || row.PreviewToken == "" || row.PreviewExpiresAt == nil {
+		return ""
+	}
+	if time.Now().After(*row.PreviewExpiresAt) {
+		return ""
+	}
+	path := content.PreviewURL(r.Context(), row.PreviewToken)
+	site, err := sites.FromContext(r.Context())
+	if err != nil || strings.TrimSpace(site.Host) == "" {
+		return path
+	}
+	return absoluteSiteURL(site.Host, path)
+}
+
+func (h *Handler) itemClone(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	clone, err := content.CloneItem(r.Context(), db, id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			h.notFound(w, r, "This item could not be found.")
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, fmt.Sprintf("%s/%d", itemsBase, clone.ItemID))
 }
 
 func (h *Handler) itemDelete(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -379,14 +450,7 @@ func (h *Handler) itemDelete(w http.ResponseWriter, r *http.Request, idStr strin
 		return
 	}
 	db, _ := sites.DB(r.Context())
-	db.Exec("DELETE FROM item_groups WHERE item_item_id = ?", id)
-	db.Exec("DELETE FROM item_tags WHERE item_item_id = ?", id)
-	db.Where("item_id = ?", id).Delete(&models.ItemFieldValue{})
-	db.Where("item_id = ?", id).Delete(&models.Comment{})
-	if err := db.Delete(&models.Item{}, id).Error; err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	deleteItemPermanent(db, id)
 	redirectList(w, r, itemsBase+listRedirectQuery(r))
 }
 
@@ -415,12 +479,17 @@ func (h *Handler) itemBulk(w http.ResponseWriter, r *http.Request) {
 			db.Model(&models.Item{}).Where("item_id = ?", id).Update("status", models.ItemStatusArchived)
 		case "trash":
 			db.Model(&models.Item{}).Where("item_id = ?", id).Update("status", models.ItemStatusTrashed)
+		case "restore":
+			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusTrashed).
+				Update("status", models.ItemStatusDraft)
+		case "approve":
+			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusPending).
+				Update("status", models.ItemStatusPublished)
+		case "reject":
+			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusPending).
+				Update("status", models.ItemStatusDraft)
 		case "delete":
-			db.Exec("DELETE FROM item_groups WHERE item_item_id = ?", id)
-			db.Exec("DELETE FROM item_tags WHERE item_item_id = ?", id)
-			db.Where("item_id = ?", id).Delete(&models.ItemFieldValue{})
-			db.Where("item_id = ?", id).Delete(&models.Comment{})
-			db.Delete(&models.Item{}, id)
+			deleteItemPermanent(db, id)
 		case "assign_category":
 			catID := formUintPtr(r, "bulk_category_id")
 			if catID != nil {
@@ -620,4 +689,23 @@ func itemFeaturedReorder(db *gorm.DB, id uint, direction int) error {
 		}
 	}
 	return nil
+}
+
+func adminContentLocales(r *http.Request) []string {
+	_, _, locales, err := content.LocaleConfig(r.Context())
+	if err != nil || len(locales) == 0 {
+		return []string{"en-US"}
+	}
+	return locales
+}
+
+func itemTranslations(r *http.Request, row models.Item) []models.Item {
+	if row.ItemID == 0 {
+		return nil
+	}
+	rows, err := content.ItemTranslations(r.Context(), &row)
+	if err != nil {
+		return nil
+	}
+	return rows
 }

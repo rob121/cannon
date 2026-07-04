@@ -1,8 +1,8 @@
 {{define "offlineNotice"}}
 <div class="site-offline-notice sticky-top border-bottom bg-warning-subtle text-warning-emphasis py-2" role="status">
   <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
-    <span class="small mb-0"><strong>Preview mode.</strong> The site is offline for visitors. You are viewing it as staff.</span>
-    <a class="small fw-semibold link-warning-emphasis text-nowrap" href="/admin">Open admin</a>
+    <span class="small mb-0"><strong>{{lang "offline.preview"}}</strong> {{lang "offline.preview_desc"}}</span>
+    <a class="small fw-semibold link-warning-emphasis text-nowrap" href="/admin">{{lang "offline.open_admin"}}</a>
   </div>
 </div>
 {{end}}

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/media"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -74,13 +75,14 @@ func (h *Handler) mediaList(w http.ResponseWriter, r *http.Request) {
 	data["InFolder"] = folder != ""
 	data["PageActionURL"] = mediaUploadURL(folder)
 	data["PageActionLabel"] = "Upload"
+	data["Uploaded"] = r.URL.Query().Get("uploaded")
 	data["ParentFolderOptions"], _ = mediaFolderOptions(site, db)
 	data["AllFolderNav"], _ = mediaFolderOptions(site, db)
 
 	if folder == "" {
 		var rootFiles []models.MediaAsset
 		db.Where("folder = ? OR folder IS NULL", "").Order("created_at DESC").Find(&rootFiles)
-		data["Rows"] = mediaFileViews(rootFiles)
+		data["Rows"] = mediaFileViews(site, rootFiles)
 		data["Total"] = int64(len(rootFiles))
 		data["Breadcrumbs"] = mediaFolderBreadcrumbs("")
 		h.render(w, r, "Media", "admin/media.html", data)
@@ -95,7 +97,7 @@ func (h *Handler) mediaList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.MediaAsset
 	db.Model(&models.MediaAsset{}).Where("folder = ?", folder).
 		Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
-	data["Rows"] = mediaFileViews(rows)
+	data["Rows"] = mediaFileViews(site, rows)
 	data["SubfolderNav"] = folderNav
 	data["Breadcrumbs"] = mediaFolderBreadcrumbs(folder)
 	h.render(w, r, mediaFolderLabel(folder), "admin/media.html", data)
@@ -204,9 +206,9 @@ func (h *Handler) mediaUpload(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(mimeType, "image/") {
 			_, _ = media.GenerateThumbnail(destPath)
 		}
-		dest := mediaBase
+		dest := mediaBase + "?uploaded=1"
 		if folder != "" {
-			dest = mediaFolderURL(folder)
+			dest = mediaBase + "?folder=" + url.QueryEscape(folder) + "&uploaded=1"
 		}
 		redirectList(w, r, dest)
 		return
@@ -343,8 +345,12 @@ func (h *Handler) mediaDelete(w http.ResponseWriter, r *http.Request, idStr stri
 	redirectList(w, r, mediaBase+listRedirectQuery(r))
 }
 
-func mediaFileViews(rows []models.MediaAsset) []mediaFileView {
+func mediaFileViews(site *config.SiteConfig, rows []models.MediaAsset) []mediaFileView {
 	out := make([]mediaFileView, 0, len(rows))
+	assetsDir := ""
+	if site != nil {
+		assetsDir = site.AssetsDir
+	}
 	for _, row := range rows {
 		view := mediaFileView{
 			MediaAsset: row,
@@ -353,7 +359,7 @@ func mediaFileViews(rows []models.MediaAsset) []mediaFileView {
 			IconClass:  mediaIconClass(row.MIME),
 		}
 		if view.IsImage {
-			view.ThumbPath = media.WebThumbnailPath(row.Path)
+			view.ThumbPath = media.ResolveWebThumbnail(assetsDir, row.Path)
 		}
 		out = append(out, view)
 	}
@@ -460,7 +466,11 @@ func (h *Handler) mediaPicker(w http.ResponseWriter, r *http.Request) {
 	if norm, err := normalizeMediaFolder(folder); err == nil {
 		folder = norm
 	}
-	q := db.Model(&models.MediaAsset{}).Where("mime LIKE ?", "image/%")
+	filesMode := strings.TrimSpace(r.URL.Query().Get("type")) == "files"
+	q := db.Model(&models.MediaAsset{})
+	if !filesMode {
+		q = q.Where("mime LIKE ?", "image/%")
+	}
 	if folder != "" {
 		q = q.Where("folder = ?", folder)
 	}
@@ -471,6 +481,7 @@ func (h *Handler) mediaPicker(w http.ResponseWriter, r *http.Request) {
 		"BasePath":      mediaBase,
 		"FolderFilter":  folder,
 		"FolderOptions": folderOptions,
-		"Rows":          mediaFileViews(rows),
+		"Rows":          mediaFileViews(site, rows),
+		"FilesMode":     filesMode,
 	})
 }

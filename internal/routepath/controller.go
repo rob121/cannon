@@ -51,6 +51,18 @@ func builtin(controller, action string) string {
 		return paths.AccountResetRequest
 	case "auth/reset-submit":
 		return paths.AccountResetSubmit
+	case "auth/mfa-challenge":
+		return paths.AccountMFAChallenge
+	case "auth/security":
+		return paths.AccountSecurity
+	case "auth/profile":
+		return paths.AccountProfile
+	case "auth/security-totp":
+		return paths.AccountSecurityTOTP
+	case "auth/security-passkey":
+		return paths.AccountSecurityPasskey
+	case "auth/passkey-login":
+		return paths.AuthPasskeyLogin
 	case "content/category":
 		return "/content/category/*"
 	case "content/item":

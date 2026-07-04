@@ -138,6 +138,8 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, data m
 	db.Model(&models.Tag{}).Count(&tagCount)
 	db.Model(&models.Comment{}).Where("approved = ?", false).Count(&commentCount)
 	db.Model(&models.Item{}).Where("status = ?", models.ItemStatusTrashed).Count(&trashedCount)
+	var pendingItemCount int64
+	db.Model(&models.Item{}).Where("status = ?", models.ItemStatusPending).Count(&pendingItemCount)
 	cfg := h.chain.Sites.Config()
 	data["UserCount"] = userCount
 	data["RouteCount"] = routeCount
@@ -147,6 +149,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, data m
 	data["CategoryCount"] = categoryCount
 	data["TagCount"] = tagCount
 	data["PendingCommentCount"] = commentCount
+	data["PendingItemCount"] = pendingItemCount
 	data["TrashedItemCount"] = trashedCount
 	data["SiteCount"] = len(cfg.Sites)
 	if _, ok := data["Subtitle"]; !ok {

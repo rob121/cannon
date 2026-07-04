@@ -21,6 +21,7 @@ const (
 	defaultHelpPath     = "/help"
 	defaultHookPath     = "/hooks"
 	defaultTemplatePath = "/templates"
+	defaultCaptchaPath  = "/captcha"
 )
 
 // Server is a Cannon extension HTTP server over a Unix socket.
@@ -36,6 +37,7 @@ type Server struct {
 	adminPath    string
 	hookPath     string
 	templatePath string
+	captchaPath  string
 
 	blocks            map[string]blockEntry
 	blockListProvider BlockListProvider
@@ -59,6 +61,10 @@ type Server struct {
 	install InstallFunc
 
 	config ConfigurationProvider
+
+	captcha *CaptchaRegistration
+
+	permissions []PermissionDef
 
 	hookHandlers map[string]HookHandler
 
@@ -86,6 +92,11 @@ func New(info Info) *Server {
 // Info returns extension metadata registered with New.
 func (s *Server) Info() Info {
 	return s.info
+}
+
+// RegisterPermissions registers permissions Cannon should sync for this extension.
+func (s *Server) RegisterPermissions(perms []PermissionDef) {
+	s.permissions = append(s.permissions, perms...)
 }
 
 // HandleRequest registers a request middleware capability handler.
@@ -266,6 +277,20 @@ func (s *Server) OnConfiguration(p ConfigurationProvider) {
 	s.config = p
 }
 
+// RegisterCaptcha registers the captcha capability at GET /captcha,
+// POST /captcha/render, and POST /captcha/verify.
+func (s *Server) RegisterCaptcha(reg CaptchaRegistration) {
+	if reg.Render == nil || reg.Verify == nil {
+		panic("extension: captcha render and verify handlers are required")
+	}
+	if s.captchaPath == "" {
+		s.captchaPath = defaultCaptchaPath
+	}
+	s.captchaPath = normalizeCapabilityPath(s.captchaPath)
+	regCopy := reg
+	s.captcha = &regCopy
+}
+
 // Handle registers a custom HTTP route.
 func (s *Server) Handle(path string, fn http.HandlerFunc) {
 	s.custom[path] = fn
@@ -325,6 +350,7 @@ func (s *Server) mux() *http.ServeMux {
 	s.registerEndpointRoutes(mux)
 	s.registerDataRoutes(mux)
 	s.registerHookRoutes(mux)
+	s.registerCaptchaRoutes(mux)
 	if s.adminHandler != nil {
 		mux.HandleFunc(s.adminPath, s.serveWire(s.adminHandler))
 		mux.HandleFunc(s.adminPath+"/", s.serveWire(s.adminHandler))
@@ -392,8 +418,12 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if s.templates != nil {
 		caps["templates"] = s.templatePath
 	}
+	if s.captcha != nil {
+		caps["captcha"] = s.captchaPath
+	}
 	writeJSON(w, http.StatusOK, capabilitiesResponse{
 		Capabilities: caps,
+		Permissions:  s.permissions,
 		Defaults: capabilityDefaults{
 			Admin: adminDefaults{
 				MenuName: s.info.AdminMenuName,

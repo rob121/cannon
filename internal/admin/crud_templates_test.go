@@ -115,6 +115,56 @@ func TestTemplateOverrideUsesFormPath(t *testing.T) {
 	}
 }
 
+func TestTemplateAssetEdit(t *testing.T) {
+	root := t.TempDir()
+	site := &config.SiteConfig{TemplateDir: root}
+	h := &Handler{}
+
+	path := "fr/assets/css/custom.css"
+	body := url.Values{
+		"path":    {path},
+		"content": {"body { color: navy; }"},
+	}
+	req := httptest.NewRequest("POST", "/admin/templates/fr/assets/edit", strings.NewReader(body.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	h.templateAssetEdit(rec, req, site, "fr")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303; body=%q", rec.Code, rec.Body.String())
+	}
+	got, err := templatemgr.ReadAsset(root, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "body { color: navy; }" {
+		t.Fatalf("content = %q", got)
+	}
+}
+
+func TestTemplateAssetDelete(t *testing.T) {
+	root := t.TempDir()
+	site := &config.SiteConfig{TemplateDir: root}
+	h := &Handler{}
+
+	path := "fr/assets/css/custom.css"
+	if err := templatemgr.SaveAsset(root, path, []byte("body { color: red; }")); err != nil {
+		t.Fatal(err)
+	}
+	body := url.Values{"path": {path}}
+	req := httptest.NewRequest("POST", "/admin/templates/fr/assets/delete", strings.NewReader(body.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+
+	h.templateAssetDelete(rec, req, site, "fr")
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303; body=%q", rec.Code, rec.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "fr", "assets", "css", "custom.css")); !os.IsNotExist(err) {
+		t.Fatalf("expected file removed, stat err = %v", err)
+	}
+}
+
 func TestTemplateRevertUsesFormPath(t *testing.T) {
 	root := t.TempDir()
 	site := &config.SiteConfig{TemplateDir: root}

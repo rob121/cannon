@@ -17,18 +17,29 @@ type Authenticator struct {
 }
 
 type User struct {
-	UserID     uint   `gorm:"primaryKey"`
-	GivenName  string `gorm:"size:128"`
-	FamilyName string `gorm:"size:128"`
-	Email      string `gorm:"size:256;uniqueIndex"`
-	Username   string `gorm:"size:128;uniqueIndex;not null"`
-	Locked     bool   `gorm:"not null;default:false"`
-	Validated  bool   `gorm:"not null;default:false"`
-	Hash       string `gorm:"size:256"`
-	Status     Status `gorm:"size:16;not null;default:active"`
-	AuthID     *uint
-	Auth       *Authenticator
-	Groups     []Group `gorm:"many2many:user_groups;"`
+	UserID       uint   `gorm:"primaryKey"`
+	GivenName    string `gorm:"size:128"`
+	FamilyName   string `gorm:"size:128"`
+	Email        string `gorm:"size:256;uniqueIndex"`
+	Username     string `gorm:"size:128;uniqueIndex;not null"`
+	AvatarURL    string `gorm:"size:1024"`
+	SSOAvatarURL string `gorm:"size:1024"`
+	Locked       bool   `gorm:"not null;default:false"`
+	Validated    bool   `gorm:"not null;default:false"`
+	Hash         string `gorm:"size:256"`
+	Status       Status `gorm:"size:16;not null;default:active"`
+	AuthID       *uint
+	Auth         *Authenticator
+	Groups       []Group `gorm:"many2many:user_groups;"`
+	Roles        []Role  `gorm:"many2many:user_roles;"`
+}
+
+// UserOAuthIdentity links a Cannon user to an external OAuth account.
+type UserOAuthIdentity struct {
+	IdentityID     uint   `gorm:"primaryKey"`
+	UserID         uint   `gorm:"index;not null"`
+	Provider       string `gorm:"size:64;not null;uniqueIndex:idx_oauth_provider_user"`
+	ProviderUserID string `gorm:"size:256;not null;uniqueIndex:idx_oauth_provider_user"`
 }
 
 type Profile struct {
@@ -80,6 +91,7 @@ const (
 	RouteTypeExtensionEndpoint  RouteType = "Extension Endpoint"
 	RouteTypeLocalFile          RouteType = "Local File"
 	RouteTypeController         RouteType = "Controller"
+	RouteTypeIframe             RouteType = "Iframe"
 )
 
 type Route struct {
@@ -97,6 +109,7 @@ type Route struct {
 	ControllerAction      string    `gorm:"size:128"`
 	IsDefault             bool      `gorm:"not null;default:false;index"`
 	ShowTitle             bool      `gorm:"not null;default:true"`
+	Sort                  int       `gorm:"not null;default:0;index"`
 	Groups                []Group   `gorm:"many2many:route_groups;"`
 }
 
@@ -130,19 +143,22 @@ const (
 )
 
 type Group struct {
-	GroupID  uint      `gorm:"primaryKey"`
-	Name     string    `gorm:"size:128;uniqueIndex;not null"`
-	ParentID *uint     `gorm:"index"`
-	Kind     GroupKind `gorm:"size:16;not null;default:backend;index"`
-	Status   Status    `gorm:"size:16;not null;default:active"`
-	Roles    []Role    `gorm:"many2many:group_roles;"`
-	Parent   *Group    `gorm:"foreignKey:ParentID;references:GroupID;constraint:-"`
+	GroupID     uint      `gorm:"primaryKey"`
+	Name        string    `gorm:"size:128;uniqueIndex;not null"`
+	Description string    `gorm:"type:text"`
+	ParentID    *uint     `gorm:"index"`
+	Kind        GroupKind `gorm:"size:16;not null;default:backend;index"`
+	Status      Status    `gorm:"size:16;not null;default:active"`
+	Roles       []Role    `gorm:"many2many:group_roles;"`
+	Parent      *Group    `gorm:"foreignKey:ParentID;references:GroupID;constraint:-"`
 }
 
 type Role struct {
-	RoleID uint   `gorm:"primaryKey"`
-	Name   string `gorm:"size:128;uniqueIndex;not null"`
-	Status Status `gorm:"size:16;not null;default:active"`
+	RoleID      uint   `gorm:"primaryKey"`
+	Name        string `gorm:"size:128;uniqueIndex;not null"`
+	Description string `gorm:"type:text"`
+	SystemRole  bool   `gorm:"not null;default:false"`
+	Status      Status `gorm:"size:16;not null;default:active"`
 }
 
 type SessionRecord struct {
@@ -166,8 +182,10 @@ const (
 	BlockTypeExtension BlockType = "extension"
 	BlockTypeContent        BlockType = "content"
 	BlockTypeLogin          BlockType = "login"
-	BlockTypeMenuVertical   BlockType = "menu-vertical"
-	BlockTypeMenuHorizontal BlockType = "menu-horizontal"
+	BlockTypeMenuVertical      BlockType = "menu-vertical"
+	BlockTypeMenuHorizontal    BlockType = "menu-horizontal"
+	BlockTypeSearchHorizontal  BlockType = "search-horizontal"
+	BlockTypeSearchVertical    BlockType = "search-vertical"
 )
 
 // Block assigns content to a template space for {{space "space"}} rendering.
@@ -197,6 +215,7 @@ func All() []any {
 	return []any{
 		&Authenticator{},
 		&User{},
+		&UserOAuthIdentity{},
 		&Profile{},
 		&ProfileField{},
 		&UserProfile{},
@@ -214,6 +233,7 @@ func All() []any {
 		&Category{},
 		&Tag{},
 		&Item{},
+		&ItemRevision{},
 		&ContentFieldGroup{},
 		&ContentField{},
 		&ItemFieldValue{},
@@ -221,6 +241,13 @@ func All() []any {
 		&Comment{},
 		&Notification{},
 		&NotificationEvent{},
-		&GroupAdminRoute{},
+		&NotificationSubscription{},
+		&Permission{},
+		&RolePermission{},
+		&RoleInheritance{},
+		&UserTOTP{},
+		&UserPasskey{},
+		&APICredential{},
+		&APIPendingToken{},
 	}
 }

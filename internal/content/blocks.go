@@ -126,7 +126,7 @@ func renderItemBlock(items []models.Item, layout string) string {
 		for _, item := range items {
 			b.WriteString(`<div class="col-12 col-md-6"><article class="card h-100 shadow-sm"><div class="card-body position-relative">`)
 			b.WriteString(`<h3 class="card-title h6 mb-2"><a href="`)
-			b.WriteString(html.EscapeString(ItemURL(item.Slug)))
+			b.WriteString(html.EscapeString(ItemURLForContext(WithLocale(context.Background(), item.Locale), item.Slug)))
 			b.WriteString(`" class="stretched-link text-decoration-none">`)
 			b.WriteString(html.EscapeString(item.Title))
 			b.WriteString(`</a></h3>`)
@@ -143,7 +143,7 @@ func renderItemBlock(items []models.Item, layout string) string {
 	b.WriteString(`<div class="list-group list-group-flush">`)
 	for _, item := range items {
 		b.WriteString(`<a class="list-group-item list-group-item-action px-0" href="`)
-		b.WriteString(html.EscapeString(ItemURL(item.Slug)))
+		b.WriteString(html.EscapeString(ItemURLForContext(WithLocale(context.Background(), item.Locale), item.Slug)))
 		b.WriteString(`"><h3 class="h6 mb-1">`)
 		b.WriteString(html.EscapeString(item.Title))
 		b.WriteString(`</h3>`)
@@ -208,7 +208,7 @@ func renderCategoryMenu(ctx context.Context) (string, error) {
 func writeCategoryNodes(b *strings.Builder, nodes []models.Category, byParent map[uint][]models.Category) {
 	for _, cat := range nodes {
 		b.WriteString(`<li><a href="`)
-		b.WriteString(html.EscapeString(CategoryURL(cat.Slug)))
+		b.WriteString(html.EscapeString(CategoryURLForContext(WithLocale(context.Background(), cat.Locale), cat.Slug)))
 		b.WriteString(`">`)
 		b.WriteString(html.EscapeString(cat.Name))
 		b.WriteString(`</a>`)

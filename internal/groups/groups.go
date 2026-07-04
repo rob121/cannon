@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
@@ -334,18 +335,7 @@ func ensureContains(ids []uint, id uint) []uint {
 	return append(ids, id)
 }
 
-// HasBackendAccess reports whether a user belongs to an active backend group.
+// HasBackendAccess reports whether a user may access the admin area.
 func HasBackendAccess(ctx context.Context, userID uint) (bool, error) {
-	db, err := sites.DB(ctx)
-	if err != nil {
-		return false, err
-	}
-	var count int64
-	err = db.Model(&models.User{}).
-		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
-		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
-		Where("users.user_id = ? AND users.status = ? AND groups.status = ? AND groups.kind = ?",
-			userID, models.StatusActive, models.StatusActive, models.GroupKindBackend).
-		Count(&count).Error
-	return count > 0, err
+	return security.Can(ctx, userID, security.PermAdminAccess)
 }

@@ -16,6 +16,7 @@
             <option value="backend" {{if eq .Row.Kind "backend"}}selected{{end}}>Backend</option>
             <option value="frontend" {{if eq .Row.Kind "frontend"}}selected{{end}}>Frontend</option>
           </select>
+          <p class="admin-form-help mb-0"><strong>Backend</strong> groups assign capability roles (Writers, Editors, etc.). <strong>Frontend</strong> groups control content visibility (<code class="admin-code">Public</code>, <code class="admin-code">Registered</code>).</p>
         </div>
         <div class="col-md-3">
           <label class="admin-form-label">Status</label>
@@ -23,6 +24,10 @@
             <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
             <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
           </select>
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Description</label>
+          <textarea class="admin-form-control" name="description" rows="2">{{.Row.Description}}</textarea>
         </div>
         <div class="col-md-6">
           <label class="admin-form-label">Parent Group</label>
@@ -34,23 +39,14 @@
             {{end}}
             {{end}}
           </select>
+          <p class="admin-form-help mb-0">Optional organizational hierarchy. Does not affect permissions.</p>
         </div>
         <div class="col-12"><div class="admin-form-divider"></div></div>
         <div class="col-12">
           <label class="admin-form-label">Roles</label>
-          <p class="admin-form-help mb-3">Members of this group inherit all selected roles.</p>
-          <div class="admin-checkbox-grid">
-            {{range .AllRoles}}
-            <label class="admin-form-check">
-              <input type="checkbox" name="role_ids" value="{{.RoleID}}" {{if containsUint $.SelectedIDs .RoleID}}checked{{end}}>
-              {{.Name}}
-            </label>
-            {{else}}
-            <p class="admin-cell-muted">No roles defined yet. <a href="/admin/roles/new" data-turbo-frame="_top">Add a role</a> first.</p>
-            {{end}}
-          </div>
+          <p class="admin-form-help mb-3">Members of this group inherit all selected roles and their permissions.</p>
+          {{template "role_access_toggles" (dict "AllRoles" .AllRoles "SelectedRoleIDs" .SelectedIDs)}}
         </div>
-        {{template "groups_form_permissions" .}}
       </div>
       {{template "form_actions" .}}
     </form>

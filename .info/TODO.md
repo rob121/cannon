@@ -1,128 +1,276 @@
-Review the admin content area, the tables with filters and search boxes etc. Basically all card headers need to be reviewed as the layouts are wonky.
+# Cannon — Tracked TODO
 
-Add more help docs about how to author extensions and for supporting different capabilites
+Status key: `[ ]` pending · `[~]` partial · `[x]` done
 
-Global Mail configuration needs to have username/password and from name
+---
 
-Add a backend page for Notifications 
+## Specs — extensions.md
 
-Each notificaiton is a shouttrr (https://github.com/containrrr/shoutrrr) config ie slack,mail etc.  
+- [x] Extension process model, socket HTTP, capabilities (request/page/data/endpoint/block/admin/help/hooks/templates/configuration/captcha)
+- [x] CSRF on wire requests, SQLite WAL, extension DB access
+- [x] Captcha capability contract + Cannon placeholder expansion and verify on login/comments
+- [x] Extension permissions — `RegisterPermissions`, host sync, `UserCan`, wire `permissions` / `denied_permissions`
+- [~] Extension block admin metadata (thinner than page/endpoint routes)
 
-Notifcation Model
- notification_id
- name
- shoutrr configuration
- status (active/inactive)
+## Specs — blocks.md
 
-We should use event hooks for notificaitons so for each configured notification we should register which hooks apply
+- [x] Spaces, `{{space}}`, admin space filter, HTML/Markdown/extension blocks
+- [x] Block wrapper templates under `partials/blocks/`
+- [ ] Multi-space assignment per block (spec: one or more spaces)
+- [~] Block show/hide by route (admin visibility)
+- [~] Template wrapper dropdown from theme scan
+- [x] Menu vertical/horizontal block types (beyond spec)
 
-onUserSignup
-onUserLogin
-onUserVerified
-onUserLocked
+## Specs — templates.md
 
+- [x] Theme folders, `template.json`, frontend/admin theme selection, versioning
+- [x] `/theme/*`, `/admin/assets/*`, admin theme browser, override flow
+- [ ] Legacy `template_dir` layout migration helper
+- [~] Template editor save reliability
+- [~] Theme/file list pagination
 
-Additional backend user groups hierarchy
+## Specs — event_hooks.md
 
-Administrator
- -> Manager
-   -> Editor
-    -> Writer
+- [x] All documented events wired (in-process + extension)
+- [x] `onUserLocked` — fire from admin user lock toggle
+- [x] `onUserSignup` / `onUserVerified` — fired from auth flows
 
+## Specs — notifications.md
 
+See `.info/specs/notifications.md` for Layer 1/2 design.
 
- We need these groups bootstrapped when the site start ups these are for the admin backend
+- [x] **Layer 1 — Admin destinations** — `Notification` model, Shoutrrr send, System → Notifications CRUD
+- [x] **Layer 1 — Auth hook subscriptions** — `onUserSignup`, `onUserAfterLogin`, `onUserVerified`, `onUserLocked`
+- [~] **Layer 1 — Expand event picker** — content/comment hooks in data model; admin form still flat list
+- [x] **Layer 2 — `notification_subscriptions` model** — user_id or role_id + event + channel
+- [x] **Layer 2 — Dispatch** — resolve role members, dedupe emails, send via site mail
+- [x] **Layer 2 — Account UI** — per-user event subscription checklist
+- [x] **Layer 2 — Role admin UI** — default subscriptions per role
+- [ ] **Layer 2 — Filters** — category, status transition, author=self (`filters_json`)
+- [ ] **Layer 2 — In-app inbox** — optional `channel: in_app` (later)
 
-Additionally frontend groups that always exist are 
+## Specs — admin_design.md
 
-Public->
-  Registered
+- [x] Bootstrap 5, Turbo, admin CSS, collapse sidebar
+- [~] Apex-shadcn visual parity
+- [~] Pagination on all tables (menu items missing; some cosmetic-only)
+- [~] Title Case on all headers/buttons
+- [x] Unified list card headers / toolbars
 
- The bakcned area should allow Administrator users to define what routes under /admin each group can crud to.
+## Specs — content.md
 
- Other groups may be used as well later .
+See `.info/specs/content.md` for full feature list.
 
- Other Site Global Config Fields (and then make sure the values are used in the various pages)
+- [x] Items, categories, tags, custom fields, frontend editing
+- [x] Comments, search, feeds, sitemap, author pages
+- [x] Global content settings (display toggles, author profile schema; frontend permissions via RBAC roles)
+- [~] Content spec polish (media picker, featured ordering, empty states, item form tabs)
+- [ ] Remaining content spec items — review `content.md` §6–§16 for gaps
 
- * Site Offline  (bool) (show maintenance page)
- * Default List Limit (for per page table views)
- * Site Meta Description
- * Robots and Ai settings for /robots.txt etc.
+## Specs — user_group_role.md
 
+See `.info/specs/user_group_role.md` and `.info/TODO_AUTH.md` for implementation detail.
 
+- [x] RBAC engine, roles, permissions, inheritance, caching
+- [x] Admin and content frontend permission namespaces
+- [x] Visibility groups separate from capability roles
+- [x] Explicit deny permissions
+- [x] Extension permission registration
+- [x] Legacy site migration path
 
-Editing a file here http://127.0.0.1:8001/admin/templates does not work 
+---
 
-Add support for a template.json in the root of a template that has meta data ie frontend or backend temptale author etc. This metadata should be added in under /admin/templates to help with the display. Additonally we should be able to mark a template status 
+## Auth & security
 
-Still to polish (follow-up)
-Admin content list card headers — unified toolbar partial across items/categories/blocks (partial CSS fix only)
-default_list_limit — stored in settings but admin lists still use hard-coded pageSize = 20 - also this should be a drop down in configuration 25,50,75,100,200,500
-site_meta_description — not yet injected into public layout (field exists in settings)
-OnUserLocked — hook exists; fire it from user lock toggle in admin users CRUD
-Assign registered group on login (currently only on user create)
-Then configure notifications under System → Notifications and group permissions under Users → Groups.
-Add a "Log Level" in the config - Debug,Error,Warning, Info, None
+- [x] **RBAC authorization** — full system in `internal/security` (see `.info/TODO_AUTH.md`; phases 0–8 complete)
+- [x] **MFA (TOTP) + passkeys** — global toggles, account security UI, login MFA step, admin MFA redirect
+- [ ] OAuth SSO providers (Goth wired; login returns “not available yet”)
 
-Extensions is listed 2x here: http://127.0.0.1:8001/admin/help - There is no information on authoring extensions (from extensions.md)
+---
 
-http://127.0.0.1:8001/admin/media/upload - deeosn't work, it needs to be more polished and when uploading images we should see a preview. Additonally http://127.0.0.1:8001/admin/media should be formatted as a file explorer and not a table. 
+## Notifications
 
-See this page for layout guidance: https://apex-shadcn.dashboardpack.com/files
+Spec: `.info/specs/notifications.md`. Two layers: admin destinations (Layer 1) + user/role subscriptions (Layer 2).
 
+**Layer 1 — done / extend**
 
-Implement the same table sort arrows on the blocks page as in the extensions page and then on Content/Categories 
+- [x] Model + Shoutrrr UI under System → Notifications
+- [x] Auth hook subscriptions (signup, login, verify, lock)
+- [ ] Content/comment hooks in admin event picker
+- [ ] Message templates; delivery error visibility
 
+**Layer 2 — user + role subscriptions**
 
-http://localhost:8001/ has a route for controller category with a predefined category on the frontend I still get "No items in this category."
+- [x] Subscription model (`user_id` or `role_id`, event, channel, status, optional filters)
+- [x] Dispatch: role → member emails, dedupe, user opt-out overrides role default
+- [x] Account/profile notifications tab (per-user)
+- [x] Role form: default notification subscriptions
+- [~] Depends on mail config (From, SMTP) for reliable email delivery
 
-Log output for access log - with support for automatic rotation the log should be basedon the hostname of the site.
+---
 
-http://127.0.0.1:8001/admin/blocks/2 blocks need a configurate to show/hide dpeending on the route.  
+## Users & groups
 
-http://127.0.0.1:8001/admin/items/new - still needs ui improvement, there are a lot of areas and it's very visually busy, save and cancel should be ain a toolbar at the top as it's too busy and you have to scroll to the bottom of the page.
+Detailed checklist: `.info/TODO_AUTH.md`
 
-http://127.0.0.1:8001/admin/field-groups/new implements requried, as a checkbox all admin checkboxes should render as a toggle 
+- [x] RBAC engine — permission registry, role inheritance, wildcards, per-user cache, default deny
+- [x] Default system roles (viewer → administrator) with seeded permissions and inheritance
+- [x] Admin section permissions (`core.admin.*`) — replaced legacy group admin route matrix
+- [x] Content frontend permissions (`core.content.frontend.*`) on roles — removed config/category permission overlays
+- [x] Explicit deny permissions on roles (override allows, including wildcards)
+- [x] Direct user role assignment; roles, groups, and permissions admin UI
+- [x] Effective permissions preview on user edit form
+- [x] Extension permissions — host sync, extension nav filtering, `core.admin.extension-apps.read`
+- [x] Visibility groups (frontend kind) separate from RBAC — Access tabs on categories, items, routes, blocks
+- [x] Backend vs frontend group kinds; admin UI copy and group pickers aligned (membership vs visibility)
+- [x] Legacy migration — group admin routes, role names, `core.content.*` → `core.content.frontend.*`
+- [x] Help — `admin/authorization.md`, extension authoring permissions section
+- [ ] Assign registered group on login (only on create today)
+- [ ] Production site auth migration smoke test (manual)
 
-_gothic_session cookie is set, can we rename that to _cannon_session?
+---
 
-http://127.0.0.1:8001/admin/field-groups - adding a field gorup works, adding a field within the group overwrites the ffield group or adds a new group.   Needs to be reviewed.
+## Configuration & system
 
-http://127.0.0.1:8001/admin/categories/1 group visibility should be on the sidebar and not th4e bottom, checkboxes should be toggles.
+- [x] Site offline, log level, default list limit (stored)
+- [~] `default_list_limit` — admin lists still hard-code page size 20
+- [x] Global default meta tags in Configuration → General (description, keywords, OG, Twitter, head extra)
+- [x] Captcha settings in Configuration → General (enable, active extension, skip authenticated)
+- [x] Access log (file rotation + System → Access Log tail UI)
+- [ ] Mail config: username/password, from name
 
+---
 
-Add content settings for the frontend to global configuration
-* Show Author
-* Show published date
-* Show Author Bio 
-* Show title
-* Show Comments
+## Admin UX polish
 
-http://localhost:8001/admin/categories/1 wraps qutes around the access levels when "enabled"
-http://localhost:8001/admin/categories is missing sorting capability like extensions
-http://localhost:8001/admin/blocks is missing sorting capabiliyt like extensions
-http://localhost:8001/admin/routes/4 group visibiliy/access should be layed out like http://localhost:8001/admin/categories/new is
-http://localhost:8001/admin/items/new - the save/cancel buttons should be right justified in the toolbar like the rest of the admin ui
+- [x] Content list card headers — unified toolbar partial
+- [x] Media: file explorer UI, upload preview, fix upload flow
+- [x] Items form: top toolbar for save/cancel, less visual noise
+- [x] Field groups: required as toggle; fix add-field-within-group bug
+- [x] Categories/routes/blocks: sort arrows like extensions
+- [x] Routes: group visibility copy aligned; sidebar layout parity with categories
+- [x] All admin checkboxes → toggles where missing
+- [x] Help: dedupe Extensions entries in Help nav (authoring + authorization docs written)
 
---
+---
 
+## Blocks & routes (bugs)
 
-Add support for MFA and also passkeys
+- [ ] Block page visibility / route tree not expanding correctly
+- [ ] Category route with predefined slug shows empty on home
 
-Estalbish a configuraiton setting to enable either of these for the user to setup
+---
 
-Add to the profile area interfaces to add mf and passkeys 
+## Extensions (runtime)
 
-Update the login form to suppor thtese methods along with sso auth authenticators we previously setup.
+- [ ] Contact extension: Bootstrap structure on HTML output
+- [ ] Calendar extension: `meeting_details` column; hide Google Meet boilerplate in description
 
+---
 
+## Done recently
 
-Extensions
+- [x] Full RBAC authorization system (`internal/security`, admin UI, migrations, help)
+- [x] Explicit deny permissions on roles + effective permissions preview on user form
+- [x] Content frontend permissions via roles; visibility groups on Access tabs only
+- [x] Extension permissions + filtered extension admin nav
+- [x] Admin auth UI alignment — backend/frontend groups, membership vs visibility copy
+- [x] Global content frontend permissions via RBAC (`core.content.frontend.*` on roles)
+- [x] Author profile schema in Configuration → Content + user account fields
+- [x] Access log middleware fix + admin tail viewer
+- [x] Theme asset management (list, edit, create, delete) with CodeMirror
+- [x] Captcha extension capability + Cannon runtime (placeholders, expand, verify)
 
-The contact extension html needs to have boostrap css classes added so it renders right
+---
 
-The calendar extension has an error: Last refresh failed: no such column: meeting_details also:
-The issue is the google meet information is in the description, there are two things - here is sample text o fhte meeting information: Join with Google Meet: https://meet.google.com/yfa-bmuo-xdg\nOr 
-  dial: (US) +1 402-735-0126 PIN: 332516045#\nMore phone numbers: https://te
- l.meet/yfa-bmuo-xdg?pin=9971233969167&hs=7\n\nLearn more about Meet at: htt
- ps://support.google.com/a/users/answer/9282720 There is also a X-GOOGLE-CONFERENCE key that can be used as a hint to hide the text, it appears that this text is appended so when X-GOOGLE-CONFERENCE has a value then we should splikt on "Join with Google Meet to hide if login is required.
+## CMS parity — priority (Joomla / Drupal gaps)
+
+- [ ] OAuth SSO + mail — unlock real deployments (see Auth & security, Configuration & system)
+- [x] Content revisions + restore from trash — editorial safety net
+- [x] Multilingual content — language-specific items/categories/URLs
+- [x] Search upgrade — full-text index + custom field filters
+- [x] Media polish — picker, image styles, drag/drop (see Admin UX polish)
+- [x] Editorial workflow — submit/review/publish for teams
+- [x] Headless content API — published content read + JWT account parity (see `.info/specs/content_api.md`)
+
+---
+
+## CMS parity — editorial workflow
+
+- [x] Submit for review, pending state, approver queue (Drupal Moderation / Joomla Workflow)
+- [x] Content item revisions — rollback, compare, audit trail (`/admin/items/{id}/revisions`)
+- [x] Draft preview — secret preview URL for unpublished content
+- [x] Trash manager — dedicated restore action and empty-trash UX (trash status exists today)
+
+---
+
+## CMS parity — multilingual
+
+- [~] UI string translations — `.ini` language files (admin/site scopes)
+- [ ] Translated content — language-specific items, categories, and associations
+- [ ] Localized URLs — e.g. `/fr/blog/post` linked translations (Joomla Language Associations / Drupal content translation)
+
+---
+
+## CMS parity — search & discovery
+
+- [~] Basic item search — SQL `LIKE` on title/intro/body
+- [ ] Full-text search — index, relevance ranking, optional Elasticsearch/Solr
+- [ ] Custom field filtering in search (spec: `content.md` §13)
+- [ ] View/analytics-based popularity — today “popular” uses comment count only
+
+---
+
+## CMS parity — integrations & headless
+
+Spec: `.info/specs/content_api.md` — headless frontend parity; read-only published content + JWT account self-service; no CMS admin API.
+
+- [x] Content API — REST + OpenAPI; app credentials + JWT login + account/profile writes
+- [ ] OAuth SSO — finish Goth provider login flow (see Auth & security)
+- [ ] Mail transport — SMTP username/password/from name (see Configuration & system)
+
+---
+
+## CMS parity — media
+
+- [~] Thumbnails — single fixed width (320px); no image style profiles
+- [ ] Configurable image sizes — global and per-category (Joomla/Drupal image styles)
+- [x] Media UX — file explorer, drag/drop upload, upload flow polish (see Admin UX polish)
+- [ ] Image transforms — on-the-fly crop, focal point, WebP variants, CDN/Imgix-style URLs
+
+---
+
+## CMS parity — platform & ops
+
+- [ ] Page/object cache — cache tags, Varnish, Joomla-style page cache
+- [ ] Staging environment — content/config sync between dev/stage/prod
+- [ ] Backup/update manager — Akeeba-style backups or one-click core updates
+
+---
+
+## CMS parity — content modeling
+
+- [~] Single “Item” type with field groups per category (not distinct content types)
+- [ ] Distinct content types — Article vs Page vs Product with separate admin menus
+- [ ] Hierarchical taxonomies / vocabularies — tags are flat today (Drupal Taxonomy)
+- [x] Duplicate/clone item
+
+---
+
+## CMS parity — comments & community
+
+- [~] Comment spam — honeypot + IP rate limit; captcha on comment forms when enabled
+- [ ] Akismet, reCAPTCHA, or moderation ML integration
+- [x] Event notifications — Layer 1 Shoutrrr + Layer 2 user/role email subscriptions (see `notifications.md`)
+
+---
+
+## CMS parity — architectural notes (not gaps)
+
+These are deliberate design choices, not missing features:
+
+- Component/module/plugin sprawl → extensions + hooks + blocks
+- Visual page builder (Gutenberg, SP Page Builder) → templates + blocks + spaces
+- Views / query builder (Drupal Views) → content blocks + controller templates + Go
+- Granular ACL asset tree (Joomla) → groups + roles + per-section admin permissions + explicit deny + item/category visibility groups
+

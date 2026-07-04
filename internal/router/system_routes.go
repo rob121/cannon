@@ -46,6 +46,16 @@ func SystemRoutes() []SystemRoute {
 			Handler: "Extension /data handlers (one hash per extension route)",
 		},
 		{
+			Name:    "Content API",
+			Path:    "/api/v1/*",
+			Handler: "Headless Content API v1",
+		},
+		{
+			Name:    "API Documentation",
+			Path:    "/api/v1/docs",
+			Handler: "OpenAPI / Swagger UI",
+		},
+		{
 			Name:    "Installer",
 			Path:    "/install/*",
 			Handler: "Installer redirect when the site is already configured",

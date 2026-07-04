@@ -40,6 +40,18 @@ func TestFetchFrontendTemplatesIncludesTemplateJSON(t *testing.T) {
 	}
 }
 
+func TestFetchConfigurationFieldsHelp(t *testing.T) {
+	md, err := Fetch("admin", "configuration-fields")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phrase := range []string{"Category dropdown", "format", "category", "boolean", "JSON Forms"} {
+		if !strings.Contains(md, phrase) {
+			t.Fatalf("expected configuration-fields help to mention %q", phrase)
+		}
+	}
+}
+
 func TestArticleURL(t *testing.T) {
 	got := ArticleURL("admin", "admin-basics")
 	want := "/admin/help/admin/admin-basics"

@@ -92,9 +92,9 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		data := settings.FormDataFromRequest(r, def.Schema)
+		data := settings.FormDataFromRequest(r, def.Schema, def.UISchema)
 		if sectionID == content.SettingsSection {
-			data = content.MergeConfigurationPermissionFormData(data, r)
+			data = content.MergeConfigurationAuthorProfileFormData(data, r)
 		}
 		if err := settings.Save(r.Context(), store, settings.ScopeGlobal, sectionID, data); err != nil {
 			h.renderConfigurationError(w, r, extMgr, "global", sectionID, def.Title, "", err.Error())
@@ -125,20 +125,30 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 		if site != nil {
 			templateDir = site.TemplateDir
 		}
-		if patched, err := themes.PatchGeneralSchema(section, templateDir); err == nil {
+		if patched, err := themes.PatchGeneralSchema(section, templateDir, extMgr.CaptchaExtensionNames()); err == nil {
 			section = patched
 		}
 	}
-	formHTML, err := settings.RenderForm(section, postURL, configurationCSRFToken(r))
+	if sectionID == settings.SectionSEO {
+		if generalSection, ok := settings.FindSection(doc, settings.SectionGeneral); ok {
+			var generalData map[string]any
+			if len(generalSection.Data) > 0 {
+				_ = json.Unmarshal(generalSection.Data, &generalData)
+			}
+			section = settings.MergeLegacySEOMetaSection(section, generalData)
+		}
+	}
+	categories, _ := content.CategoryTreeAll(r.Context())
+	renderCtx := &settings.FormRenderContext{Categories: categories}
+	formHTML, err := settings.RenderForm(section, postURL, configurationCSRFToken(r), renderCtx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if sectionID == content.SettingsSection {
 		db, _ := sites.DB(r.Context())
-		createIDs, editIDs, publishIDs, _ := content.LoadPermissionGroupIDs(r.Context())
 		settings, _ := content.LoadSettings(r.Context())
-		formHTML = content.InjectConfigurationPermissionFields(formHTML, loadActiveGroups(db), loadActiveProfiles(db), createIDs, editIDs, publishIDs, settings.AuthorProfileID)
+		formHTML = content.InjectConfigurationAuthorProfileField(formHTML, loadActiveProfiles(db), settings.AuthorProfileID)
 	}
 	h.renderConfiguration(w, r, extMgr, section.Title, "global", section.ID, section.Title, "", formHTML, r.URL.Query().Get("saved") == "1", "", nil)
 }
@@ -189,7 +199,7 @@ func (h *Handler) configurationExtension(w http.ResponseWriter, r *http.Request,
 		if saveSection == "" {
 			saveSection = section.ID
 		}
-		data := settings.FormDataFromRequest(r, section.Schema)
+		data := settings.FormDataFromRequest(r, section.Schema, section.UISchema)
 		raw, _ := json.Marshal(data)
 		if err := extMgr.SaveConfiguration(rt.Model.Socket, extension.ConfigurationSaveRequest{
 			Section: saveSection,
@@ -202,7 +212,9 @@ func (h *Handler) configurationExtension(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	formHTML, err := settings.RenderForm(section, postURL, configurationCSRFToken(r))
+	categories, _ := content.CategoryTreeAll(r.Context())
+	renderCtx := &settings.FormRenderContext{Categories: categories}
+	formHTML, err := settings.RenderForm(section, postURL, configurationCSRFToken(r), renderCtx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

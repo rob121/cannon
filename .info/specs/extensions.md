@@ -22,11 +22,14 @@ A json response that tells the parent process what this extension can do
   "admin": "admin_handler"
   "hooks": "hooks_handler"
   "templates": "templates_handler"
+  "captcha": "captcha_handler"
 }
 }
 ```
 
 Hooks exposes event subscriptions Cannon dispatches (`onBeforeRoute`, `onUserBeforeLogin`, etc.). `GET /hooks` returns `{"hooks":["onBeforeRoute"]}`. `POST /hooks` receives `event`, `arguments`, and the normal wire request. Register with `OnHook(event, fn)`. See `.info/specs/event_hooks.md`.
+
+Captcha provides render and verify handlers for protected forms (login, registration, comments, extension forms). Cannon uses **one active captcha extension per site** — see the Captcha capability section below. Register with `RegisterCaptcha`. Multiple captcha extensions may be installed, but only the site-selected provider is called.
 
 Request is triggered on a web request early in the process, the extension can make changes to the request body etc. make decisions about blocking, ddecoding etc. It is expected to be passed to in http routing middleware.
 
@@ -143,6 +146,149 @@ If an extension embeds templates, it should expose a `templates` capability. The
 
 Template override files live under `{template_dir}/extension/...`. For example an embedded local template named `calendar/page.html` is overridden by `{template_dir}/extension/calendar/page.html`. Extension template paths should be namespaced to the extension, such as `contact/form.html`, so multiple extensions do not collide.
 
+## Captcha capability
+
+Extensions that protect forms with a third-party captcha provider (Cloudflare Turnstile, hCaptcha, reCAPTCHA, etc.) should expose a dedicated `captcha` capability instead of folding the logic into `request`, `hooks`, or `data`.
+
+**Why a separate capability**
+
+- Captcha has a fixed contract: render a widget, verify a token, expose public client config.
+- Cannon integrates captcha in multiple places (login, comments, registration, extension forms) from one provider.
+- Hooks and request middleware are the wrong abstraction for HTML widget rendering and provider-specific verification.
+
+**One active provider per site**
+
+Sites may install several captcha extensions, but Cannon calls **only the configured active captcha extension** for render and verify. Other extensions that expose `captcha` remain idle until selected in site configuration. Do not run multiple captcha providers on the same form.
+
+If the active captcha extension is stopped or verification fails, Cannon should **fail closed** and reject the protected action.
+
+### Form placement with `<captcha>` placeholders
+
+Authors choose **where** captcha appears by placing a literal placeholder in any form HTML:
+
+```html
+<captcha context="login" provider="any"></captcha>
+<captcha context="comment" provider="cloudflare"></captcha>
+```
+
+Template helper (equivalent):
+
+```html
+{{captcha "login"}}
+{{captcha "comment" "any"}}
+```
+
+Attributes:
+
+| Attribute | Required | Meaning |
+|-----------|----------|---------|
+| `context` | yes | Protected form context: `login`, `register`, `comment`, or `form` |
+| `provider` | no | `any` (default) uses the site's active captcha extension; otherwise an extension name or provider alias such as `cloudflare`, `turnstile`, or `recaptcha` |
+| `type` | no | Legacy alias for `provider` |
+
+**Cannon expands placeholders — extensions do not scan HTML via `onAfterRender`.**
+
+After the layout renders, Cannon:
+
+1. Reads **Configuration → General → Captcha** (`captcha_enabled`, `captcha_active_extension`, `captcha_skip_authenticated`).
+2. If captcha is disabled, removes all placeholders.
+3. If the viewer is signed in and **Skip Captcha For Signed-In Users** is enabled, removes placeholders (no widget, no verify on submit).
+4. For each remaining placeholder, resolves `provider` (`any` → active extension) and calls `POST /captcha/render` on that extension.
+5. Replaces the tag with returned `html`, injects `head_html` before `</head>` once per page, and records `field_name` + `context` for submit verification.
+6. Fires `onAfterRender` on the final body so hooks may adjust output — captcha extensions should **not** rely on this for primary widget injection.
+
+Extension-generated forms (contact extension, etc.) may include the same literal `<captcha context="form" provider="any"></captcha>` string in their HTML output.
+
+On mutating form submit, Cannon verifies only when captcha applied to that request: it reads the token from the rendered `field_name` (stored in session during render) and calls `POST /captcha/verify` on the same extension. Protected flows wired today: frontend login, admin login, item comments, and extension `/data` form submissions proxied through `/ext/{route_hash}/...`.
+
+Cannon implementation notes:
+
+- Placeholder expansion runs after layout render and in `RenderFragment` (for login blocks).
+- `head_html` from render is injected before `</head>`.
+- Each expanded widget includes `<input type="hidden" name="captcha_context" value="…">`.
+- The token field name returned by render is stored in session under `captcha:field:{context}` for verify on submit.
+
+Register on the extension server with `RegisterCaptcha`. Default socket paths:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/captcha` | GET | Provider metadata and public client configuration |
+| `/captcha/render` | POST | HTML/head fragment for one protected context |
+| `/captcha/verify` | POST | Validate a submitted captcha token |
+
+**GET /captcha**
+
+```json
+{
+  "id": "cannon-extension-turnstile",
+  "title": "Cloudflare Turnstile",
+  "contexts": ["login", "register", "comment", "form"],
+  "client": {
+    "site_key": "0x4AAAAAAA..."
+  }
+}
+```
+
+- `id` — stable provider identifier (usually the extension name).
+- `contexts` — form contexts this provider supports (`login`, `register`, `comment`, `form`).
+- `client` — public values only. Never return secret keys.
+
+**POST /captcha/render**
+
+Cannon sends the normal wire request plus captcha context:
+
+```json
+{
+  "method": "GET",
+  "url": "/login",
+  "site_id": "example",
+  "csrf": "session-csrf-token",
+  "captcha_context": "login",
+  "captcha_action": "login"
+}
+```
+
+Respond with:
+
+```json
+{
+  "html": "<div class=\"cf-turnstile\" data-sitekey=\"...\"></div>",
+  "head_html": "<script src=\"https://challenges.cloudflare.com/turnstile/v0/api.js\" async defer></script>",
+  "field_name": "cf-turnstile-response"
+}
+```
+
+- `html` — widget markup inserted into the protected form.
+- `head_html` — optional scripts/styles Cannon may inject into the page head once per request.
+- `field_name` — form field Cannon reads on submit and forwards to verify.
+
+**POST /captcha/verify**
+
+```json
+{
+  "method": "POST",
+  "url": "/login",
+  "site_id": "example",
+  "captcha_context": "login",
+  "captcha_token": "token-from-client",
+  "captcha_remote_ip": "203.0.113.10"
+}
+```
+
+Respond with HTTP `200` when valid:
+
+```json
+{"valid": true}
+```
+
+Respond with HTTP `403` when invalid:
+
+```json
+{"valid": false, "error": "captcha verification failed"}
+```
+
+Verification happens server-to-server between Cannon and the extension. The extension calls the provider API using secrets from its own `/configuration` store.
+
 
 Another built in capability should be /help which provides help docs to be included in the parents /admin/help area.  /help should respond with the list of help articles the extension provides ie 
 
@@ -170,6 +316,22 @@ Each entry when requested should respond as markdown to be rendered and included
 /install should also support a system configuration via /configuration - which uses https://jsonforms.io defined forms to allow update of the values the extension needs
 
 this library will render the forms: https://github.com/TobiEiss/go-jsonforms
+
+### Configuration field types
+
+Cannon extends plain JSON Forms with reusable widgets for admin configuration (global sections and extension `/configuration`):
+
+| Kind | How to declare | Notes |
+|------|----------------|-------|
+| Boolean | `"type": "boolean"` | Rendered as an enable/disable toggle; unchecked fields save as `false` |
+| Enum select | `"enum": [...]` on `string` or `integer` | Standard dropdown |
+| Textarea | UI `"options": {"multi": true}` | Multi-line text for long strings |
+| Category | `"format": "category"` on an integer property and/or UI `"options": {"format": "category"}` | Dropdown of active site categories by ID; supports `"type": ["integer", "null"]` |
+| Dynamic enum | Patched at render (e.g. theme names, captcha extensions) | Schema ships with a placeholder `enum`; Cannon fills options from site data |
+
+Global section JSON lives in `internal/settings/definitions/*.json`. Extensions return the same `schema` / `ui_schema` / `data` shape from `GET /configuration`.
+
+See `internal/help/docs/admin/configuration-fields.md` and `EXTENSIONS.md` for examples.
 
 
 ## Databses

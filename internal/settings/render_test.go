@@ -22,7 +22,7 @@ func TestRenderFormBooleanToggle(t *testing.T) {
 		Schema:   def.Schema,
 		UISchema: def.UISchema,
 		Data:     []byte(`{"debug_template_spaces":true,"site_offline":false}`),
-	}, "/admin/configuration/global/general", "")
+	}, "/admin/configuration/global/general", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,6 +39,12 @@ func TestRenderFormBooleanToggle(t *testing.T) {
 	if strings.Contains(html, `type="boolean"`) {
 		t.Fatalf("expected boolean inputs replaced with toggles: %q", html)
 	}
+	if !strings.Contains(html, `name="#/properties/captcha_enabled"`) || !strings.Contains(html, `admin-form-toggle-input`) {
+		t.Fatal("expected captcha_enabled toggle in grouped section")
+	}
+	if !strings.Contains(html, `name="#/properties/captcha_skip_authenticated"`) {
+		t.Fatal("expected captcha_skip_authenticated toggle in grouped section")
+	}
 	if !strings.Contains(html, `name="#/properties/debug_template_spaces" value="true" checked`) {
 		t.Fatal("expected debug_template_spaces toggle checked")
 	}
@@ -54,7 +60,7 @@ func TestRenderFormInjectsCSRF(t *testing.T) {
 	}
 	html, err := settings.RenderForm(extension.ConfigurationSection{
 		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
-	}, "/admin/configuration/global/general", "abc123")
+	}, "/admin/configuration/global/general", "abc123", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +78,7 @@ func TestFormDataFromRequestBooleanDefaults(t *testing.T) {
 		"#/properties/debug_template_spaces": {"true"},
 	}
 	r := &http.Request{Form: form}
-	data := settings.FormDataFromRequest(r, def.Schema)
+	data := settings.FormDataFromRequest(r, def.Schema, def.UISchema)
 	if !settings.Bool(data, "debug_template_spaces") {
 		t.Fatalf("debug_template_spaces: %+v", data)
 	}
@@ -130,7 +136,7 @@ func TestRenderFormSelectFieldsSubmitAndDisplay(t *testing.T) {
 		Schema:   schema,
 		UISchema: uiSchema,
 		Data:     []byte(`{"frontend_theme":"fr","log_level":"debug","default_list_limit":50}`),
-	}, "/admin/configuration/global/general", "")
+	}, "/admin/configuration/global/general", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +154,34 @@ func TestRenderFormSelectFieldsSubmitAndDisplay(t *testing.T) {
 	}
 }
 
+func TestRenderFormTextareaFields(t *testing.T) {
+	def, ok, err := settings.GlobalDefinition("seo")
+	if err != nil || !ok {
+		t.Fatal(err, ok)
+	}
+	html, err := settings.RenderForm(extension.ConfigurationSection{
+		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
+		Data: []byte(`{"site_meta_description":"Line one\nLine two","site_meta_keywords":"a, b"}`),
+	}, "/admin/configuration/global/seo", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		`<textarea class="form-input admin-form-control admin-form-textarea" id="#/properties/site_meta_description"`,
+		`Line one`,
+		`<textarea class="form-input admin-form-control admin-form-textarea" id="#/properties/site_meta_keywords"`,
+		`<textarea class="form-input admin-form-control admin-form-textarea" id="#/properties/site_head_extra"`,
+		`Default Meta Tags`,
+	} {
+		if !strings.Contains(html, part) {
+			t.Fatalf("expected %q in form html:\n%s", part, html)
+		}
+	}
+	if strings.Contains(html, `id="#/properties/site_meta_description" name="#/properties/site_meta_description" type="text"`) {
+		t.Fatal("expected meta description as textarea, not text input")
+	}
+}
+
 func TestFormDataFromRequestEnumFields(t *testing.T) {
 	def, ok, err := settings.GlobalDefinition("general")
 	if err != nil || !ok {
@@ -160,7 +194,7 @@ func TestFormDataFromRequestEnumFields(t *testing.T) {
 		"#/properties/default_list_limit": {"50"},
 	}
 	r := &http.Request{Form: form}
-	data := settings.FormDataFromRequest(r, def.Schema)
+	data := settings.FormDataFromRequest(r, def.Schema, def.UISchema)
 	if got := fmt.Sprint(data["frontend_theme"]); got != "fr" {
 		t.Fatalf("frontend_theme: got %q data=%+v", got, data)
 	}

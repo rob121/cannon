@@ -11,10 +11,13 @@ import (
 	"github.com/rob121/cannon/internal/accesslog"
 	"github.com/rob121/cannon/internal/applog"
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/extensions"
+	"github.com/rob121/cannon/internal/httpreq"
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/router"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/session"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -175,6 +178,11 @@ func (c *Chain) Session(next http.Handler) http.Handler {
 			return
 		}
 		ctx := user.WithContext(r.Context(), svc)
+		if userID, ok := svc.CurrentID(); ok {
+			if loaded, err := security.PreloadForUser(ctx, userID); err == nil {
+				ctx = loaded
+			}
+		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -220,6 +228,43 @@ func (c *Chain) Locale(next http.Handler) http.Handler {
 	})
 }
 
+func (c *Chain) ContentLocale(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		uiLocale := ""
+		if mgr := LocaleFromContext(r.Context()); mgr != nil {
+			uiLocale = mgr.Locale()
+		}
+		cookie, _ := r.Cookie("cannon_locale")
+		cookieVal := ""
+		if cookie != nil {
+			cookieVal = cookie.Value
+		}
+
+		if strings.HasPrefix(path, "/admin") {
+			_, defaultLocale, _, _ := content.LocaleConfig(r.Context())
+			ctx := content.WithLocale(r.Context(), defaultLocale)
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		locale, stripped := content.ResolveContentLocale(
+			r.Context(),
+			path,
+			uiLocale,
+			cookieVal,
+			r.Header.Get("Accept-Language"),
+		)
+		if stripped != path {
+			cloned := r.Clone(r.Context())
+			cloned.URL.Path = stripped
+			r = cloned
+		}
+		ctx := content.WithLocale(r.Context(), locale)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (c *Chain) ExtensionRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		site, _ := sites.FromContext(r.Context())
@@ -242,6 +287,8 @@ func (c *Chain) ExtensionRequest(next http.Handler) http.Handler {
 			return
 		}
 		ctx := router.WithUserContext(r.Context(), userCtx)
+		ctx = extensions.WithContext(ctx, mgr)
+		ctx = httpreq.WithContext(ctx, updated)
 		next.ServeHTTP(w, updated.WithContext(ctx))
 	})
 }

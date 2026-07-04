@@ -18,29 +18,46 @@
     {{end}}
   </div>
 
-  {{if or .GroupLabel .GroupType .GroupStatus}}
+  {{if or .GroupLabel .GroupType .GroupStatus .MetaURL .AssetsURL}}
   <div class="admin-form-card admin-form-card-compact">
     <div class="admin-form-card-body">
-      <div class="row g-2">
-        {{if .GroupLabel}}
-        <div class="col-md-4"><span class="admin-cell-muted">Label</span><div class="admin-cell-primary">{{.GroupLabel}}</div></div>
-        {{end}}
-        {{if .GroupType}}
-        <div class="col-md-4"><span class="admin-cell-muted">Type</span><div>{{.GroupType}}</div></div>
-        {{end}}
-        <div class="col-md-4">
-          <span class="admin-cell-muted">Status</span>
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div class="d-flex flex-wrap gap-4 align-items-start">
+          {{if .GroupLabel}}
           <div>
-            {{if eq .GroupStatus "inactive"}}
-            <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
-            {{else}}
-            <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
-            {{end}}
+            <span class="admin-cell-muted">Label</span>
+            <div class="admin-cell-primary">{{.GroupLabel}}</div>
+          </div>
+          {{end}}
+          {{if .GroupType}}
+          <div>
+            <span class="admin-cell-muted">Type</span>
+            <div>{{if .GroupTypeLabel}}{{.GroupTypeLabel}}{{else}}{{.GroupType}}{{end}}</div>
+          </div>
+          {{end}}
+          <div>
+            <span class="admin-cell-muted">Status</span>
+            <div>
+              {{if eq .GroupStatus "inactive"}}
+              <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
+              {{else}}
+              <span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>
+              {{end}}
+            </div>
           </div>
         </div>
-        {{if .MetaURL}}
-        <div class="col-md-12">
-          <a class="btn-admin-ghost btn-admin-sm" href="{{.MetaURL}}">Edit theme metadata</a>
+        {{if or .MetaURL .AssetsURL}}
+        <div class="d-flex flex-wrap gap-2">
+          {{if .MetaURL}}
+          <a class="btn-admin-outline btn-admin-sm" href="{{.MetaURL}}" data-turbo-frame="_top">
+            <i class="bi bi-sliders"></i> Edit Theme
+          </a>
+          {{end}}
+          {{if .AssetsURL}}
+          <a class="btn-admin-outline btn-admin-sm" href="{{.AssetsURL}}" data-turbo-frame="_top">
+            <i class="bi bi-folder2-open"></i> Manage Assets
+          </a>
+          {{end}}
         </div>
         {{end}}
       </div>

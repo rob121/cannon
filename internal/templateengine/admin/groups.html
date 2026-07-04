@@ -19,7 +19,7 @@
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .GroupID)}}
         </tr>
         {{else}}
-        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-diagram-3" "Title" "No groups yet" "Message" "Use groups to restrict who can view or edit content." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-diagram-3" "Title" "No groups yet" "Message" "Create organizational groups and assign roles to grant capabilities." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

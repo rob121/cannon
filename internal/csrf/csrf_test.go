@@ -1,6 +1,7 @@
 package csrf
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,6 +35,13 @@ func TestSubmittedToken(t *testing.T) {
 	if got := SubmittedToken(r); got != "from-form" {
 		t.Fatalf("form token = %q, want from-form", got)
 	}
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(raw) != "_csrf=from-form" {
+		t.Fatalf("form body = %q", string(raw))
+	}
 
 	r = httptest.NewRequest(http.MethodPost, "/", nil)
 	r.Header.Set(HeaderName, "from-header")
@@ -46,6 +54,13 @@ func TestSubmittedToken(t *testing.T) {
 	r.Header.Set("Content-Type", "multipart/form-data; boundary=bound")
 	if got := SubmittedToken(r); got != "multipart-token" {
 		t.Fatalf("multipart token = %q, want multipart-token", got)
+	}
+	raw, err = io.ReadAll(r.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `name="_csrf"`) || !strings.Contains(string(raw), "multipart-token") {
+		t.Fatalf("multipart body was not preserved: %q", string(raw))
 	}
 }
 

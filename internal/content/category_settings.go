@@ -123,6 +123,20 @@ func CategoryItemColumnClass(columns int) string {
 	}
 }
 
+// CategoryItemListClass returns CSS classes for semantic item listing layouts.
+func CategoryItemListClass(columns int) string {
+	switch NormalizeCategoryListColumns(columns) {
+	case 1:
+		return "site-item-list"
+	case 2:
+		return "site-item-list site-item-list--cols-2"
+	case 4:
+		return "site-item-list site-item-list--cols-4"
+	default:
+		return "site-item-list site-item-list--grid"
+	}
+}
+
 // ListTotalPages returns the page count for a paginated listing.
 func ListTotalPages(total int64, pageSize int) int {
 	if pageSize <= 0 {

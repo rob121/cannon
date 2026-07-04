@@ -21,8 +21,9 @@ type TemplateItem struct {
 
 // TemplateSummary is formatted extension template data for admin display.
 type TemplateSummary struct {
-	Available bool
-	Items     []TemplateItem
+	Running       bool
+	HasCapability bool
+	Items         []TemplateItem
 }
 
 func (m *Manager) fetchTemplates(socketPath, templateBase string) ([]extension.TemplateDefinition, error) {
@@ -72,8 +73,14 @@ func (m *Manager) TemplateSource(extensionName, path string) (extension.Template
 // TemplateSummary returns overridable templates advertised by a running extension.
 func (m *Manager) TemplateSummary(extensionName, templateDir string) TemplateSummary {
 	rt, ok := m.runtime(extensionName)
-	if !ok || !m.IsRunning(extensionName) || rt.Capabilities.Templates == "" {
-		return TemplateSummary{Available: false}
+	if !ok {
+		return TemplateSummary{}
+	}
+	if !m.IsRunning(extensionName) {
+		return TemplateSummary{}
+	}
+	if strings.TrimSpace(rt.Capabilities.Templates) == "" {
+		return TemplateSummary{Running: true}
 	}
 	items := make([]TemplateItem, 0, len(rt.Templates))
 	for _, def := range rt.Templates {
@@ -86,5 +93,5 @@ func (m *Manager) TemplateSummary(extensionName, templateDir string) TemplateSum
 		items = append(items, item)
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
-	return TemplateSummary{Available: true, Items: items}
+	return TemplateSummary{Running: true, HasCapability: true, Items: items}
 }

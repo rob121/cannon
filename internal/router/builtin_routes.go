@@ -30,6 +30,7 @@ var builtinRouteDefs = []BuiltinRoute{
 	{Name: "Content Feed", Path: "/content/feed/*", Prefix: "content", Controller: "content", ControllerAction: "feed", Methods: http.MethodGet},
 	{Name: "Content Create", Path: "/content/edit/new", Prefix: "content", Controller: "content", ControllerAction: "edit-new", Methods: "GET, POST"},
 	{Name: "Content Edit", Path: "/content/edit/*", Prefix: "content", Controller: "content", ControllerAction: "edit", Methods: "GET, POST"},
+	{Name: "Content Preview", Path: "/content/preview/*", Prefix: "content", Controller: "content", ControllerAction: "preview", Methods: http.MethodGet},
 	{Name: "Login", Path: paths.AuthLogin, Prefix: "auth", Controller: "auth", ControllerAction: "login", Methods: "GET, POST"},
 	{Name: "Logout", Path: paths.AuthLogout, Prefix: "auth", Controller: "auth", ControllerAction: "logout", Methods: "GET, POST"},
 	{Name: "OAuth Sign In", Path: paths.AuthOAuth, Prefix: "auth", Controller: "auth", ControllerAction: "oauth", Methods: http.MethodGet},
@@ -37,6 +38,12 @@ var builtinRouteDefs = []BuiltinRoute{
 	{Name: "Verification Pending", Path: paths.AccountVerifyResend, Prefix: "account", Controller: "auth", ControllerAction: "verify-resend", Methods: http.MethodGet},
 	{Name: "Reset Password", Path: paths.AccountResetRequest, Prefix: "account", Controller: "auth", ControllerAction: "reset-request", Methods: "GET, POST"},
 	{Name: "Reset Password Submit", Path: paths.AccountResetSubmit, Prefix: "account", Controller: "auth", ControllerAction: "reset-submit", Methods: "GET, POST"},
+	{Name: "MFA Challenge", Path: paths.AccountMFAChallenge, Prefix: "account", Controller: "auth", ControllerAction: "mfa-challenge", Methods: "GET, POST"},
+	{Name: "Account Security", Path: paths.AccountSecurity, Prefix: "account", Controller: "auth", ControllerAction: "security", Methods: http.MethodGet},
+	{Name: "Account Profile", Path: paths.AccountProfile, Prefix: "account", Controller: "auth", ControllerAction: "profile", Methods: "GET, POST"},
+	{Name: "TOTP Setup", Path: paths.AccountSecurityTOTP, Prefix: "account", Controller: "auth", ControllerAction: "security-totp", Methods: http.MethodPost},
+	{Name: "Passkey Setup", Path: paths.AccountSecurityPasskey, Prefix: "account", Controller: "auth", ControllerAction: "security-passkey", Methods: "GET, POST"},
+	{Name: "Passkey Login", Path: paths.AuthPasskeyLogin, Prefix: "auth", Controller: "auth", ControllerAction: "passkey-login", Methods: http.MethodPost},
 }
 
 // BuiltinControllerRoutes returns built-in content, auth, and account controller routes.

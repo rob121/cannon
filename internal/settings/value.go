@@ -71,6 +71,44 @@ func GlobalIntDefault(ctx context.Context, section, key string, fallback int) (i
 	return fallback, nil
 }
 
+// GlobalStringSlice reads a string array from global settings.
+func GlobalStringSlice(ctx context.Context, section, key string) ([]string, error) {
+	data, err := NewStore().Load(ctx, ScopeGlobal, section)
+	if err != nil {
+		return nil, err
+	}
+	v, ok := data[key]
+	if !ok || v == nil {
+		return nil, nil
+	}
+	switch raw := v.(type) {
+	case []string:
+		return raw, nil
+	case []any:
+		out := make([]string, 0, len(raw))
+		for _, item := range raw {
+			if s, ok := item.(string); ok {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+		return out, nil
+	default:
+		text := strings.TrimSpace(fmt.Sprint(v))
+		if text == "" {
+			return nil, nil
+		}
+		parts := strings.Split(text, ",")
+		out := make([]string, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part != "" {
+				out = append(out, part)
+			}
+		}
+		return out, nil
+	}
+}
+
 // AllowLogin reports whether public sign-in is enabled.
 func AllowLogin(ctx context.Context) (bool, error) {
 	return GlobalBoolDefault(ctx, SectionGeneral, "allow_login", true)
@@ -79,6 +117,31 @@ func AllowLogin(ctx context.Context) (bool, error) {
 // AllowSignup reports whether public account registration is enabled.
 func AllowSignup(ctx context.Context) (bool, error) {
 	return GlobalBoolDefault(ctx, SectionGeneral, "allow_signup", true)
+}
+
+// AllowMFATOTP reports whether users may enroll TOTP authenticators.
+func AllowMFATOTP(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionGeneral, "allow_mfa_totp", false)
+}
+
+// AllowPasskeys reports whether users may register and use passkeys.
+func AllowPasskeys(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionGeneral, "allow_passkeys", false)
+}
+
+// CaptchaEnabled reports whether captcha placeholders should be expanded.
+func CaptchaEnabled(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionGeneral, "captcha_enabled", false)
+}
+
+// CaptchaActiveExtension returns the configured captcha extension name.
+func CaptchaActiveExtension(ctx context.Context) (string, error) {
+	return GlobalString(ctx, SectionGeneral, "captcha_active_extension")
+}
+
+// CaptchaSkipAuthenticated reports whether signed-in users skip captcha render and verify.
+func CaptchaSkipAuthenticated(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionGeneral, "captcha_skip_authenticated", true)
 }
 
 // SiteOffline reports whether the public site should show a maintenance page.
@@ -127,7 +190,57 @@ func LogLevel(ctx context.Context) (string, error) {
 
 // SiteMetaDescription returns the global default meta description.
 func SiteMetaDescription(ctx context.Context) (string, error) {
-	return GlobalString(ctx, SectionGeneral, "site_meta_description")
+	return globalStringWithLegacy(ctx, "site_meta_description")
+}
+
+// SiteMetaKeywords returns the global default meta keywords.
+func SiteMetaKeywords(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_meta_keywords")
+}
+
+// SiteOGTitle returns the global default Open Graph title.
+func SiteOGTitle(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_og_title")
+}
+
+// SiteOGImage returns the global default Open Graph image URL.
+func SiteOGImage(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_og_image")
+}
+
+// SiteTwitterCard returns the configured Twitter card type.
+func SiteTwitterCard(ctx context.Context) (string, error) {
+	card, err := globalStringWithLegacy(ctx, "site_twitter_card")
+	if err != nil || strings.TrimSpace(card) == "" {
+		return "summary_large_image", err
+	}
+	return strings.TrimSpace(card), nil
+}
+
+// SiteTwitterSite returns the site Twitter @handle.
+func SiteTwitterSite(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_twitter_site")
+}
+
+// SiteTwitterCreator returns the default Twitter creator @handle.
+func SiteTwitterCreator(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_twitter_creator")
+}
+
+// SiteHeadExtra returns additional head markup configured by an administrator.
+func SiteHeadExtra(ctx context.Context) (string, error) {
+	return globalStringWithLegacy(ctx, "site_head_extra")
+}
+
+func globalStringWithLegacy(ctx context.Context, key string) (string, error) {
+	value, err := GlobalString(ctx, SectionSEO, key)
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(value) != "" {
+		return value, nil
+	}
+	return GlobalString(ctx, SectionGeneral, key)
 }
 
 // FrontendTheme returns the active public site theme id.

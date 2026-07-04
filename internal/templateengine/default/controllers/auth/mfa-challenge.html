@@ -1,0 +1,31 @@
+<article class="mb-4">
+  {{template "pageHeader" (dict "Title" (lang "auth.mfa_title") "Subtitle" (lang "auth.mfa_subtitle"))}}
+  {{if .Error}}<div class="alert alert-danger mb-3" role="alert">{{.Error}}</div>{{end}}
+  <div class="card shadow-sm">
+    <div class="card-body">
+      {{if .TOTPAllowed}}
+      <form method="post" action="{{.Action}}" class="mb-4">
+        {{.CSRF}}
+        <div class="mb-3">
+          <label class="form-label" for="mfa-code">{{lang "auth.mfa_code"}}</label>
+          <input class="form-control" id="mfa-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary">{{lang "auth.verify"}}</button>
+      </form>
+      {{end}}
+      {{if and .PasskeysAllowed .PasskeyBeginURL}}
+      {{if .TOTPAllowed}}<div class="text-center text-muted small my-3">{{lang "auth.or"}}</div>{{end}}
+      <button type="button" class="btn btn-outline-primary" id="mfa-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.use_passkey"}}</button>
+      <div class="text-danger small mt-2 d-none" id="mfa-passkey-error"></div>
+      {{end}}
+    </div>
+  </div>
+</article>
+{{if .PasskeysAllowed}}
+<script src="/theme/site-mfa.js?v=1"></script>
+<script>
+document.getElementById('mfa-passkey-btn')?.addEventListener('click', function () {
+  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'mfa-passkey-error');
+});
+</script>
+{{end}}

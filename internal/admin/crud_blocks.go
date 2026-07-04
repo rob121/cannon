@@ -134,7 +134,7 @@ func (h *Handler) blockForm(w http.ResponseWriter, r *http.Request, id uint) {
 
 	meta, _ := blocks.ParseMetadata(row.Metadata)
 	extOptions := extensionBlockOptions(extMgr, db)
-	allGroups := loadActiveGroups(db)
+	allGroups := loadFrontendGroups(db)
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
@@ -230,7 +230,7 @@ func (h *Handler) renderBlockForm(w http.ResponseWriter, r *http.Request, row mo
 }
 
 func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta blocks.Metadata, extOptions []extensionBlockOption, allGroups []models.Group, isNew bool, spaceFilter, errMsg string) map[string]any {
-	categories, _ := content.CategoryTree(ctx)
+	categories, _ := content.CategoryTreeAll(ctx)
 	var tags []models.Tag
 	db.Order("name asc").Find(&tags)
 	var allMenus []models.Menu
@@ -334,6 +334,10 @@ func blockTypeLabel(row models.Block) string {
 			return "Menu Horizontal (" + meta.MenuName + ")"
 		}
 		return "Menu Horizontal"
+	case models.BlockTypeSearchHorizontal:
+		return "Search Horizontal"
+	case models.BlockTypeSearchVertical:
+		return "Search Vertical"
 	default:
 		return string(row.Type)
 	}

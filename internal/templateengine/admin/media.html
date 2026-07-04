@@ -1,4 +1,5 @@
 {{template "page_header" .}}
+{{if eq .Uploaded "1"}}{{template "success_alert" (dict "Success" "File uploaded successfully.")}}{{end}}
 <div class="admin-media-manager">
   <aside class="admin-media-sidebar">
     <div class="admin-media-sidebar-header">
@@ -38,6 +39,14 @@
           {{end}}
         </nav>
         <div class="admin-media-toolbar-actions">
+          <form method="post" action="{{.BasePath}}/upload" enctype="multipart/form-data" class="admin-media-quick-upload" data-turbo="false" id="media-browse-upload-form">
+            {{csrfField}}
+            <input type="hidden" name="folder" value="{{if .FolderFilter}}{{.FolderFilter}}{{else}}content{{end}}">
+            <label class="admin-media-quick-upload-label">
+              <input type="file" name="file" class="admin-media-quick-upload-input" aria-label="Quick upload file">
+              <span class="btn-admin-primary btn-admin-sm"><i class="bi bi-cloud-arrow-up"></i> Quick Upload</span>
+            </label>
+          </form>
           <button type="button" class="btn-admin-outline btn-admin-sm" data-media-new-folder-toggle>
             <i class="bi bi-folder-plus"></i> New Folder
           </button>

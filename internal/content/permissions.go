@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
-	"github.com/rob121/cannon/internal/roles"
+	"github.com/rob121/cannon/internal/security"
 )
 
 var ErrPermissionDenied = errors.New("permission denied")
@@ -18,81 +17,55 @@ func CanCreateItem(ctx context.Context, userID uint) (bool, error) {
 
 // CanCreateItemInCategory reports whether the user may create items in the given category.
 func CanCreateItemInCategory(ctx context.Context, userID uint, categoryID *uint) (bool, error) {
-	allowed, err := EffectiveCreateGroups(ctx, categoryID)
-	if err != nil {
-		return false, err
-	}
-	if len(allowed) > 0 {
-		return groups.UserInAnyGroup(ctx, userID, allowed)
-	}
-	return hasAnyRole(ctx, userID, roles.AdminRole, roles.EditorRole, roles.AuthorRole, roles.WriterRole)
+	return security.Can(ctx, userID, security.PermContentFrontendCreate)
 }
 
 // CanEditItem reports whether the user may edit the given item.
 func CanEditItem(ctx context.Context, userID uint, item *models.Item) (bool, error) {
-	var categoryID *uint
-	if item != nil {
-		categoryID = item.CategoryID
-	}
-	allowed, err := EffectiveEditGroups(ctx, categoryID)
-	if err != nil {
+	if ok, err := security.Can(ctx, userID, security.PermContentFrontendEdit); err != nil {
 		return false, err
-	}
-	if len(allowed) > 0 {
-		return groups.UserInAnyGroup(ctx, userID, allowed)
-	}
-	ok, err := hasAnyRole(ctx, userID, roles.AdminRole, roles.EditorRole, roles.ManagerRole)
-	if err != nil {
-		return false, err
-	}
-	if ok {
+	} else if ok {
 		return true, nil
 	}
-	author, err := roles.HasRole(ctx, userID, roles.AuthorRole)
-	if err != nil {
+	if ok, err := security.Can(ctx, userID, security.PermContentFrontendEditOwn); err != nil {
 		return false, err
+	} else if ok && item != nil && item.AuthorID != nil && *item.AuthorID == userID {
+		return true, nil
 	}
-	writer, err := roles.HasRole(ctx, userID, roles.WriterRole)
-	if err != nil {
-		return false, err
-	}
-	if (!author && !writer) || item == nil || item.AuthorID == nil {
-		return false, nil
-	}
-	return *item.AuthorID == userID, nil
+	return false, nil
 }
 
 // CanPublishItem reports whether the user may publish or unpublish items.
 func CanPublishItem(ctx context.Context, userID uint, categoryID *uint) (bool, error) {
-	allowed, err := EffectivePublishGroups(ctx, categoryID)
-	if err != nil {
-		return false, err
-	}
-	if len(allowed) > 0 {
-		return groups.UserInAnyGroup(ctx, userID, allowed)
-	}
-	return hasAnyRole(ctx, userID, roles.AdminRole, roles.EditorRole)
+	return security.Can(ctx, userID, security.PermContentFrontendPublish)
 }
 
 // CanDeleteItem reports whether the user may permanently delete items.
 func CanDeleteItem(ctx context.Context, userID uint) (bool, error) {
-	return hasAnyRole(ctx, userID, roles.AdminRole, roles.EditorRole)
+	return security.Can(ctx, userID, security.PermContentFrontendDelete)
+}
+
+// CanViewFrontendContent reports whether the user may access protected frontend content features.
+func CanViewFrontendContent(ctx context.Context, userID uint) (bool, error) {
+	return security.Can(ctx, userID, security.PermContentFrontendView)
+}
+
+// CanViewComments reports whether the user may view item comments on the frontend.
+func CanViewComments(ctx context.Context, userID uint) (bool, error) {
+	return security.Can(ctx, userID, security.PermContentFrontendCommentView)
+}
+
+// CanCreateComment reports whether the user may post comments on the frontend.
+func CanCreateComment(ctx context.Context, userID uint) (bool, error) {
+	return security.Can(ctx, userID, security.PermContentFrontendCommentCreate)
+}
+
+// CanModerateComments reports whether the user may moderate comments.
+func CanModerateComments(ctx context.Context, userID uint) (bool, error) {
+	return security.Can(ctx, userID, security.PermContentFrontendCommentModerate)
 }
 
 // CanManageComments reports whether the user may moderate comments in admin.
 func CanManageComments(ctx context.Context, userID uint) (bool, error) {
-	return hasAnyRole(ctx, userID, roles.AdminRole, roles.EditorRole)
-}
-
-func hasAnyRole(ctx context.Context, userID uint, names ...string) (bool, error) {
-	for _, name := range names {
-		ok, err := roles.HasRole(ctx, userID, name)
-		if err != nil {
-			return false, err
-		}
-		if ok {
-			return true, nil
-		}
-	}
-	return false, nil
+	return CanModerateComments(ctx, userID)
 }

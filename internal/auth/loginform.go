@@ -45,6 +45,9 @@ type LoginFormData struct {
 	Error           string
 	CSRF            template.HTML
 	Providers       []OAuthProviderView
+	PasskeysEnabled bool
+	PasskeyBeginURL  string
+	PasskeyFinishURL string
 }
 
 // BuildLoginFormData assembles login form view data for a request.
@@ -122,6 +125,16 @@ func BuildLoginFormData(ctx context.Context, r *http.Request, opts LoginFormOpti
 	if !data.Authenticated && !data.Disabled && !data.LocalEnabled && len(data.Providers) == 0 {
 		data.Disabled = true
 		data.DisabledMessage = "No sign-in methods are configured. Enable authenticators in the admin."
+	}
+
+	passkeys, err := settings.AllowPasskeys(ctx)
+	if err != nil {
+		return data, err
+	}
+	data.PasskeysEnabled = passkeys && !data.Authenticated && !data.Disabled
+	if data.PasskeysEnabled {
+		data.PasskeyBeginURL = routepath.ControllerWithSuffix(ctx, "auth", "passkey-login", "begin")
+		data.PasskeyFinishURL = routepath.ControllerWithSuffix(ctx, "auth", "passkey-login", "finish")
 	}
 	return data, nil
 }

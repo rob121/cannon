@@ -1,4 +1,5 @@
 {{template "page_header" .}}
+{{template "form_toolbar" (dict "FormID" "media-upload-form" "SubmitID" "media-upload-submit" "SubmitLabel" "Upload" "SubmitIcon" "bi-cloud-arrow-up" "SubmitDisabled" true "CancelURL" .CancelURL "BasePath" .BasePath)}}
 <div class="admin-media-upload" data-turbo="false">
   <div class="admin-form-card">
     <div class="admin-form-card-header">
@@ -73,12 +74,6 @@
           </div>
         </section>
 
-        <div class="admin-form-actions">
-          <button type="submit" class="btn-admin-primary" id="media-upload-submit" disabled>
-            <i class="bi bi-cloud-arrow-up"></i> Upload
-          </button>
-          <a class="btn-admin-outline" href="{{if .CancelURL}}{{.CancelURL}}{{else}}{{.BasePath}}{{end}}">Cancel</a>
-        </div>
       </form>
     </div>
   </div>

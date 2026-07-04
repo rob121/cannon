@@ -41,6 +41,14 @@ func (h *Handler) templates(w http.ResponseWriter, r *http.Request, path string)
 		h.templateRevert(w, r, site)
 	case len(parts) == 2 && parts[1] == "meta":
 		h.templateMeta(w, r, site, parts[0])
+	case len(parts) == 2 && parts[1] == "assets":
+		h.templateAssets(w, r, site, parts[0])
+	case len(parts) == 3 && parts[1] == "assets" && parts[2] == "edit":
+		h.templateAssetEdit(w, r, site, parts[0])
+	case len(parts) == 3 && parts[1] == "assets" && parts[2] == "new":
+		h.templateAssetNew(w, r, site, parts[0])
+	case len(parts) == 3 && parts[1] == "assets" && parts[2] == "delete":
+		h.templateAssetDelete(w, r, site, parts[0])
 	case len(parts) == 1:
 		h.templateGroup(w, r, site, parts[0])
 	default:
@@ -123,6 +131,7 @@ func (h *Handler) templateGroup(w http.ResponseWriter, r *http.Request, site *co
 			"PageActionURL":   templatesBase + "/new?group=" + url.QueryEscape(group),
 			"PageActionLabel": "New File",
 			"TemplatesBase":   templatesBase,
+			"AssetsURL":       templatesBase + "/" + url.PathEscape(group) + "/assets",
 			"MetaURL":         templatesBase + "/" + url.PathEscape(group) + "/meta",
 		})
 	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
@@ -145,6 +154,7 @@ func (h *Handler) templateGroup(w http.ResponseWriter, r *http.Request, site *co
 		data["GroupLabel"] = group
 	}
 	data["GroupType"] = meta.Type
+	data["GroupTypeLabel"] = themeTypeLabel(meta.Type)
 	data["GroupStatus"] = meta.Status
 	h.render(w, r, group+" Theme", "admin/templates_group.html", data)
 }

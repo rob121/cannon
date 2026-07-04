@@ -8,6 +8,7 @@ import (
 
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers"
+	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -26,6 +27,7 @@ const (
 	ActionFeed     = "feed"
 	ActionEditNew  = "edit-new"
 	ActionEdit     = "edit"
+	ActionPreview  = "preview"
 )
 
 type Controller struct{}
@@ -68,6 +70,7 @@ func Definition() controllers.Definition {
 			{ID: ActionEdit, Title: "Edit Item", Methods: []string{http.MethodGet, http.MethodPost}, DefaultPath: "/content/edit/*", RequireAuth: true, ConfigFields: []controllers.ConfigField{
 				{Name: "item_slug", Label: "Item", Type: "item", Required: true, Help: "Required when the route path has no wildcard slug segment."},
 			}},
+			{ID: ActionPreview, Title: "Preview Item", Methods: []string{http.MethodGet}, DefaultPath: "/content/preview/*"},
 		},
 	}
 }
@@ -94,6 +97,8 @@ func (c *Controller) Handle(ctx *controllers.Context, actionID string) controlle
 		return c.handleEditNew(ctx)
 	case ActionEdit:
 		return c.handleEdit(ctx)
+	case ActionPreview:
+		return c.handlePreview(ctx)
 	default:
 		return controllers.Error(http.StatusNotFound, "unknown content action")
 	}
@@ -172,8 +177,8 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		"TotalPages":        cms.ListTotalPages(total, listSettings.PageSize),
 		"Pagination":        listSettings.Pagination,
 		"ListColumns":       listSettings.Columns,
-		"ItemColClass":      cms.CategoryItemColumnClass(listSettings.Columns),
-		"PaginationBaseURL": cms.CategoryURL(cat.Slug),
+		"ItemListClass":     cms.CategoryItemListClass(listSettings.Columns),
+		"PaginationBaseURL": cms.CategoryURLForContext(ctx.GoContext(), cat.Slug),
 		"Categories":        categories,
 		"ShowCategoryTitle":       showTitle,
 		"ShowCategoryDescription": showDescription,
@@ -203,9 +208,21 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 	settings, _ := cms.LoadSettings(ctx.GoContext())
 	var comments []models.Comment
 	var commentCount int64
-	if settings.ShowComments {
-		comments, _ = cms.ApprovedComments(ctx.GoContext(), item.ItemID)
-		commentCount, _ = cms.CommentCount(ctx.GoContext(), item.ItemID)
+	showComments := settings.ShowComments && settings.AllowComments
+	canPostComment := settings.AllowComments
+	if showComments {
+		if ctx.Authenticated() {
+			if user, err := ctx.CurrentUser(); err == nil {
+				canView, _ := cms.CanViewComments(ctx.GoContext(), user.UserID)
+				showComments = canView
+				canPost, _ := cms.CanCreateComment(ctx.GoContext(), user.UserID)
+				canPostComment = canPost
+			}
+		}
+		if showComments {
+			comments, _ = cms.ApprovedComments(ctx.GoContext(), item.ItemID)
+			commentCount, _ = cms.CommentCount(ctx.GoContext(), item.ItemID)
+		}
 	}
 	related, _ := cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
 	bodyHTML, _ := cms.RichTextToHTML(item.Body)
@@ -241,6 +258,8 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 		"Related":         related,
 		"CommentCount":    commentCount,
 		"CommentSettings": settings,
+		"ShowComments":    showComments,
+		"CanPostComment":  canPostComment,
 		"ContentSettings": displaySettings,
 		"AuthorProfile":   authorProfile,
 		"CanEdit":         canEdit,
@@ -249,6 +268,16 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 		"Gallery":         gallery,
 		"Embeds":          embeds,
 		"Attachments":     attachments,
+	}
+	if errKey := strings.TrimSpace(ctx.Request.URL.Query().Get("comment_error")); errKey != "" {
+		switch errKey {
+		case "spam":
+			data["CommentError"] = "Your comment was rejected as spam."
+		case "captcha":
+			data["CommentError"] = captcha.UserFacingError(captcha.ErrVerificationFailed)
+		default:
+			data["CommentError"] = "Could not post your comment. Please try again."
+		}
 	}
 	applyItemSEO(data, item, ctx)
 	return controllers.HTML(item.Title, data)
@@ -266,17 +295,29 @@ func (c *Controller) handleItemComment(ctx *controllers.Context, slug string) co
 	if !settings.ShowComments || !settings.AllowComments {
 		return controllers.Error(http.StatusForbidden, "comments are disabled")
 	}
+	var userID *uint
+	if ctx.Authenticated() {
+		user, err := ctx.CurrentUser()
+		if err != nil {
+			return controllers.Error(http.StatusUnauthorized, "login required")
+		}
+		ok, err := cms.CanCreateComment(ctx.GoContext(), user.UserID)
+		if err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		}
+		if !ok {
+			return controllers.Error(http.StatusForbidden, "permission denied")
+		}
+		userID = &user.UserID
+	}
 	if err := ctx.Request.ParseForm(); err != nil {
 		return controllers.Error(http.StatusBadRequest, err.Error())
 	}
-	if err := cms.ValidateCommentSpam(ctx.Request, clientIP(ctx.Request)); err != nil {
-		return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(slug)+"?comment_error=spam#comments")
+	if err := captcha.VerifySubmit(ctx.GoContext(), ctx.Request, captcha.CaptchaContextComment); err != nil {
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), slug)+"?comment_error=captcha#comments")
 	}
-	var userID *uint
-	if ctx.Authenticated() {
-		if user, err := ctx.CurrentUser(); err == nil {
-			userID = &user.UserID
-		}
+	if err := cms.ValidateCommentSpam(ctx.Request, clientIP(ctx.Request)); err != nil {
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), slug)+"?comment_error=spam#comments")
 	}
 	in := cms.CommentInput{
 		ItemID:      item.ItemID,
@@ -288,9 +329,9 @@ func (c *Controller) handleItemComment(ctx *controllers.Context, slug string) co
 	}
 	_, err = cms.CreateComment(ctx.GoContext(), in, ctx.Authenticated())
 	if err != nil {
-		return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(slug)+"?comment_error=1#comments")
+		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), slug)+"?comment_error=1#comments")
 	}
-	return controllers.Redirect(http.StatusSeeOther, cms.ItemURL(slug)+"?comment_posted=1#comments")
+	return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), slug)+"?comment_posted=1#comments")
 }
 
 func (c *Controller) handleTag(ctx *controllers.Context) controllers.Result {
@@ -374,13 +415,14 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 	authorID := queryUint(ctx.Request, "author")
 	sort := ctx.Request.URL.Query().Get("sort")
 	opts := cms.ListOptions{
-		Query:      query,
-		CategoryID: categoryID,
-		TagID:      tagID,
-		AuthorID:   authorID,
-		Sort:       sort,
-		Page:       page,
-		Limit:      20,
+		Query:        query,
+		CategoryID:   categoryID,
+		TagID:        tagID,
+		AuthorID:     authorID,
+		Sort:         sort,
+		Page:         page,
+		Limit:        20,
+		FieldFilters: cms.ParseFieldFilters(ctx.Request.URL.Query()),
 	}
 	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, opts)
 	if err != nil {
@@ -389,22 +431,25 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 	categories, _ := cms.CategoryTree(ctx.GoContext())
 	tags, _ := cms.ListTags(ctx.GoContext())
 	authors, _ := cms.ListAuthorsWithItems(ctx.GoContext(), ctx.ViewerGroups)
+	searchFields, _ := cms.SearchableFields(ctx.GoContext())
 	title := "Search"
 	if query != "" {
 		title = "Search: " + query
 	}
 	return controllers.HTML(title, map[string]any{
-		"Query":      query,
-		"Items":      items,
-		"Total":      total,
-		"Page":       page,
-		"Categories": categories,
-		"Tags":       tags,
-		"Authors":    authors,
-		"CategoryID": categoryID,
-		"TagID":      tagID,
-		"AuthorID":   authorID,
-		"Sort":       sort,
+		"Query":          query,
+		"Items":          items,
+		"Total":          total,
+		"Page":           page,
+		"Categories":     categories,
+		"Tags":           tags,
+		"Authors":        authors,
+		"CategoryID":     categoryID,
+		"TagID":          tagID,
+		"AuthorID":       authorID,
+		"Sort":           sort,
+		"SearchFields":   searchFields,
+		"FieldFilters":   opts.FieldFilters,
 	})
 }
 
@@ -433,7 +478,7 @@ func (c *Controller) handleFeed(ctx *controllers.Context) controllers.Result {
 		}
 		opts.CategoryID = cat.CategoryID
 		feedTitle = cat.Name + " — " + siteName
-		feedLink = siteURL + cms.CategoryURL(slug)
+		feedLink = siteURL + cms.CategoryURLForContext(ctx.GoContext(), slug)
 		feedDesc = "Items in " + cat.Name
 	case len(parts) >= 2 && parts[0] == "tag":
 		slug := strings.Join(parts[1:], "/")
@@ -482,7 +527,7 @@ func applyItemSEO(data map[string]any, item *models.Item, ctx *controllers.Conte
 	}
 	canonical := strings.TrimSpace(item.CanonicalURL)
 	if canonical == "" {
-		canonical = siteBaseURL(ctx) + cms.ItemURL(item.Slug)
+		canonical = siteBaseURL(ctx) + cms.ItemURLForContext(ctx.GoContext(), item.Slug)
 	}
 	ogImage := strings.TrimSpace(item.Image)
 	data["MetaTitle"] = metaTitle

@@ -40,8 +40,13 @@ Capabilities map a role to an HTTP path on the extension socket:
 | `admin` | When the extension admin UI is opened under `/admin/extension-apps/{name}` |
 | `help` | Help articles aggregated into `/admin/help` |
 | `templates` | Lists embedded extension templates that can be copied into site overrides |
+| `captcha` | Renders and verifies captcha widgets for protected forms |
 
-Register handlers with `HandleRequest`, `HandlePage`, `RegisterPage`, `HandleData`, `RegisterEndpoint`, `RegisterBlock`, `HandleAdmin`, `OnHook`, and `OnConfiguration`. Paths default to `/request`, `/page`, `/data`, `/endpoint`, `/block`, `/hooks`, and `/admin` but can be customized.
+Register handlers with `HandleRequest`, `HandlePage`, `RegisterPage`, `HandleData`, `RegisterEndpoint`, `RegisterBlock`, `HandleAdmin`, `OnHook`, `OnConfiguration`, and `RegisterCaptcha`. Paths default to `/request`, `/page`, `/data`, `/endpoint`, `/block`, `/hooks`, `/admin`, and `/captcha` but can be customized.
+
+### Permissions
+
+Extensions can register permissions in the `/capabilities` response under `permissions`. Cannon syncs them into the site permission catalog (prefixed with the extension name unless the id already includes it). Use `Server.RegisterPermissions` in Go extensions. Signed-in wire requests include a `permissions` array on the `user` scope and, when present, a `denied_permissions` array for explicit denies. Use `extension.UserCan(req, "myext.action")` to check access in extension handlers (denies override allows).
 
 ### Template overrides
 
@@ -341,6 +346,164 @@ s.RegisterBlock(extension.BlockDefinition{
 
 Cannon loads block definitions when an extension starts, matches the template space to a block id, then POSTs to `/block/{id}`.
 
+### Captcha
+
+Use the `captcha` capability when your extension integrates a third-party captcha provider (Turnstile, hCaptcha, reCAPTCHA, etc.). Cannon renders and verifies captcha through a **single active captcha extension per site**. You may install multiple captcha extensions, but only the one selected in site configuration is called; the others stay idle until selected.
+
+Do not implement captcha through `request`, `hooks`, or ad hoc `data` routes — the dedicated capability keeps widget rendering and token verification consistent across login, registration, comments, and extension forms.
+
+#### Placeholder placement
+
+Put captcha exactly where you want it in a form:
+
+```html
+<captcha context="login" provider="any"></captcha>
+```
+
+In Cannon templates:
+
+```html
+{{captcha "login"}}
+{{captcha "comment" "cloudflare"}}
+```
+
+- `context` — `login`, `register`, `comment`, or `form`
+- `provider` — `any` (use the site's active captcha extension) or a specific provider/extension id; `type` is an alias for `provider`
+
+Cannon scans the rendered HTML and replaces each placeholder by calling the active captcha extension's `/captcha/render`. Extension-generated forms can use the same literal placeholder, for example `<captcha context="form" provider="any"></captcha>`, when they submit through `/ext/{route_hash}/...` data routes. **Captcha extensions should not implement primary placement by subscribing to `onAfterRender` and parsing HTML themselves** — Cannon owns expansion so verification stays paired with render.
+
+Global settings under **Configuration → General → Captcha**:
+
+| Setting | Purpose |
+|---------|---------|
+| Enable Captcha | Master switch for placeholder expansion |
+| Active Captcha Extension | Extension used when `provider="any"` |
+| Skip Captcha For Signed-In Users | Remove placeholders and skip verify for authenticated users (default on) |
+
+After expansion, `onAfterRender` still runs on the final HTML for optional customization by any extension.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/captcha` | GET | Provider metadata and public client configuration |
+| `/captcha/render` | POST | Widget HTML/head fragment for one protected context |
+| `/captcha/verify` | POST | Validate a submitted captcha token |
+
+**GET /captcha**
+
+```json
+{
+  "id": "cannon-extension-turnstile",
+  "title": "Cloudflare Turnstile",
+  "contexts": ["login", "register", "comment", "form"],
+  "client": {
+    "site_key": "0x4AAAAAAA..."
+  }
+}
+```
+
+Only public client values belong in `client`. Store secret keys in extension configuration (`OnConfiguration` + `/configuration`).
+
+**POST /captcha/render**
+
+```json
+{
+  "method": "GET",
+  "url": "/login",
+  "site_id": "example",
+  "csrf": "session-csrf-token",
+  "captcha_context": "login",
+  "captcha_action": "login"
+}
+```
+
+Response:
+
+```json
+{
+  "html": "<div class=\"cf-turnstile\" data-sitekey=\"...\"></div>",
+  "head_html": "<script src=\"https://challenges.cloudflare.com/turnstile/v0/api.js\" async defer></script>",
+  "field_name": "cf-turnstile-response"
+}
+```
+
+**POST /captcha/verify**
+
+```json
+{
+  "method": "POST",
+  "url": "/login",
+  "site_id": "example",
+  "captcha_context": "login",
+  "captcha_token": "token-from-client",
+  "captcha_remote_ip": "203.0.113.10"
+}
+```
+
+HTTP `200` when valid:
+
+```json
+{"valid": true}
+```
+
+HTTP `403` when invalid:
+
+```json
+{"valid": false, "error": "captcha verification failed"}
+```
+
+Supported contexts:
+
+| Context | Typical use |
+|---------|-------------|
+| `login` | Frontend and admin login forms |
+| `register` | Self-registration |
+| `comment` | Item comment forms |
+| `form` | Generic protected forms |
+
+Register on the extension server:
+
+```go
+s.RegisterCaptcha(extension.CaptchaRegistration{
+    ProviderInfo: func(req extension.WireRequest) (extension.CaptchaProviderInfo, error) {
+        return extension.CaptchaProviderInfo{
+            ID:    "cannon-extension-turnstile",
+            Title: "Cloudflare Turnstile",
+            Contexts: []string{
+                extension.CaptchaContextLogin,
+                extension.CaptchaContextComment,
+            },
+            Client: map[string]string{"site_key": siteKey},
+        }, nil
+    },
+    Render: func(req extension.WireRequest) (extension.CaptchaRenderResult, error) {
+        _ = extension.CaptchaContext(req)
+        return extension.CaptchaRenderResult{
+            HTML:      `<div class="cf-turnstile" data-sitekey="..."></div>`,
+            HeadHTML:  `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
+            FieldName: "cf-turnstile-response",
+        }, nil
+    },
+    Verify: func(req extension.WireRequest) (extension.CaptchaVerifyResult, error) {
+        token := extension.CaptchaToken(req)
+        ip := extension.CaptchaRemoteIP(req)
+        _ = token
+        _ = ip
+        return extension.CaptchaVerifyResult{Valid: true}, nil
+    },
+})
+```
+
+If the active captcha extension is unavailable or verification fails, Cannon rejects the protected action (fail closed).
+
+**Cannon runtime (implemented)**
+
+1. Templates or HTML include `{{captcha "login"}}` or `<captcha context="login" provider="any"></captcha>`.
+2. After render, Cannon expands placeholders via the active extension's `/captcha/render`.
+3. `head_html` is injected before `</head>`; widget HTML replaces the tag.
+4. Session stores `captcha:field:{context}` → token field name from the extension.
+5. On protected POSTs, including extension `/data` form submissions proxied through `/ext/{route_hash}/...`, Cannon calls `/captcha/verify` when captcha is enabled and **Skip Captcha For Signed-In Users** does not apply.
+6. Wired forms: frontend login, admin login, item comments, and extension `/data` form submissions.
+
 ## Wire protocol
 
 Capability handlers receive a POST with a JSON body:
@@ -368,11 +531,17 @@ Capability handlers receive a POST with a JSON body:
   "data_path": "contact/submit",
   "block_space": "footer",
   "block_item": "contact-form",
-  "block_data": {"form_id": 42}
+  "block_data": {"form_id": 42},
+  "captcha_context": "login",
+  "captcha_action": "login",
+  "captcha_token": "token-from-client",
+  "captcha_remote_ip": "203.0.113.10"
 }
 ```
 
 Page handlers receive `page_item` (definition id) and optional `page_data` route metadata from the admin Routes UI (for example `form_id`).
+
+Captcha handlers receive `captcha_context`, optional `captcha_action`, and on verify `captcha_token` plus optional `captcha_remote_ip`. Helpers: `CaptchaContext`, `CaptchaAction`, `CaptchaToken`, `CaptchaRemoteIP`.
 
 Endpoint handlers receive `endpoint_item` (definition id) and optional `endpoint_data` route metadata from **Extension Endpoint** routes. Return `extension.Redirect`, `extension.HTML`, or a custom `WireResponse` with any status code and headers — Cannon writes the response directly to the client.
 
@@ -524,6 +693,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/rob121/cannon/extension"
 )
@@ -538,6 +708,17 @@ func main() {
 
 	s.HandlePage("/page", func(req extension.WireRequest) extension.WireResponse {
 		return extension.HTML(200, "<h1>Hello</h1>")
+	})
+
+	s.RegisterPermissions([]extension.PermissionDef{
+		{ID: "manage", DisplayName: "Manage Extension", Description: "Access the extension admin UI."},
+	})
+
+	s.HandleAdmin("/admin", func(req extension.WireRequest) extension.WireResponse {
+		if !extension.UserCan(req, "my-extension.manage") {
+			return extension.Error(http.StatusForbidden, "forbidden")
+		}
+		return extension.HTML(200, "<h1>Admin</h1>")
 	})
 
 	if err := s.Run(); err != nil {
@@ -654,6 +835,33 @@ internal/settings/definitions/general.json
 ```
 
 Each file contains `title`, `schema`, and `ui_schema`.
+
+#### Category dropdown fields
+
+Configuration forms support a reusable **category dropdown** for choosing a site category by ID. Mark a property in either the schema or UI schema:
+
+**Schema** — set `"format": "category"` on an integer property (nullable recommended):
+
+```json
+"listing_category_id": {
+  "type": ["integer", "null"],
+  "format": "category",
+  "title": "Listing Category",
+  "description": "Default category for public listings."
+}
+```
+
+**UI schema** — add `"options": {"format": "category"}` on the control (either this or schema `format` is enough):
+
+```json
+{
+  "type": "Control",
+  "scope": "#/properties/listing_category_id",
+  "options": {"format": "category"}
+}
+```
+
+Cannon replaces the default number input with a `<select>` populated from active categories. Empty selection stores `null` when the property type includes `"null"`, otherwise `0`. Extension and global configuration forms both support this field type.
 
 ### Custom routes
 

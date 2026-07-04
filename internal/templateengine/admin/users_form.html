@@ -1,95 +1,200 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
+{{template "form_toolbar" (dict "FormID" "user-form" "BasePath" .BasePath)}}
+<form method="post" id="user-form" class="admin-user-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+
+  {{if .IsNew}}
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">New Account</h2>
+        <p class="admin-form-card-desc">Create a local account with email, username, and password.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="admin-form-label">Given Name</label>
-          <input class="admin-form-control" name="given_name" value="{{.Row.GivenName}}">
+          <label class="admin-form-label" for="user-given-name">Given Name</label>
+          <input class="admin-form-control" id="user-given-name" name="given_name" value="{{.Row.GivenName}}">
         </div>
         <div class="col-md-6">
-          <label class="admin-form-label">Family Name</label>
-          <input class="admin-form-control" name="family_name" value="{{.Row.FamilyName}}">
+          <label class="admin-form-label" for="user-family-name">Family Name</label>
+          <input class="admin-form-control" id="user-family-name" name="family_name" value="{{.Row.FamilyName}}">
         </div>
         <div class="col-md-6">
-          <label class="admin-form-label">Email</label>
-          <input class="admin-form-control" type="email" name="email" value="{{.Row.Email}}" required>
+          <label class="admin-form-label" for="user-email">Email</label>
+          <input class="admin-form-control" id="user-email" type="email" name="email" value="{{.Row.Email}}" required>
         </div>
         <div class="col-md-6">
-          <label class="admin-form-label">Username</label>
-          <input class="admin-form-control" name="username" value="{{.Row.Username}}" required>
+          <label class="admin-form-label" for="user-username">Username</label>
+          <input class="admin-form-control" id="user-username" name="username" value="{{.Row.Username}}" required>
         </div>
         <div class="col-md-6">
-          <label class="admin-form-label">Password</label>
-          <input class="admin-form-control" type="password" name="password" {{if .IsNew}}required{{end}}>
-          {{if not .IsNew}}<p class="admin-form-help">Leave blank to keep the current password.</p>{{end}}
+          <label class="admin-form-label" for="user-password">Password</label>
+          <input class="admin-form-control" id="user-password" type="password" name="password" required>
         </div>
-        {{if not .IsNew}}
-        <div class="col-md-4">
-          <label class="admin-form-label">Status</label>
-          <select class="admin-form-control" name="status">
-            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
-            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
-          </select>
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Verified</label>
-          <label class="admin-form-toggle">
-            <input type="checkbox" class="admin-form-toggle-input" name="validated" value="1" {{if .Row.Validated}}checked{{end}}>
-            <span class="admin-form-toggle-track" aria-hidden="true">
-              <span class="admin-form-toggle-thumb"></span>
-            </span>
-            <span class="admin-form-toggle-text" data-on="Verified" data-off="Unverified">{{if .Row.Validated}}Verified{{else}}Unverified{{end}}</span>
-          </label>
-          <p class="admin-form-help">Mark whether this account email is verified.</p>
-          {{if .VerifyURL}}
-          <p class="admin-form-help">Verification link: <code class="admin-code">{{.VerifyURL}}</code></p>
-          {{end}}
-        </div>
-        <div class="col-md-4">
-          <label class="admin-form-label">Locked</label>
-          <label class="admin-form-toggle">
-            <input type="checkbox" class="admin-form-toggle-input" name="locked" value="1" {{if .Row.Locked}}checked{{end}}>
-            <span class="admin-form-toggle-track" aria-hidden="true">
-              <span class="admin-form-toggle-thumb"></span>
-            </span>
-            <span class="admin-form-toggle-text" data-on="Locked" data-off="Unlocked">{{if .Row.Locked}}Locked{{else}}Unlocked{{end}}</span>
-          </label>
-          <p class="admin-form-help">Prevent this account from signing in.</p>
-        </div>
-        {{end}}
         <div class="col-12"><div class="admin-form-divider"></div></div>
         <div class="col-12">
           <label class="admin-form-label">Groups</label>
-          <p class="admin-form-help mb-3">Group membership determines which roles apply to this user.</p>
-          <div class="admin-checkbox-grid">
-            {{range .AllGroups}}
-            <label class="admin-form-check">
-              <input type="checkbox" name="group_ids" value="{{.GroupID}}" {{if containsUint $.SelectedIDs .GroupID}}checked{{end}}>
-              {{groupName .Name}}
-            </label>
-            {{else}}
-            <p class="admin-cell-muted">No groups defined yet. <a href="/admin/groups/new" data-turbo-frame="_top">Add a group</a> first.</p>
+          {{template "group_membership_toggles" .}}
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Direct Roles</label>
+          <p class="admin-form-help mb-3">Optional roles assigned directly to this user.</p>
+          {{template "role_access_toggles" .}}
+        </div>
+      </div>
+    </div>
+  </div>
+  {{else}}
+  <div class="admin-form-split">
+    <div class="admin-form-split-main">
+      <div class="admin-form-card">
+        <div class="admin-form-card-header">
+          <div class="admin-form-card-heading">
+            <h2 class="admin-form-card-title">Account Details</h2>
+            <p class="admin-form-card-desc">Identity, login credentials, and contact information.</p>
+          </div>
+        </div>
+        <div class="admin-form-card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label" for="user-given-name">Given Name</label>
+              <input class="admin-form-control" id="user-given-name" name="given_name" value="{{.Row.GivenName}}">
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="user-family-name">Family Name</label>
+              <input class="admin-form-control" id="user-family-name" name="family_name" value="{{.Row.FamilyName}}">
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="user-email">Email</label>
+              <input class="admin-form-control" id="user-email" type="email" name="email" value="{{.Row.Email}}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="user-username">Username</label>
+              <input class="admin-form-control" id="user-username" name="username" value="{{.Row.Username}}" required>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="user-password">Password</label>
+              <input class="admin-form-control" id="user-password" type="password" name="password">
+              <p class="admin-form-help mb-0">Leave blank to keep the current password.</p>
+            </div>
+            <div class="col-12">
+              <label class="admin-form-label" for="user-avatar">Avatar</label>
+              {{template "media_field_input" (dict "ID" "user-avatar" "Name" "avatar_url" "Value" .Row.AvatarURL "Label" "Profile avatar" "Help" "Pick from the media library or paste a URL. Shown on author pages and account profile.")}}
+              {{if and (not .Row.AvatarURL) .Row.SSOAvatarURL}}
+              <p class="admin-form-help mb-0">SSO photo available from sign-in provider until a custom avatar is set.</p>
+              {{else if .ResolvedAvatarURL}}
+              <p class="admin-form-help mb-0">Current display avatar: <a href="{{.ResolvedAvatarURL}}" target="_blank" rel="noopener noreferrer">{{.ResolvedAvatarURL}}</a></p>
+              {{end}}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {{if .AuthorProfileName}}
+      <div class="admin-form-section-card">
+        {{template "form_section_header" (dict "Title" "Author Profile" "Description" (printf "Public author information from the %s profile schema." .AuthorProfileName))}}
+        <div class="admin-form-section-body">
+          <div class="row g-3">
+            {{range .ProfileFields}}
+            {{if not (and (eq .Type "image") (or (eq .Name "Avatar") (eq .Name "avatar") (eq .Name "Photo") (eq .Name "photo")))}}
+            <div class="{{if eq .Type "image"}}col-12{{else if or (eq .Type "textarea") (eq .Type "rich_text")}}col-12{{else}}col-md-6{{end}}">
+              <label class="admin-form-label" for="field-{{.FieldID}}">{{.Label}}</label>
+              {{template "custom_field_input" (dict "Field" . "Value" (index $.ProfileValues .FieldID))}}
+            </div>
+            {{end}}
             {{end}}
           </div>
         </div>
-        {{if and (not .IsNew) .AuthorProfileName}}
-        <div class="col-12"><div class="admin-form-divider"></div></div>
-        <div class="col-12">
-          <h3 class="admin-form-section-title">Author Profile</h3>
-          <p class="admin-form-section-desc">Values for the <strong>{{.AuthorProfileName}}</strong> profile shown on content authored by this user.</p>
+      </div>
+      {{end}}
+    </div>
+
+    <aside class="admin-form-split-sidebar" aria-label="Account settings">
+      <div class="admin-form-sidebar-card">
+        <div class="admin-sidebar-tabs" role="tablist" aria-label="Account settings">
+          <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="account">Account</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="groups">Groups</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="roles">Roles</button>
+          {{if .EffectivePermissions}}
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="permissions">Permissions</button>
+          {{end}}
         </div>
-        {{range .ProfileFields}}
-        <div class="col-md-6">
-          <label class="admin-form-label">{{.Label}}{{if eq .Type "rich_text"}} <span class="admin-cell-muted">(rich text)</span>{{end}}</label>
-          {{template "custom_field_input" (dict "Field" . "Value" (index $.ProfileValues .FieldID))}}
+
+        <div class="admin-sidebar-panel is-active" data-sidebar-panel="account" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="user-status">Status</label>
+              <select class="admin-form-control" id="user-status" name="status">
+                <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+                <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">Email Verified</span>
+              {{template "form_toggle" (dict "Name" "validated" "Checked" .Row.Validated "OnLabel" "Verified" "OffLabel" "Unverified")}}
+              <p class="admin-form-help mb-0">Mark whether this account email is verified.</p>
+            </div>
+            {{if .VerifyURL}}
+            <div class="admin-sidebar-field admin-sidebar-field-divider">
+              <span class="admin-form-label">Verification Link</span>
+              <div class="admin-preview-link">
+                <div class="admin-preview-link-url-wrap">
+                  <a class="admin-preview-link-url" href="{{.VerifyURL}}" target="_blank" rel="noopener noreferrer">{{.VerifyURL}}</a>
+                </div>
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-copy-text="{{.VerifyURL}}">
+                  <i class="bi bi-clipboard"></i> Copy link
+                </button>
+              </div>
+              <p class="admin-form-help mb-0">Share this link so the user can verify their email address.</p>
+            </div>
+            {{end}}
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">Account Lock</span>
+              {{template "form_toggle" (dict "Name" "locked" "Checked" .Row.Locked "OnLabel" "Locked" "OffLabel" "Unlocked")}}
+              <p class="admin-form-help mb-0">Prevent this account from signing in.</p>
+            </div>
+          </div>
         </div>
-        {{end}}
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="groups" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            {{template "group_membership_toggles" .}}
+          </div>
+        </div>
+
+        <div class="admin-sidebar-panel" data-sidebar-panel="roles" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <p class="admin-form-help mb-3">Direct role assignments apply in addition to group roles.</p>
+            {{template "role_access_toggles" .}}
+          </div>
+        </div>
+
+        {{if .EffectivePermissions}}
+        <div class="admin-sidebar-panel" data-sidebar-panel="permissions" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            <p class="admin-form-help mb-3">Effective permissions from direct roles, group roles, and inheritance ({{.EffectivePermissions.AllowTotal}} allowed{{if .EffectivePermissions.DenyTotal}}, {{.EffectivePermissions.DenyTotal}} denied{{end}}).</p>
+            {{range .EffectivePermissions.Categories}}
+            <div class="mb-3">
+              <div class="admin-form-label mb-1">{{.}}</div>
+              <ul class="admin-effective-perms">
+                {{range index $.EffectivePermissions.ByCategory .}}
+                <li class="admin-effective-perm{{if .Wildcard}} is-wildcard{{end}}{{if .Denied}} is-denied{{end}}">
+                  <span class="admin-effective-perm-name">{{.DisplayName}}</span>
+                  <code class="admin-effective-perm-key">{{.ID}}</code>
+                </li>
+                {{end}}
+              </ul>
+            </div>
+            {{end}}
+          </div>
+        </div>
         {{end}}
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </aside>
   </div>
-</div>
+  {{end}}
+</form>

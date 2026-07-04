@@ -27,7 +27,7 @@ func TestRenderOnAfterRenderCanReplaceBodyAndHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, nil)
+	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, testLayoutFuncs(false))
 	ctx := hooks.WithFire(context.Background(), func(_ context.Context, event string, args map[string]any) (map[string]any, error) {
 		if event != hooks.OnAfterRender {
 			return args, nil
@@ -78,7 +78,7 @@ func TestRenderErrorOnAfterRenderAppliesHeaders(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, nil)
+	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, testLayoutFuncs(false))
 	ctx := hooks.WithFire(context.Background(), func(_ context.Context, event string, args map[string]any) (map[string]any, error) {
 		if event != hooks.OnAfterRender {
 			return args, nil
@@ -126,7 +126,7 @@ func TestRenderOnAfterRenderCanReplaceTextBody(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, nil)
+	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Frontend: "mysite"}, nil, nil, testLayoutFuncs(false))
 	ctx := hooks.WithFire(context.Background(), func(_ context.Context, event string, args map[string]any) (map[string]any, error) {
 		if event == hooks.OnAfterRender {
 			args["body"] = "after"

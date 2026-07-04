@@ -34,29 +34,19 @@
               <label class="admin-form-label" for="item-slug">Slug</label>
               <input class="admin-form-control" id="item-slug" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
             </div>
+            {{if gt (len .ContentLocales) 1}}
+            <div class="col-md-4">
+              <label class="admin-form-label" for="item-locale">Locale</label>
+              <select class="admin-form-control" id="item-locale" name="locale">
+                {{range .ContentLocales}}
+                <option value="{{.}}" {{if eq $.Row.Locale .}}selected{{end}}>{{.}}</option>
+                {{end}}
+              </select>
+            </div>
+            {{end}}
             <div class="col-12">
               <label class="admin-form-label">Featured Image</label>
-              <div class="admin-media-field">
-                <div class="admin-media-field-preview{{if not .Row.Image}} is-empty{{end}}" id="item-image-preview">
-                  {{if .Row.Image}}
-                  <img src="{{.Row.Image}}" alt="Featured image preview">
-                  {{else}}
-                  <span class="admin-media-field-placeholder"><i class="bi bi-image"></i> No image selected</span>
-                  {{end}}
-                </div>
-                <div class="admin-media-field-controls">
-                  <input class="admin-form-control" type="text" name="image" id="item-image" value="{{.Row.Image}}" placeholder="/assets/media/content/photo.jpg" inputmode="url" autocomplete="off">
-                  <div class="admin-media-field-actions">
-                    <button type="button" class="btn-admin-outline btn-admin-sm" data-media-picker-open>
-                      <i class="bi bi-images"></i> Choose From Media
-                    </button>
-                    <button type="button" class="btn-admin-ghost btn-admin-sm" data-media-picker-clear>
-                      Clear
-                    </button>
-                  </div>
-                  <p class="admin-form-help">Pick from the library or paste a URL.</p>
-                </div>
-              </div>
+              {{template "media_field_input" (dict "ID" "item-image" "Name" "image" "Value" .Row.Image "Label" "Featured image" "Help" "Pick from the library or paste a URL.")}}
             </div>
             <div class="col-12">
               <label class="admin-form-label" for="item-intro">Intro / Excerpt</label>
@@ -75,12 +65,11 @@
         </div>
 
         <div class="admin-sidebar-panel" data-sidebar-panel="tags" role="tabpanel">
-          <p class="admin-form-panel-intro">Select tags to help visitors find related content.</p>
-          <div class="admin-checkbox-grid">
+          <div class="admin-tag-pills">
             {{range .AllTags}}
-            <label class="admin-form-check">
-              <input type="checkbox" name="tag_ids" value="{{.TagID}}" {{if containsUint $.SelectedTagIDs .TagID}}checked{{end}}>
-              {{.Name}}
+            <label class="admin-tag-pill">
+              <input type="checkbox" class="admin-tag-pill-input" name="tag_ids" value="{{.TagID}}" {{if containsUint $.SelectedTagIDs .TagID}}checked{{end}}>
+              <span class="admin-tag-pill-label">{{.Name}}</span>
             </label>
             {{else}}
             <p class="admin-cell-muted mb-0">No tags yet. <a href="/admin/tags/new" data-turbo-frame="_top">Create a tag</a>.</p>
@@ -89,7 +78,6 @@
         </div>
 
         <div class="admin-sidebar-panel" data-sidebar-panel="media" role="tabpanel">
-          <p class="admin-form-panel-intro">Gallery images, embedded media, and downloadable attachments shown on the item page.</p>
           <div class="admin-repeat-section mb-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <label class="admin-form-label mb-0">Image Gallery</label>
@@ -154,12 +142,14 @@
               <div class="admin-repeat-row" data-repeat-row="attachment">
                 <input class="admin-form-control" type="text" name="attachment_url" value="{{.URL}}" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="{{.Label}}" placeholder="Label">
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-attachment-picker-open title="Choose from media"><i class="bi bi-folder2-open"></i></button>
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="attachment">
                 <input class="admin-form-control" type="text" name="attachment_url" value="" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="" placeholder="Label">
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-attachment-picker-open title="Choose from media"><i class="bi bi-folder2-open"></i></button>
                 <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
               </div>
               {{end}}
@@ -169,7 +159,6 @@
 
         {{if .CustomFields}}
         <div class="admin-sidebar-panel" data-sidebar-panel="fields" role="tabpanel">
-          <p class="admin-form-panel-intro">Custom fields assigned to this item's category or field group.</p>
           <div class="row g-3">
             {{range .CustomFields}}
             <div class="col-md-6">
@@ -197,6 +186,7 @@
               <label class="admin-form-label" for="item-status">Status</label>
               <select class="admin-form-control" id="item-status" name="status">
                 <option value="draft" {{if eq .Row.Status "draft"}}selected{{end}}>Draft</option>
+                <option value="pending" {{if eq .Row.Status "pending"}}selected{{end}}>Pending Review</option>
                 <option value="published" {{if eq .Row.Status "published"}}selected{{end}}>Published</option>
                 <option value="archived" {{if eq .Row.Status "archived"}}selected{{end}}>Archived</option>
                 <option value="trashed" {{if eq .Row.Status "trashed"}}selected{{end}}>Trashed</option>
@@ -236,13 +226,55 @@
               <label class="admin-form-label" for="item-publish-end">Publish End</label>
               <input class="admin-form-control" id="item-publish-end" type="datetime-local" name="publish_end" value="{{if .Row.PublishEnd}}{{.Row.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
             </div>
+            {{if not .IsNew}}
+            <details class="admin-sidebar-field admin-sidebar-details" id="preview">
+              <summary class="admin-form-label">Draft Preview</summary>
+              <div class="admin-sidebar-details-body">
+              {{if .PreviewURL}}
+              <div class="admin-preview-link">
+                <div class="admin-preview-link-url-wrap">
+                  <a class="admin-preview-link-url" href="{{.PreviewURL}}" target="_blank" rel="noopener noreferrer">{{.PreviewURL}}</a>
+                </div>
+                <button type="button" class="btn-admin-outline btn-admin-sm" data-copy-text="{{.PreviewURL}}">
+                  <i class="bi bi-clipboard"></i> Copy link
+                </button>
+              </div>
+              <p class="admin-form-help">Share this secret link to preview unpublished content. Expires in 7 days.</p>
+              {{else}}
+              <p class="admin-form-help">Generate a secret link to preview this item before publishing.</p>
+              {{end}}
+              <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/preview-token" class="btn-admin-outline btn-admin-sm">{{if .PreviewURL}}Refresh Link{{else}}Generate Preview Link{{end}}</button>
+              </div>
+            </details>
+            {{if gt (len .ContentLocales) 1}}
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-translation-of">Link Translation</label>
+              <input class="admin-form-control" id="item-translation-of" name="translation_of_item_id" type="number" min="1" placeholder="Item ID to link">
+              <p class="admin-form-help mb-0">Optional. Enter another item&rsquo;s ID to group translations.</p>
+              {{if .Translations}}
+              <ul class="admin-form-help mb-0 mt-2">
+                {{range .Translations}}
+                <li><a href="{{$.BasePath}}/{{.ItemID}}" data-turbo-frame="_top">{{.Locale}} — {{.Title}}</a></li>
+                {{end}}
+              </ul>
+              {{end}}
+            </div>
+            {{end}}
+            <div class="admin-sidebar-field admin-sidebar-field-divider">
+              <span class="admin-form-label">Editorial</span>
+              <div class="admin-sidebar-action-links">
+                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/submit-review" class="btn-admin-ghost btn-admin-sm">Submit for Review</button>
+                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/clone" class="btn-admin-ghost btn-admin-sm" onclick="return confirm('Duplicate this item as a new draft?')">Duplicate</button>
+                <a class="btn-admin-ghost btn-admin-sm" href="{{.RevisionsURL}}" data-turbo-frame="_top">Revisions</a>
+              </div>
+            </div>
+            {{end}}
           </div>
         </div>
 
         <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
           <div class="admin-sidebar-fields">
-            <p class="admin-form-help">Only members of the selected groups can view this item.</p>
-            {{template "group_access_toggles" .}}
+            {{template "group_visibility_sidebar" .}}
           </div>
         </div>
 
@@ -270,7 +302,3 @@
     </aside>
   </div>
 </form>
-
-<dialog class="admin-media-picker-dialog" id="media-picker-dialog">
-  <turbo-frame id="media-picker-frame"></turbo-frame>
-</dialog>

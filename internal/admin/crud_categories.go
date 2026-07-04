@@ -71,7 +71,7 @@ func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
 		listRows = append(listRows, item)
 	}
 
-	all, _ := content.CategoryTree(r.Context())
+	all, _ := content.CategoryTreeAll(r.Context())
 	data["Rows"] = listRows
 	data["AllCategories"] = all
 	data["ListQuery"] = listQueryFromData(data)
@@ -83,12 +83,13 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 	isNew := id == 0
 	var row models.Category
 	if !isNew {
-		if err := db.Preload("Groups").Preload("CreateGroups").Preload("EditGroups").Preload("PublishGroups").First(&row, id).Error; err != nil {
+		if err := db.Preload("Groups").First(&row, id).Error; err != nil {
 			h.notFound(w, r)
 			return
 		}
 	} else {
 		row.Status = models.StatusActive
+		row.Locale = content.LocaleFromContext(r.Context())
 		row.InheritSettings = true
 		row.InheritPermissions = true
 		row.ShowTitle = true
@@ -100,10 +101,10 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			row.ParentID = &pid
 		}
 	}
-	allGroups := loadActiveGroups(db)
+	allGroups := loadFrontendGroups(db)
 	var fieldGroups []models.ContentFieldGroup
 	db.Order("name asc").Find(&fieldGroups)
-	allCats, _ := content.CategoryTree(r.Context())
+	allCats, _ := content.CategoryTreeAll(r.Context())
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
@@ -111,9 +112,12 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			return
 		}
 		row.Name = formString(r, "name")
+		row.Locale = formString(r, "locale")
+		content.NormalizeCategoryLocale(r.Context(), &row)
 		row.ParentID = formUintPtr(r, "parent_id")
+		slugCtx := content.WithLocale(r.Context(), row.Locale)
 		var slugErr error
-		row.Slug, slugErr = content.ResolveCategorySlug(r.Context(), row.Name, formString(r, "slug"), row.ParentID, row.CategoryID)
+		row.Slug, slugErr = content.ResolveCategorySlug(slugCtx, row.Name, formString(r, "slug"), row.ParentID, row.CategoryID)
 		if slugErr != nil {
 			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, slugErr.Error())
 			return
@@ -124,7 +128,6 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.Sort = formInt(r, "sort", 0)
 		row.Status = formStatus(r)
 		row.InheritSettings = formBool(r, "inherit_settings")
-		row.InheritPermissions = formBool(r, "inherit_permissions")
 		row.ShowTitle = formBool(r, "show_title")
 		row.ShowDescription = formBool(r, "show_description")
 		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
@@ -134,7 +137,7 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		var saveErr error
 		if isNew {
 			saveErr = db.Select(
-				"ParentID", "Name", "Slug", "Description", "Image", "Template",
+				"ParentID", "Locale", "Name", "Slug", "Description", "Image", "Template",
 				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
 			).Create(&row).Error
 		} else {
@@ -145,18 +148,6 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			return
 		}
 		if err := replaceFormGroups(db, &row, r); err != nil {
-			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
-			return
-		}
-		if err := replaceFormGroupsOptional(db, &row, "CreateGroups", r, "create_group_ids"); err != nil {
-			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
-			return
-		}
-		if err := replaceFormGroupsOptional(db, &row, "EditGroups", r, "edit_group_ids"); err != nil {
-			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
-			return
-		}
-		if err := replaceFormGroupsOptional(db, &row, "PublishGroups", r, "publish_group_ids"); err != nil {
 			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
 			return
 		}
@@ -182,11 +173,9 @@ func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row
 		"Subtitle":        subtitle,
 		"AllGroups":       allGroups,
 		"SelectedIDs":     defaultGroupSelectedIDs(db, row.Groups, isNew),
-		"CreateGroupIDs":   groupSelectedIDs(row.CreateGroups),
-		"EditGroupIDs":     groupSelectedIDs(row.EditGroups),
-		"PublishGroupIDs":  groupSelectedIDs(row.PublishGroups),
 		"FieldGroups":     fieldGroups,
 		"AllCategories":   allCats,
+		"ContentLocales": adminContentLocales(r),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

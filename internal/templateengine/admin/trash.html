@@ -1,0 +1,43 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <div class="admin-table-toolbar">
+    <form method="post" action="{{.BasePath}}/empty" class="admin-inline-form" onsubmit="return confirm('Permanently delete all trashed items? This cannot be undone.')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline btn-admin-sm btn-admin-danger">Empty Trash</button>
+    </form>
+  </div>
+  <div class="admin-table-scroll">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Author</th>
+          <th>Trashed</th>
+          <th class="admin-col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr>
+          <td><span class="admin-cell-primary">{{.Title}}</span><div class="admin-cell-muted">{{.Slug}}</div></td>
+          <td>{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+          <td>{{if .AuthorName}}{{.AuthorName}}{{else}}—{{end}}</td>
+          <td class="admin-cell-muted">{{.UpdatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              <form method="post" action="{{$.BasePath}}/{{.ItemID}}/restore" class="admin-inline-form">{{csrfField}}
+                <button type="submit" class="btn-admin-ghost btn-admin-sm">Restore</button>
+              </form>
+              <a class="btn-admin-icon" href="/admin/items/{{.ItemID}}" data-turbo-frame="_top" title="Edit"><i class="bi bi-pencil"></i></a>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-trash" "Title" "Trash is empty" "Message" "Trashed items appear here until restored or permanently deleted.")}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{template "pagination" .}}
+</div>

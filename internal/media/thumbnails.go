@@ -26,6 +26,19 @@ func WebThumbnailPath(webPath string) string {
 	return base + "_thumb" + ext
 }
 
+// ResolveWebThumbnail returns the thumbnail URL when a generated thumb exists, otherwise webPath.
+func ResolveWebThumbnail(assetsDir, webPath string) string {
+	if webPath == "" || assetsDir == "" {
+		return webPath
+	}
+	thumbWeb := WebThumbnailPath(webPath)
+	thumbLocal := filepath.Join(assetsDir, strings.TrimPrefix(thumbWeb, "/assets/"))
+	if _, err := os.Stat(thumbLocal); err == nil {
+		return thumbWeb
+	}
+	return webPath
+}
+
 // GenerateThumbnail creates a resized copy of an image if it is wider than thumbMaxWidth.
 func GenerateThumbnail(srcPath string) (string, error) {
 	f, err := os.Open(srcPath)

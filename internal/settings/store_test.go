@@ -46,7 +46,7 @@ func TestRenderFormUsesAdminClasses(t *testing.T) {
 		Title:    "General",
 		Schema:   []byte(`{"type":"object","properties":{"site_name":{"type":"string","title":"Site Name"}}}`),
 		UISchema: []byte(`{"type":"VerticalLayout","elements":[{"type":"Control","scope":"#/properties/site_name"}]}`),
-	}, "/admin/configuration/global/general", "")
+	}, "/admin/configuration/global/general", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestRenderFormMailDoesNotShowGeneralTitle(t *testing.T) {
 	}
 	html, err := settings.RenderForm(extension.ConfigurationSection{
 		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
-	}, "/admin/configuration/global/mail", "")
+	}, "/admin/configuration/global/mail", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestRenderFormMailHTMLTemplatePlaceholder(t *testing.T) {
 	html, err := settings.RenderForm(extension.ConfigurationSection{
 		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
 		Data: []byte(`{}`),
-	}, "/admin/configuration/global/mail", "")
+	}, "/admin/configuration/global/mail", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestRenderFormGeneralHTML(t *testing.T) {
 	}
 	html, err := settings.RenderForm(extension.ConfigurationSection{
 		ID: def.ID, Title: def.Title, Schema: def.Schema, UISchema: def.UISchema,
-	}, "/admin/configuration/global/general", "")
+	}, "/admin/configuration/global/general", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

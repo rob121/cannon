@@ -11,7 +11,10 @@
     <div class="admin-stat-value">{{if .ItemCount}}{{.ItemCount}}{{else}}—{{end}}</div>
     <div class="admin-stat-foot">
       {{if .TrashedItemCount}}
-      <span class="admin-stat-badge admin-stat-badge-neutral">{{.TrashedItemCount}} in trash</span>
+      <a class="admin-stat-badge admin-stat-badge-neutral" href="/admin/trash" data-turbo-frame="_top">{{.TrashedItemCount}} in trash</a>
+      {{end}}
+      {{if .PendingItemCount}}
+      <a class="admin-stat-badge admin-stat-badge-warning" href="/admin/review" data-turbo-frame="_top">{{.PendingItemCount}} pending review</a>
       {{end}}
       <span class="admin-stat-meta">Published content</span>
     </div>

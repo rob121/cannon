@@ -1,0 +1,61 @@
+{{template "page_header" .}}
+<div class="admin-help-manager" data-turbo="false">
+  {{if .Breadcrumbs}}
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if .URL}}
+      <a class="admin-help-breadcrumb-link" href="{{.URL}}">{{.Label}}</a>
+      {{else}}
+      <span class="admin-help-breadcrumb-current">{{.Label}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{.CancelURL}}">
+      <i class="bi bi-arrow-left"></i> Back
+    </a>
+  </div>
+  {{end}}
+
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">{{if .IsEdit}}Edit Asset{{else}}New Asset{{end}}</h2>
+        <p class="admin-form-card-desc">Theme assets are served from <code class="admin-code">/theme/</code>. Paths are relative to the theme <code class="admin-code">assets/</code> folder, e.g. <code class="admin-code">css/custom.css</code>.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
+      {{template "error_alert" .}}
+      <form method="post" id="template-asset-form" action="{{if .IsEdit}}{{.BasePath}}/edit{{else}}{{.BasePath}}/new{{end}}">
+        {{csrfField}}
+        {{if .IsEdit}}
+        <div class="mb-3">
+          <label class="admin-form-label">Path</label>
+          <div class="admin-form-static"><code class="admin-code">{{.Path}}</code></div>
+          <input type="hidden" name="path" value="{{.Path}}">
+        </div>
+        {{else}}
+        <div class="mb-3">
+          <label class="admin-form-label" for="asset-relative">Relative path</label>
+          <input class="admin-form-control" id="asset-relative" name="relative" value="{{.Relative}}" placeholder="css/custom.css" required>
+          <p class="admin-form-help">Editable types: CSS, JS, JSON, HTML, SVG, XML, Markdown, and text files.</p>
+        </div>
+        {{end}}
+        <div class="mb-3">
+          <label class="admin-form-label" for="asset-content">Content</label>
+          <div class="admin-code-editor-field">
+            <textarea class="admin-form-control admin-template-editor" id="asset-content" name="content" rows="24" data-editor-mode="{{if .EditorMode}}{{.EditorMode}}{{else}}css{{end}}" data-editor-height="28rem" required>{{.Content}}</textarea>
+          </div>
+        </div>
+        <div class="admin-form-actions">
+          <button type="submit" class="btn-admin-primary">Save</button>
+          <a class="btn-admin-outline" href="{{.CancelURL}}">Cancel</a>
+          {{if .CanDelete}}
+          <button type="submit" class="btn-admin-outline admin-form-actions-revert" formaction="{{.BasePath}}/delete" formmethod="post" onclick="return confirm('Delete this asset permanently?')">Delete Asset</button>
+          {{end}}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

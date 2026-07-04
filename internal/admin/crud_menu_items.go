@@ -135,7 +135,7 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 	if parentID, ok := parseID(r.URL.Query().Get("parent_id")); ok && isNew {
 		row.ParentID = &parentID
 	}
-	allGroups := loadActiveGroups(db)
+	allGroups := loadFrontendGroups(db)
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {

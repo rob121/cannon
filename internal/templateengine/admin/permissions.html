@@ -1,0 +1,46 @@
+{{template "page_header" .}}
+<div class="admin-form-card">
+  <div class="admin-form-card-body">
+    <p class="admin-form-help mb-4">Read-only catalog of registered capabilities. Assign permissions on the <a href="/admin/roles" data-turbo-frame="_top">Roles</a> screen using <strong>Allow</strong> and <strong>Deny</strong>. Explicit denies override allows, including wildcards.</p>
+    <form method="get" class="mb-4">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="admin-form-label">Category</label>
+          <select class="admin-form-control" name="category" onchange="this.form.submit()">
+            <option value="">All categories</option>
+            {{range .Categories}}
+            <option value="{{.}}" {{if eq $.FilterCategory .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </div>
+      </div>
+    </form>
+    {{range .Categories}}
+    {{if or (not $.FilterCategory) (eq $.FilterCategory .)}}
+    <div class="mb-4">
+      <h2 class="admin-form-card-title h5">{{.}}</h2>
+      <div class="table-responsive">
+        <table class="table admin-table">
+          <thead>
+            <tr>
+              <th>Permission</th>
+              <th>ID</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{range index $.PermsByCategory .}}
+            <tr{{if .Dangerous}} class="table-danger"{{end}}>
+              <td>{{.DisplayName}}</td>
+              <td><code class="admin-code">{{.ID}}</code></td>
+              <td class="admin-cell-muted">{{.Description}}</td>
+            </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {{end}}
+    {{end}}
+  </div>
+</div>

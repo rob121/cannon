@@ -2,11 +2,13 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers/auth"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 	"golang.org/x/crypto/bcrypt"
@@ -42,14 +44,14 @@ func (h *Handler) userList(w http.ResponseWriter, r *http.Request) {
 	var total int64
 	db.Model(&models.User{}).Count(&total)
 	data := listPage(r, page, total, usersBase,
-		"Manage user accounts and access.",
+		"Manage accounts, group membership, and role assignments.",
 		"Add Account", map[string]any{"ActiveNav": "accounts"})
 	order := applyListSort(r, data, map[string]string{
 		"username": "username",
 		"email":    "email",
 		"status":   "status",
 	}, "username")
-	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Groups").Order(order).Find(&rows)
+	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Preload("Groups").Preload("Roles").Order(order).Find(&rows)
 	data["Rows"] = rows
 	h.render(w, r, "Accounts", "admin/users.html", data)
 }
@@ -59,13 +61,15 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 	isNew := id == 0
 	var row models.User
 	if !isNew {
-		if err := db.Preload("Groups").First(&row, id).Error; err != nil {
+		if err := db.Preload("Groups").Preload("Roles").First(&row, id).Error; err != nil {
 			h.notFound(w, r)
 			return
 		}
 	}
 	var allGroups []models.Group
-	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&allGroups)
+	allGroups = loadMembershipGroups(db)
+	var allRoles []models.Role
+	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&allRoles)
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
@@ -77,7 +81,7 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 				formString(r, "given_name"), formString(r, "family_name"),
 				formString(r, "email"), formString(r, "username"), r.FormValue("password"))
 			if err != nil {
-				h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
+				h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 				return
 			}
 			row = *u
@@ -94,6 +98,7 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			row.Status = formStatus(r)
 			row.Locked = r.FormValue("locked") == "1"
 			row.Validated = r.FormValue("validated") == "1"
+			row.AvatarURL = formString(r, "avatar_url")
 			if pw := r.FormValue("password"); pw != "" {
 				hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 				if err != nil {
@@ -103,7 +108,7 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 				row.Hash = string(hash)
 			}
 			if err := db.Save(&row).Error; err != nil {
-				h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
+				h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 				return
 			}
 			if row.Locked && !wasLocked {
@@ -120,14 +125,24 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			db.Where("group_id IN ?", groupIDs).Find(&selected)
 		}
 		if err := db.Model(&row).Association("Groups").Replace(selected); err != nil {
-			h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
+			h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 			return
 		}
+		roleIDs := formUintList(r, "role_ids")
+		var selectedRoles []models.Role
+		if len(roleIDs) > 0 {
+			db.Where("role_id IN ?", roleIDs).Find(&selectedRoles)
+		}
+		if err := db.Model(&row).Association("Roles").Replace(selectedRoles); err != nil {
+			h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
+			return
+		}
+		security.InvalidateSiteUser(r.Context(), row.UserID)
 		if !isNew {
 			if profileID, err := content.AuthorProfileID(r.Context()); err == nil && profileID > 0 {
 				fields, _ := content.ActiveProfileFields(r.Context(), profileID)
 				if err := content.SaveProfileUserFieldValues(db, row.UserID, fields, r); err != nil {
-					h.renderUserForm(w, r, row, allGroups, isNew, err.Error())
+					h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 					return
 				}
 			}
@@ -138,13 +153,17 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 		redirectList(w, r, usersBase)
 		return
 	}
-	h.renderUserForm(w, r, row, allGroups, isNew, "")
+	h.renderUserForm(w, r, row, allGroups, allRoles, isNew, "")
 }
 
-func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row models.User, allGroups []models.Group, isNew bool, errMsg string) {
+func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row models.User, allGroups []models.Group, allRoles []models.Role, isNew bool, errMsg string) {
 	selected := make([]uint, 0, len(row.Groups))
 	for _, group := range row.Groups {
 		selected = append(selected, group.GroupID)
+	}
+	selectedRoles := make([]uint, 0, len(row.Roles))
+	for _, role := range row.Roles {
+		selectedRoles = append(selectedRoles, role.RoleID)
 	}
 	profileFields := []models.ProfileField{}
 	profileInputs := []models.ContentField{}
@@ -170,7 +189,7 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 	subtitle := "Create a new account with local authentication."
 	if !isNew {
 		title = "Edit Account"
-		subtitle = "Update account details, groups, and access status."
+		subtitle = "Update account details, group membership, and role assignments."
 	}
 	data := formData(map[string]any{
 		"ActiveNav":   "accounts",
@@ -179,20 +198,41 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 		"BasePath":    usersBase,
 		"Subtitle":    subtitle,
 		"AllGroups":         allGroups,
+		"AllRoles":          allRoles,
 		"SelectedIDs":       selected,
+		"SelectedRoleIDs":   selectedRoles,
 		"AuthorProfileName": authorProfileName,
 		"ProfileFields":     profileInputs,
 		"ProfileValues":     profileValues,
 	})
+	if !isNew {
+		if avatar, err := content.ResolveUserAvatar(r.Context(), row.UserID); err == nil {
+			data["ResolvedAvatarURL"] = avatar
+		}
+	}
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
 	if !isNew && !row.Validated {
 		if token, err := auth.EnsureVerifyToken(r.Context(), row.UserID); err == nil {
-			data["VerifyURL"] = auth.VerifyURL(r.Context(), token)
+			data["VerifyURL"] = userVerifyURL(r, token)
+		}
+	}
+	if !isNew && row.UserID > 0 {
+		if preview, err := effectivePermissionPreview(r.Context(), row.UserID); err == nil {
+			data["EffectivePermissions"] = preview
 		}
 	}
 	h.render(w, r, title, "admin/users_form.html", data)
+}
+
+func userVerifyURL(r *http.Request, token string) string {
+	path := auth.VerifyURL(r.Context(), token)
+	site, err := sites.FromContext(r.Context())
+	if err != nil || strings.TrimSpace(site.Host) == "" {
+		return path
+	}
+	return absoluteSiteURL(site.Host, path)
 }
 
 func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request, idStr string) {

@@ -120,6 +120,18 @@ func TestCategoryItemColumnClass(t *testing.T) {
 	}
 }
 
+func TestCategoryItemListClass(t *testing.T) {
+	if cls := content.CategoryItemListClass(1); cls != "site-item-list" {
+		t.Fatalf("1 column: %q", cls)
+	}
+	if cls := content.CategoryItemListClass(2); cls != "site-item-list site-item-list--cols-2" {
+		t.Fatalf("2 columns: %q", cls)
+	}
+	if cls := content.CategoryItemListClass(4); cls != "site-item-list site-item-list--cols-4" {
+		t.Fatalf("4 columns: %q", cls)
+	}
+}
+
 func categorySettingsTestContext(t *testing.T) (context.Context, *gorm.DB) {
 	t.Helper()
 	path := t.TempDir() + "/category-settings.sqlite"

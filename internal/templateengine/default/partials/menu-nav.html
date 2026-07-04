@@ -1,0 +1,39 @@
+{{define "menu-nav-link-attrs"}}
+{{if .Target}} target="{{.Target}}"{{if eq .Target "_blank"}} rel="noopener noreferrer"{{end}}{{end}}
+{{end}}
+
+{{define "menu-nav-node"}}
+{{$item := .Item}}
+{{$depth := .Depth}}
+{{$children := $item.Children}}
+{{$hasChildren := and $children (lt $depth 3)}}
+{{if $hasChildren}}
+<li class="nav-item dropdown{{if gt $depth 1}} dropend{{end}}">
+  <a class="nav-link dropdown-toggle {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+  <ul class="dropdown-menu">
+    {{range $children}}{{template "menu-nav-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
+  </ul>
+</li>
+{{else}}
+<li class="nav-item">
+  <a class="nav-link {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+</li>
+{{end}}
+{{end}}
+
+{{define "menu-nav-dropdown-node"}}
+{{$item := .Item}}
+{{$depth := .Depth}}
+{{$children := $item.Children}}
+{{$hasChildren := and $children (lt $depth 3)}}
+{{if $hasChildren}}
+<li class="dropend">
+  <a class="dropdown-item dropdown-toggle {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+  <ul class="dropdown-menu">
+    {{range $children}}{{template "menu-nav-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
+  </ul>
+</li>
+{{else}}
+<li><a class="dropdown-item {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a></li>
+{{end}}
+{{end}}

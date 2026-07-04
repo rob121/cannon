@@ -66,6 +66,9 @@ func Migrate(site *config.SiteConfig) error {
 			return err
 		}
 	}
+	if err := RepairContentLocaleSchema(db); err != nil {
+		return err
+	}
 	return nil
 }
 

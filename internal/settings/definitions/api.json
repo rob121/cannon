@@ -1,0 +1,65 @@
+{
+  "title": "API",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "jwt_ttl_seconds": {
+        "type": "integer",
+        "title": "JWT Access Token TTL (seconds)",
+        "default": 3600,
+        "minimum": 300,
+        "maximum": 86400,
+        "description": "How long user access tokens remain valid."
+      },
+      "refresh_ttl_seconds": {
+        "type": "integer",
+        "title": "Refresh Token TTL (seconds)",
+        "default": 604800,
+        "minimum": 3600,
+        "maximum": 2592000,
+        "description": "How long refresh tokens remain valid."
+      },
+      "cors_origins": {
+        "type": "string",
+        "title": "CORS Allowed Origins",
+        "description": "Comma-separated origins for browser-based headless apps (e.g. https://app.example.com). Leave empty to disable CORS."
+      },
+      "rate_limit_per_minute": {
+        "type": "integer",
+        "title": "Default Rate Limit (requests/minute)",
+        "default": 120,
+        "minimum": 10,
+        "maximum": 10000
+      },
+      "login_rate_limit_per_minute": {
+        "type": "integer",
+        "title": "Login Rate Limit (requests/minute per IP)",
+        "default": 20,
+        "minimum": 5,
+        "maximum": 1000
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {
+        "type": "Group",
+        "label": "Authentication",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/jwt_ttl_seconds"},
+          {"type": "Control", "scope": "#/properties/refresh_ttl_seconds"}
+        ]
+      },
+      {
+        "type": "Group",
+        "label": "CORS & Rate Limits",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/cors_origins"},
+          {"type": "Control", "scope": "#/properties/rate_limit_per_minute"},
+          {"type": "Control", "scope": "#/properties/login_rate_limit_per_minute"}
+        ]
+      }
+    ]
+  }
+}

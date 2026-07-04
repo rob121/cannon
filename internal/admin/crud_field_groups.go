@@ -7,9 +7,16 @@ import (
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 const fieldGroupsBase = "/admin/field-groups"
+
+type fieldGroupFieldRow struct {
+	models.ContentField
+	CanMoveUp   bool
+	CanMoveDown bool
+}
 
 func (h *Handler) fieldGroups(w http.ResponseWriter, r *http.Request, path string) {
 	parts := pathParts("/field-groups", path)
@@ -58,6 +65,7 @@ func (h *Handler) fieldGroupForm(w http.ResponseWriter, r *http.Request, id uint
 		}
 		sort.Slice(row.Fields, func(i, j int) bool { return row.Fields[i].Sort < row.Fields[j].Sort })
 	}
+	fieldRows := fieldGroupFieldRows(row.Fields)
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -72,7 +80,7 @@ func (h *Handler) fieldGroupForm(w http.ResponseWriter, r *http.Request, id uint
 		}
 		if err != nil {
 			h.render(w, r, "Field Group", "admin/field_groups_form.html", formData(map[string]any{
-				"ActiveNav": "field_groups", "Error": err.Error(), "Row": row, "IsNew": isNew, "BasePath": fieldGroupsBase,
+				"ActiveNav": "field_groups", "Error": err.Error(), "Row": row, "FieldRows": fieldRows, "IsNew": isNew, "BasePath": fieldGroupsBase,
 			}))
 			return
 		}
@@ -84,7 +92,7 @@ func (h *Handler) fieldGroupForm(w http.ResponseWriter, r *http.Request, id uint
 		title = "Edit Field Group"
 	}
 	h.render(w, r, title, "admin/field_groups_form.html", formData(map[string]any{
-		"ActiveNav": "field_groups", "Row": row, "IsNew": isNew, "BasePath": fieldGroupsBase,
+		"ActiveNav": "field_groups", "Row": row, "FieldRows": fieldRows, "IsNew": isNew, "BasePath": fieldGroupsBase,
 	}))
 }
 
@@ -95,6 +103,23 @@ func (h *Handler) contentFieldAction(w http.ResponseWriter, r *http.Request, par
 		return
 	}
 	db, _ := sites.DB(r.Context())
+	if len(parts) == 4 && parts[1] == "fields" && (parts[3] == "move-up" || parts[3] == "move-down") {
+		fieldID, ok := parseID(parts[2])
+		if !ok {
+			h.notFound(w, r)
+			return
+		}
+		direction := 1
+		if parts[3] == "move-up" {
+			direction = -1
+		}
+		if err := contentFieldReorder(db, groupID, fieldID, direction); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		redirectList(w, r, fieldGroupsBase+"/"+strconv.FormatUint(uint64(groupID), 10))
+		return
+	}
 	if len(parts) == 3 && parts[2] == "new" {
 		h.contentFieldForm(w, r, groupID, 0)
 		return
@@ -199,4 +224,51 @@ func (h *Handler) fieldGroupDelete(w http.ResponseWriter, r *http.Request, idStr
 		return
 	}
 	redirectList(w, r, fieldGroupsBase)
+}
+
+func fieldGroupFieldRows(fields []models.ContentField) []fieldGroupFieldRow {
+	out := make([]fieldGroupFieldRow, 0, len(fields))
+	last := len(fields) - 1
+	for i, field := range fields {
+		out = append(out, fieldGroupFieldRow{
+			ContentField: field,
+			CanMoveUp:    i > 0,
+			CanMoveDown:  i < last,
+		})
+	}
+	return out
+}
+
+func contentFieldReorder(db *gorm.DB, groupID, fieldID uint, direction int) error {
+	if direction == 0 {
+		return nil
+	}
+	var siblings []models.ContentField
+	if err := db.Where("field_group_id = ?", groupID).Order("sort asc, field_id asc").Find(&siblings).Error; err != nil {
+		return err
+	}
+	idx := -1
+	for i, item := range siblings {
+		if item.FieldID == fieldID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return gorm.ErrRecordNotFound
+	}
+	target := idx + direction
+	if target < 0 || target >= len(siblings) {
+		return nil
+	}
+	siblings[idx], siblings[target] = siblings[target], siblings[idx]
+	for i, item := range siblings {
+		if item.Sort == i {
+			continue
+		}
+		if err := db.Model(&models.ContentField{}).Where("field_id = ?", item.FieldID).Update("sort", i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/rob121/cannon/internal/captcha"
 )
 
 // FuncMap returns html/template functions for Cannon templates.
@@ -100,5 +101,27 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			return false
 		},
 		"showRouteTitle": func() bool { return true },
+		"siteName":            func() string { return "" },
+		"siteMetaDescription": func() string { return "" },
+		"siteMetaKeywords":    func() string { return "" },
+		"siteOGTitle":         func() string { return "" },
+		"siteOGImage":         func() string { return "" },
+		"siteTwitterCard":     func() string { return "summary_large_image" },
+		"siteTwitterSite":     func() string { return "" },
+		"siteTwitterCreator":  func() string { return "" },
+		"siteHeadExtra":       func() template.HTML { return "" },
+		// captcha emits a <captcha> placeholder expanded by Cannon before onAfterRender.
+		// Usage: {{captcha "login"}} or {{captcha "comment" "any"}}
+		"captcha": func(args ...string) template.HTML {
+			context := "form"
+			provider := captcha.ProviderAny
+			if len(args) > 0 {
+				context = strings.TrimSpace(args[0])
+			}
+			if len(args) > 1 {
+				provider = strings.TrimSpace(args[1])
+			}
+			return template.HTML(captcha.PlaceholderMarkup(context, provider))
+		},
 	}
 }

@@ -1,12 +1,14 @@
 package csrf
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
 	"errors"
 	"html"
 	"html/template"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -47,25 +49,47 @@ func SubmittedToken(r *http.Request) string {
 	if v := strings.TrimSpace(r.Header.Get(HeaderName)); v != "" {
 		return v
 	}
-	if token := formFieldToken(r); token != "" {
+	if token := parsedFormFieldToken(r); token != "" {
 		return token
 	}
-	ct := r.Header.Get("Content-Type")
-	if strings.HasPrefix(ct, "multipart/form-data") {
-		_ = r.ParseMultipartForm(32 << 20)
-	} else if r.Form == nil {
-		_ = r.ParseForm()
+	if err := parseFormPreserveBody(r); err != nil {
+		return ""
 	}
-	return formFieldToken(r)
+	return parsedFormFieldToken(r)
 }
 
-func formFieldToken(r *http.Request) string {
+func parsedFormFieldToken(r *http.Request) string {
 	if r.MultipartForm != nil {
 		if vals := r.MultipartForm.Value[FieldName]; len(vals) > 0 {
 			return strings.TrimSpace(vals[0])
 		}
 	}
-	return strings.TrimSpace(r.FormValue(FieldName))
+	if r.Form != nil {
+		return strings.TrimSpace(r.Form.Get(FieldName))
+	}
+	return ""
+}
+
+func parseFormPreserveBody(r *http.Request) error {
+	if r == nil {
+		return ErrInvalid
+	}
+	if r.Body == nil {
+		return r.ParseForm()
+	}
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	ct := r.Header.Get("Content-Type")
+	if strings.HasPrefix(ct, "multipart/form-data") {
+		err = r.ParseMultipartForm(32 << 20)
+	} else {
+		err = r.ParseForm()
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	return err
 }
 
 // Valid compares expected and submitted tokens in constant time.

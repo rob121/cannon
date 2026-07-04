@@ -3,6 +3,7 @@
 <form method="post" id="route-form">
   {{csrfField}}
   {{template "error_alert" .}}
+  {{template "success_alert" .}}
   <div class="admin-form-split">
     <div class="admin-form-split-main">
       <div class="admin-form-card">
@@ -30,15 +31,17 @@
             <option value="Extension" {{if eq .Row.Type "Extension"}}selected{{end}}>Extension</option>
             <option value="Extension Endpoint" {{if eq .Row.Type "Extension Endpoint"}}selected{{end}}>Extension Endpoint</option>
             <option value="Local File" {{if eq .Row.Type "Local File"}}selected{{end}}>Local File</option>
+            <option value="Iframe" {{if eq .Row.Type "Iframe"}}selected{{end}}>Iframe</option>
             <option value="Controller" {{if eq .Row.Type "Controller"}}selected{{end}}>Controller</option>
           </select>
         </div>
-        <div class="col-12 route-fields-target" id="route-fields-target"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File"))}} hidden{{end}}>
+        <div class="col-12 route-fields-target" id="route-fields-target"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File") (eq .Row.Type "Iframe"))}} hidden{{end}}>
           <div class="admin-form-divider"></div>
           <label class="admin-form-label">Target</label>
-          <input class="admin-form-control" name="target" value="{{.Row.Target}}"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File"))}} disabled{{end}}>
+          <input class="admin-form-control" name="target" value="{{.Row.Target}}"{{if not (or (eq .Row.Type "Url") (eq .Row.Type "Local File") (eq .Row.Type "Iframe"))}} disabled{{end}}>
           <p class="admin-form-help route-help-url"{{if ne .Row.Type "Url"}} hidden{{end}}>Redirect destination for URL routes.</p>
           <p class="admin-form-help route-help-local"{{if ne .Row.Type "Local File"}} hidden{{end}}>Relative path under the site assets directory for local file routes.</p>
+          <p class="admin-form-help route-help-iframe"{{if ne .Row.Type "Iframe"}} hidden{{end}}>External URL to embed in an iframe on this page (for example a form or map).</p>
         </div>
 
         <div class="col-12 route-fields-extension" id="route-fields-extension"{{if ne .Row.Type "Extension"}} hidden{{end}}>
@@ -254,6 +257,7 @@
       <div class="admin-form-sidebar-card">
         <div class="admin-sidebar-tabs" role="tablist" aria-label="Route settings">
           <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="settings">Settings</button>
+          <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="menu">Menu</button>
           <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">Access</button>
         </div>
 
@@ -272,6 +276,11 @@
               <p class="admin-form-help">Controls whether the frontend renders the page heading for this route.</p>
             </div>
             <div class="admin-sidebar-field">
+              <label class="admin-form-label">Sort</label>
+              <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
+              <p class="admin-form-help mb-0">Lower numbers appear first in the routes list.</p>
+            </div>
+            <div class="admin-sidebar-field">
               <label class="admin-form-label">Default route</label>
               {{template "form_toggle" (dict "Name" "is_default" "Value" "1" "Checked" .Row.IsDefault "OnLabel" "Default" "OffLabel" "Not default")}}
               <p class="admin-form-help">Used for home links and post-login redirects. Only one route can be default.</p>
@@ -279,10 +288,47 @@
           </div>
         </div>
 
+        <div class="admin-sidebar-panel" data-sidebar-panel="menu" role="tabpanel">
+          <div class="admin-sidebar-fields">
+            {{if .RouteMenuLinks}}
+            <div class="admin-sidebar-field">
+              <span class="admin-form-label">In menus</span>
+              <ul class="admin-form-help mb-0 ps-3">
+                {{range .RouteMenuLinks}}
+                <li><a href="{{$.MenuItemsBase}}/{{.MenuItemID}}">{{if .ItemName}}{{.ItemName}}{{else}}Item{{end}}</a> <span class="admin-cell-muted">({{if .MenuName}}{{.MenuName}}{{else}}menu{{end}})</span></li>
+                {{end}}
+              </ul>
+            </div>
+            {{end}}
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="route-add-to-menu">Add to menu</label>
+              <select class="admin-form-control" name="add_to_menu_id" id="route-add-to-menu">
+                <option value="">— Don't add —</option>
+                {{range .AllMenus}}
+                <option value="{{.MenuID}}">{{.MenuName}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help">Optional. Creates a menu item linked to this route when you save.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="route-add-to-menu-parent">Parent item</label>
+              <select class="admin-form-control" name="add_to_menu_parent_id" id="route-add-to-menu-parent" disabled>
+                <option value="">— Top level —</option>
+                {{range .MenuParentOptions}}
+                <option value="{{.MenuItemID}}" data-menu-id="{{.MenuID}}">{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="route-add-to-menu-name">Menu label</label>
+              <input class="admin-form-control" name="add_to_menu_name" id="route-add-to-menu-name" placeholder="Defaults to route name">
+            </div>
+          </div>
+        </div>
+
         <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
           <div class="admin-sidebar-fields">
-            <p class="admin-form-help">Only members of the selected groups can access this route.</p>
-            {{template "group_access_toggles" .}}
+            {{template "group_visibility_sidebar" .}}
           </div>
         </div>
       </div>

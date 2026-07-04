@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
@@ -9,13 +10,18 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rob121/cannon/internal/auth/mfa"
+	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/help"
 	"github.com/rob121/cannon/internal/hooks"
+	"github.com/rob121/cannon/internal/httpreq"
 	"github.com/rob121/cannon/internal/httpx"
+	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
+	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
@@ -52,10 +58,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.groups(w, r, path)
 	case strings.HasPrefix(path, "/roles"):
 		h.roles(w, r, path)
+	case strings.HasPrefix(path, "/permissions"):
+		h.permissions(w, r, path)
 	case strings.HasPrefix(path, "/routes"):
 		h.routes(w, r, path)
 	case strings.HasPrefix(path, "/items"):
 		h.items(w, r, path)
+	case strings.HasPrefix(path, "/trash"):
+		h.itemTrash(w, r, path)
+	case strings.HasPrefix(path, "/review"):
+		h.itemReview(w, r, path)
 	case strings.HasPrefix(path, "/categories"):
 		h.categories(w, r, path)
 	case strings.HasPrefix(path, "/tags"):
@@ -86,6 +98,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.help(w, r, path)
 	case strings.HasPrefix(path, "/configuration"):
 		h.configuration(w, r, path)
+	case strings.HasPrefix(path, "/api"):
+		h.apiSection(w, r, path)
 	case strings.HasPrefix(path, "/notifications"):
 		h.notifications(w, r, path)
 	case strings.HasPrefix(path, "/blocks"):
@@ -107,13 +121,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 	sel, _ := themes.SelectionFromContext(r.Context())
 	return templateengine.New(site, sel, nil, nil, templateengine.MergeFuncMaps(
 		templateengine.CSRFFuncs(r),
+		lang.FuncMap(middleware.LocaleFromContext(r.Context()), lang.TranslationPreviewActive(r)),
 		template.FuncMap{
-		"lang": func(key string, pairs ...string) string {
-			if mgr := middleware.LocaleFromContext(r.Context()); mgr != nil {
-				return mgr.Fmt(key, pairs...)
-			}
-			return key
-		},
 		"dict": func(values ...any) (map[string]any, error) {
 			if len(values)%2 != 0 {
 				return nil, fmt.Errorf("dict: odd number of arguments")
@@ -168,7 +177,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 		"helpURL": func(extensionName, articlePath string) string {
 			return extensions.HelpArticleURL(extensionName, articlePath)
 		},
-		"containsUint":  containsUint,
+		"containsUint":   containsUint,
+		"containsString": containsString,
 		"fieldOptions": func(raw string) []content.FieldOption {
 			return content.ParseFieldConfig(raw).Options
 		},
@@ -181,7 +191,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 		"joinRoleNames": func(roles []models.Role) string {
 			names := make([]string, 0, len(roles))
 			for _, role := range roles {
-				names = append(names, role.Name)
+				names = append(names, RoleDisplayName(role.Name))
 			}
 			return strings.Join(names, ", ")
 		},
@@ -201,6 +211,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			return false
 		},
 		"groupName": GroupDisplayName,
+		"roleName":  RoleDisplayName,
 		"formatBytes": formatBytes,
 	})), nil
 }
@@ -217,13 +228,16 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 		data[k] = v
 	}
 	listExtra := listExtraFromData(data)
-	data["AdminExtensions"] = h.adminExtensionNav(r)
+	extNav := h.adminExtensionNav(r)
+	data["AdminExtensions"] = extNav
+	data["NavExtensionAppsVisible"] = len(extNav) > 0
 	if nav, ok := data["ActiveNav"].(string); ok {
 		data["NavUsersOpen"] = usersNavOpen(nav)
 		data["NavMenusOpen"] = menusNavOpen(nav)
 		data["NavContentOpen"] = contentNavOpen(nav)
 		data["NavSystemOpen"] = systemNavOpen(nav)
 		data["NavExtensionAppsOpen"] = extensionAppsNavOpen(nav)
+		data["NavAPIOpen"] = apiNavOpen(nav)
 	}
 	eng, err := h.engine(r, listExtra)
 	if err != nil {
@@ -275,9 +289,22 @@ type LoginHandler struct {
 }
 
 func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	site, _ := sites.FromContext(r.Context())
+	extMgr := h.Chain.Extensions(site)
+	_ = extMgr.Bootstrap(r.Context())
+	ctx := extensions.WithContext(r.Context(), extMgr)
+	if _, ok := httpreq.FromContext(ctx); !ok {
+		ctx = httpreq.WithContext(ctx, r)
+	}
+	r = r.WithContext(ctx)
+
+	svc, _ := user.FromContext(r.Context())
+	if pending, ok := mfa.GetPendingMFA(svc); ok && pending.Context == "admin" && r.Method != http.MethodPost {
+		httpx.Redirect(w, r, routepath.Controller(r.Context(), "auth", "mfa-challenge"))
+		return
+	}
 	if r.Method != http.MethodPost {
-		svc, err := user.FromContext(r.Context())
-		if err == nil {
+		if svc != nil {
 			if userID, ok := svc.CurrentID(); ok {
 				if allowed, err := CanAccessAdmin(r.Context(), userID, "/admin", false); err == nil && allowed {
 					httpx.Redirect(w, r, "/admin")
@@ -288,6 +315,12 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodPost {
 		_ = r.ParseForm()
+		if err := captcha.VerifySubmit(r.Context(), r, captcha.CaptchaContextLogin); err != nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			token, _ := csrfToken(r)
+			fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, captcha.UserFacingError(err)))
+			return
+		}
 		svc, _ := user.FromContext(r.Context())
 		username := strings.TrimSpace(r.FormValue("username"))
 		loginArgs := hooks.RequestArgs(r)
@@ -297,7 +330,7 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, hooks.ErrAborted) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			token, _ := csrfToken(r)
-			fmt.Fprint(w, loginHTML(token))
+			fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, ""))
 			return
 		}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -305,6 +338,30 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		u, err := user.AuthenticateLocal(r.Context(), username, r.FormValue("password"))
 		if err == nil {
+			allowed, err := CanAccessAdmin(r.Context(), u.UserID, "/admin", false)
+			if err != nil || !allowed {
+				writeStandaloneAdminError(w, http.StatusForbidden, "Access Denied",
+					"Your account does not have permission to access the admin panel.",
+					"Contact an administrator to request access.")
+				return
+			}
+			needsMFA, err := mfa.UserRequiresMFA(r.Context(), u.UserID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if needsMFA {
+				if err := mfa.SetPendingMFA(svc, mfa.PendingMFA{
+					UserID:  u.UserID,
+					Context: "admin",
+					Return:  "/admin",
+				}); err != nil {
+					http.Error(w, "could not start MFA session", http.StatusInternalServerError)
+					return
+				}
+				httpx.Redirect(w, r, routepath.Controller(r.Context(), "auth", "mfa-challenge"))
+				return
+			}
 			_ = user.EnsureRegisteredGroup(r.Context(), u.UserID)
 			afterArgs := map[string]any{
 				"context":  "admin",
@@ -316,13 +373,6 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			allowed, err := CanAccessAdmin(r.Context(), u.UserID, "/admin", false)
-			if err != nil || !allowed {
-				writeStandaloneAdminError(w, http.StatusForbidden, "Access Denied",
-					"Your account does not have permission to access the admin panel.",
-					"Contact an administrator to request access.")
-				return
-			}
 			_ = svc.Login(u.UserID)
 			httpx.Redirect(w, r, "/admin")
 			return
@@ -330,7 +380,15 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	token, _ := csrfToken(r)
-	fmt.Fprint(w, loginHTML(token))
+	fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, ""))
+}
+
+func renderLoginPageHTML(ctx context.Context, token, errMsg string) string {
+	html := loginHTML(token, errMsg)
+	if expanded, err := captcha.ExpandHTML(ctx, html); err == nil {
+		html = expanded
+	}
+	return html
 }
 
 func csrfToken(r *http.Request) (string, error) {
@@ -341,8 +399,12 @@ func csrfToken(r *http.Request) (string, error) {
 	return svc.EnsureCSRFToken()
 }
 
-func loginHTML(token string) string {
+func loginHTML(token, errMsg string) string {
 	csrfField := string(csrf.HiddenField(token))
+	alert := ""
+	if strings.TrimSpace(errMsg) != "" {
+		alert = `<div class="alert alert-danger" role="alert">` + template.HTMLEscapeString(errMsg) + `</div>`
+	}
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -364,16 +426,18 @@ func loginHTML(token string) string {
     </div>
     <div class="admin-form-card admin-install-card">
       <div class="admin-form-card-body">
+        ` + alert + `
         <form method="post">
           ` + csrfField + `
           <div class="mb-3">
             <label class="admin-form-label">Username</label>
             <input class="admin-form-control" name="username" required autofocus>
           </div>
-          <div class="mb-4">
+          <div class="mb-3">
             <label class="admin-form-label">Password</label>
             <input class="admin-form-control" type="password" name="password" required>
           </div>
+          <div class="mb-4">` + captcha.PlaceholderMarkup(captcha.CaptchaContextLogin, captcha.ProviderAny) + `</div>
           <button type="submit" class="btn-admin-primary w-100">Sign In</button>
         </form>
       </div>

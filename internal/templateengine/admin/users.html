@@ -6,6 +6,7 @@
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "username" "Label" "User")}}
           <th>Groups</th>
+          <th>Roles</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
         </tr>
@@ -23,11 +24,12 @@
             </div>
           </td>
           <td><span class="admin-cell-muted">{{if .Groups}}{{joinGroupNames .Groups}}{{else}}—{{end}}</span></td>
+          <td><span class="admin-cell-muted">{{if .Roles}}{{joinRoleNames .Roles}}{{else}}—{{end}}</span></td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .UserID "Status" .Status)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .UserID)}}
         </tr>
         {{else}}
-        <tr><td colspan="4" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-people" "Title" "No users yet" "Message" "Registered accounts will appear here once users sign up." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-people" "Title" "No users yet" "Message" "Registered accounts will appear here once users sign up." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

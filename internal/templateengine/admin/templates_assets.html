@@ -1,0 +1,101 @@
+{{template "page_header" .}}
+<div class="admin-help-manager">
+  <div class="admin-help-toolbar">
+    <nav class="admin-help-breadcrumb" aria-label="Template breadcrumb">
+      {{range $i, $c := .Breadcrumbs}}
+      {{if $i}}<span class="admin-help-breadcrumb-sep">/</span>{{end}}
+      {{if .URL}}
+      <a class="admin-help-breadcrumb-link" href="{{.URL}}">{{.Label}}</a>
+      {{else}}
+      <span class="admin-help-breadcrumb-current">{{.Label}}</span>
+      {{end}}
+      {{end}}
+    </nav>
+    {{if .ThemeURL}}
+    <a class="btn-admin-ghost btn-admin-sm admin-help-back" href="{{.ThemeURL}}">
+      <i class="bi bi-arrow-left"></i> Back to templates
+    </a>
+    {{end}}
+  </div>
+
+  <div class="admin-form-card admin-form-card-compact">
+    <div class="admin-form-card-body">
+      <div class="row g-2">
+        {{if .GroupLabel}}
+        <div class="col-md-6"><span class="admin-cell-muted">Theme</span><div class="admin-cell-primary">{{.GroupLabel}}</div></div>
+        {{end}}
+        <div class="col-md-6">
+          <span class="admin-cell-muted">Public URL</span>
+          <div><code class="admin-code">/theme/…</code></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-data-card admin-template-browser-card">
+    {{template "error_alert" .}}
+    <div class="admin-template-browser-toolbar">
+      <p class="admin-template-browser-summary">
+        {{.AssetTotal}} {{if eq .AssetTotal 1}}asset{{else}}assets{{end}}
+        {{if gt .EditableTotal 0}} · {{.EditableTotal}} editable{{end}}
+        {{if gt .FolderTotal 0}} in {{.FolderTotal}} {{if eq .FolderTotal 1}}folder{{else}}folders{{end}}{{end}}.
+      </p>
+      <div class="admin-template-browser-actions">
+        <button type="button" class="btn-admin-ghost btn-admin-sm" data-template-browser-expand>Expand All</button>
+        <button type="button" class="btn-admin-ghost btn-admin-sm" data-template-browser-collapse>Collapse All</button>
+      </div>
+    </div>
+
+    {{if and (not .RootEntries) (not .Folders)}}
+    {{template "table_empty_state" (dict "Icon" "bi-folder2-open" "Title" "No theme assets yet" "Message" "Add CSS, JavaScript, and other files under this theme's assets folder. They are served at /theme/ on the public site." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}
+    {{else}}
+    <div class="admin-template-browser">
+      {{if .RootEntries}}
+      <section class="admin-template-folder admin-template-folder-root">
+        <div class="admin-template-folder-header">
+          <span class="admin-template-folder-icon"><i class="bi bi-folder2"></i></span>
+          <div class="admin-template-folder-heading">
+            <h3 class="admin-template-folder-title">Assets Root</h3>
+            <p class="admin-template-folder-desc">Files in the theme assets directory root.</p>
+          </div>
+          <span class="admin-template-folder-count">{{len .RootEntries}}</span>
+        </div>
+        <div class="admin-table-scroll admin-template-folder-table-wrap">
+          <table class="admin-table admin-table-compact">
+            {{template "asset_file_table_head" (dict "Root" $)}}
+            <tbody>
+              {{range .RootEntries}}
+              {{template "asset_file_row" (dict "Root" $ "Entry" .)}}
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {{end}}
+
+      {{range .Folders}}
+      <details class="admin-template-folder" data-template-folder open>
+        <summary class="admin-template-folder-summary">
+          <span class="admin-template-folder-icon"><i class="bi bi-folder-fill"></i></span>
+          <span class="admin-template-folder-heading">
+            <span class="admin-template-folder-title">{{.Label}}</span>
+            <span class="admin-template-folder-desc">{{.Total}} {{if eq .Total 1}}file{{else}}files{{end}}</span>
+          </span>
+          <span class="admin-template-folder-count">{{.Total}}</span>
+        </summary>
+        <div class="admin-table-scroll admin-template-folder-table-wrap">
+          <table class="admin-table admin-table-compact">
+            {{template "asset_file_table_head" (dict "Root" $)}}
+            <tbody>
+              {{range .Entries}}
+              {{template "asset_file_row" (dict "Root" $ "Entry" .)}}
+              {{end}}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {{end}}
+    </div>
+    {{end}}
+  </div>
+</div>

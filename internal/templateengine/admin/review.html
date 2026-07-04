@@ -1,0 +1,56 @@
+{{template "page_header" .}}
+<div class="admin-data-card">
+  <form method="post" action="{{.BasePath}}" class="admin-bulk-form">
+    {{csrfField}}
+    <div class="admin-table-toolbar admin-table-toolbar-secondary">
+      <div class="admin-bulk-toolbar">
+        <span class="admin-bulk-toolbar-label">With Selected</span>
+        <select class="admin-form-control admin-form-control-sm admin-bulk-action-select" name="bulk_action">
+          <option value="">Bulk Action</option>
+          <option value="approve">Approve &amp; Publish</option>
+          <option value="reject">Return to Draft</option>
+        </select>
+        <button type="submit" class="btn-admin-outline btn-admin-sm" onclick="return confirm('Apply bulk action to selected items?')">Apply</button>
+      </div>
+    </div>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th class="admin-col-check"><input type="checkbox" data-bulk-select-all aria-label="Select all"></th>
+            <th>Title</th>
+            <th>Category</th>
+            <th>Author</th>
+            <th>Submitted</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Rows}}
+          <tr>
+            <td class="admin-col-check"><input type="checkbox" name="item_ids" value="{{.ItemID}}" data-bulk-select-item></td>
+            <td><span class="admin-cell-primary">{{.Title}}</span><div class="admin-cell-muted">{{.Slug}}</div></td>
+            <td>{{if .CategoryName}}{{.CategoryName}}{{else}}—{{end}}</td>
+            <td>{{if .AuthorName}}{{.AuthorName}}{{else}}—{{end}}</td>
+            <td class="admin-cell-muted">{{.UpdatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+            <td class="admin-col-actions">
+              <div class="admin-row-actions">
+                <form method="post" action="{{$.BasePath}}/{{.ItemID}}/approve" class="admin-inline-form">{{csrfField}}
+                  <button type="submit" class="btn-admin-icon" title="Approve"><i class="bi bi-check-circle"></i></button>
+                </form>
+                <form method="post" action="{{$.BasePath}}/{{.ItemID}}/reject" class="admin-inline-form">{{csrfField}}
+                  <button type="submit" class="btn-admin-icon" title="Return to draft"><i class="bi bi-arrow-counterclockwise"></i></button>
+                </form>
+                <a class="btn-admin-icon" href="/admin/items/{{.ItemID}}" data-turbo-frame="_top" title="Edit"><i class="bi bi-pencil"></i></a>
+              </div>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-inbox" "Title" "Review queue is empty" "Message" "Items submitted for review will appear here for approvers.")}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </form>
+  {{template "pagination" .}}
+</div>

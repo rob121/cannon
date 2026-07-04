@@ -6,16 +6,13 @@ import (
 	"github.com/rob121/cannon/internal/hooks"
 )
 
-// NotificationEvents lists hook names available for notification subscriptions.
-var NotificationEvents = []string{
-	hooks.OnUserSignup,
-	hooks.OnUserAfterLogin,
-	hooks.OnUserVerified,
-	hooks.OnUserLocked,
-}
-
 func init() {
-	for _, event := range NotificationEvents {
+	seen := map[string]struct{}{}
+	for _, event := range SubscribableEvents {
+		if _, ok := seen[event]; ok {
+			continue
+		}
+		seen[event] = struct{}{}
 		event := event
 		hooks.Register(event, func(ctx context.Context, e *hooks.Event) (*hooks.Result, error) {
 			DispatchEvent(ctx, event, e.Arguments)

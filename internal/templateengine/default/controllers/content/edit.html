@@ -136,6 +136,9 @@
 
       <div class="d-flex flex-wrap gap-2">
         <button type="submit" class="btn btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+        {{if and (not .IsNew) (not .CanPublish)}}
+        <button type="submit" name="workflow_action" value="submit_review" class="btn btn-outline-primary">Submit for Review</button>
+        {{end}}
         {{if not .IsNew}}<a href="{{itemURL .Item.Slug}}" class="btn btn-outline-secondary">View item</a>{{end}}
       </div>
     </div>

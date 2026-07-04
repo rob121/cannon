@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/themes"
 )
 
@@ -46,7 +47,7 @@ func TestLayoutOfflineNoticeInjectedForCustomTheme(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e := New(&config.SiteConfig{TemplateDir: dir, Name: "Demo"}, themes.Selection{Frontend: "fr"}, nil, nil, nil)
+	e := New(&config.SiteConfig{TemplateDir: dir, Name: "Demo"}, themes.Selection{Frontend: "fr"}, nil, nil, testLayoutFuncs(true))
 	e.SetHookContext(context.Background())
 	defer e.SetHookContext(nil)
 
@@ -71,13 +72,25 @@ func TestInjectAfterBodyOpen(t *testing.T) {
 }
 
 func testLayoutFuncs(offline bool) template.FuncMap {
-	return template.FuncMap{
+	funcs := template.FuncMap{
 		"isOffline":           func() bool { return offline },
 		"siteName":            func() string { return "Demo" },
 		"siteMetaDescription": func() string { return "" },
+		"siteMetaKeywords":    func() string { return "" },
+		"siteOGTitle":         func() string { return "" },
+		"siteOGImage":         func() string { return "" },
+		"siteTwitterCard":     func() string { return "summary_large_image" },
+		"siteTwitterSite":     func() string { return "" },
+		"siteTwitterCreator":  func() string { return "" },
+		"siteHeadExtra":       func() template.HTML { return "" },
 		"year":                func() int { return 2026 },
 		"menu":                func(string) ([]map[string]any, error) { return nil, nil },
 		"lenspace":            func(string) (int, error) { return 0, nil },
 		"space":               func(string) (template.HTML, error) { return "", nil },
+		"controllerURL":       func(string, string) string { return "#" },
 	}
+	for k, v := range lang.TestFuncMap() {
+		funcs[k] = v
+	}
+	return funcs
 }

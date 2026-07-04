@@ -60,7 +60,7 @@
                 </td>
               </tr>
               {{else}}
-              <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No profile fields yet" "Message" "Add fields such as bio, avatar URL, or social links for authors.")}}</td></tr>
+              <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No profile fields yet" "Message" "Add fields such as bio, avatar image, or social links for authors.")}}</td></tr>
               {{end}}
             </tbody>
           </table>
@@ -81,7 +81,7 @@
           </div>
           <div class="col-md-3">
             <label class="admin-form-label">Type</label>
-            <input class="admin-form-control" name="field_type" value="text" required>
+            {{template "field_type_select" (dict "Name" "field_type" "Value" "text" "Required" true)}}
           </div>
           <div class="col-md-2">
             <label class="admin-form-label">Sort</label>
@@ -99,7 +99,8 @@
           </div>
           <div class="col-md-12">
             <label class="admin-form-label">Configuration (JSON)</label>
-            <textarea class="admin-form-control" name="field_configuration" rows="3"></textarea>
+            <textarea class="admin-form-control" name="field_configuration" rows="3" placeholder='{"options":[{"value":"a","label":"Option A"}]}'></textarea>
+            <p class="admin-form-help">Optional. Required for select, radio, and checkbox types. Use <strong>Image</strong> type for avatar or photo fields.</p>
           </div>
         </div>
       </form>

@@ -16,6 +16,8 @@ import (
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/user"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"gorm.io/gorm"
 )
 
@@ -44,6 +46,21 @@ func parseID(s string) (uint, bool) {
 
 func formString(r *http.Request, key string) string {
 	return strings.TrimSpace(r.FormValue(key))
+}
+
+func themeTypeLabel(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "frontend":
+		return "Frontend"
+	case "backend":
+		return "Admin"
+	case "full":
+		return "Full"
+	case "":
+		return "Full"
+	default:
+		return strings.ToUpper(raw[:1]) + strings.ToLower(raw[1:])
+	}
 }
 
 func formStatus(r *http.Request) models.Status {
@@ -83,6 +100,8 @@ func formItemStatus(r *http.Request) models.ItemStatus {
 	switch formString(r, "status") {
 	case string(models.ItemStatusPublished):
 		return models.ItemStatusPublished
+	case string(models.ItemStatusPending):
+		return models.ItemStatusPending
 	case string(models.ItemStatusArchived):
 		return models.ItemStatusArchived
 	case string(models.ItemStatusTrashed):
@@ -184,6 +203,13 @@ func layoutContext(r *http.Request) map[string]any {
 			}
 		}
 	}
+	navCan := navCanMap(r.Context())
+	data["NavCan"] = navCan
+	data["NavContentVisible"] = navGroupVisible(navCan, "items", "review", "trash", "categories", "tags", "field_groups", "media", "comments")
+	data["NavMenusVisible"] = navGroupVisible(navCan, "menus", "menu_items")
+	data["NavUsersVisible"] = navGroupVisible(navCan, "accounts", "authenticators", "profiles", "groups", "roles", "permissions")
+	data["NavAPIVisible"] = navGroupVisible(navCan, "api_credentials", "api_settings")
+	data["NavSystemVisible"] = navGroupVisible(navCan, "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log")
 	return data
 }
 
@@ -232,6 +258,20 @@ func siteAdminURL(host string) string {
 	return strings.TrimRight(siteFrontendURL(host), "/") + "/admin"
 }
 
+func absoluteSiteURL(host, path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return siteFrontendURL(host)
+	}
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	return strings.TrimRight(siteFrontendURL(host), "/") + path
+}
+
 func formUintList(r *http.Request, key string) []uint {
 	var ids []uint
 	for _, s := range r.Form[key] {
@@ -257,7 +297,7 @@ func uintPtrEq(ptr *uint, id uint) bool {
 
 func usersNavOpen(nav string) bool {
 	switch nav {
-	case "accounts", "authenticators", "profiles", "groups", "roles":
+	case "accounts", "authenticators", "profiles", "groups", "roles", "permissions":
 		return true
 	default:
 		return false
@@ -275,7 +315,16 @@ func menusNavOpen(nav string) bool {
 
 func contentNavOpen(nav string) bool {
 	switch nav {
-	case "items", "categories", "tags", "field_groups", "comments", "media":
+	case "items", "categories", "tags", "field_groups", "comments", "media", "trash", "review":
+		return true
+	default:
+		return false
+	}
+}
+
+func apiNavOpen(nav string) bool {
+	switch nav {
+	case "api_credentials", "api_settings":
 		return true
 	default:
 		return false
@@ -284,7 +333,7 @@ func contentNavOpen(nav string) bool {
 
 func systemNavOpen(nav string) bool {
 	switch nav {
-	case "sites", "extension_registry", "blocks", "configuration", "notifications", "access_log":
+	case "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log":
 		return true
 	default:
 		return false
@@ -321,6 +370,20 @@ func loadActiveProfiles(db *gorm.DB) []models.Profile {
 func loadActiveGroups(db *gorm.DB) []models.Group {
 	var rows []models.Group
 	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&rows)
+	return rows
+}
+
+// loadMembershipGroups returns backend organizational groups for user/group RBAC assignment.
+func loadMembershipGroups(db *gorm.DB) []models.Group {
+	var rows []models.Group
+	db.Where("status = ? AND kind = ?", models.StatusActive, models.GroupKindBackend).Order("name asc").Find(&rows)
+	return rows
+}
+
+// loadFrontendGroups returns visibility groups for content, routes, and blocks.
+func loadFrontendGroups(db *gorm.DB) []models.Group {
+	var rows []models.Group
+	db.Where("status = ? AND kind = ?", models.StatusActive, models.GroupKindFrontend).Order("name asc").Find(&rows)
 	return rows
 }
 
@@ -391,4 +454,15 @@ func GroupDisplayName(name string) string {
 	default:
 		return name
 	}
+}
+
+// RoleDisplayName returns the admin-facing label for a role name.
+func RoleDisplayName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	name = strings.ReplaceAll(name, "_", " ")
+	name = strings.ReplaceAll(name, "-", " ")
+	return cases.Title(language.English, cases.NoLower).String(name)
 }

@@ -1,0 +1,5 @@
+<form class="site-search-block site-search-vertical{{if .Class}} {{.Class}}{{end}}" method="get" action="{{.Action}}" role="search">
+  {{if .Label}}<label class="form-label" for="search-block-q-{{.BlockID}}">{{.Label}}</label>{{end}}
+  <input type="search" class="form-control mb-2" id="search-block-q-{{.BlockID}}" name="q" placeholder="{{.Placeholder}}"{{if not .Label}} aria-label="{{.Placeholder}}"{{end}} autocomplete="off">
+  <button type="submit" class="btn btn-primary w-100">{{.Button}}</button>
+</form>

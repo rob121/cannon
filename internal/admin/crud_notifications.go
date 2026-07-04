@@ -133,6 +133,7 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		"BasePath":       notificationsBase,
 		"SelectedEvents": selected,
 		"HookEvents":     notifications.NotificationEvents,
+		"SubscribableGroups": notifications.EventGroups(),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

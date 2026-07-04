@@ -5,18 +5,22 @@ import (
 	"testing"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/themes"
 )
 
 func testAdminFuncs() map[string]any {
-	return map[string]any{
+	funcs := map[string]any{
 		"listQuery":       func(page int, sort, dir string) string { return "?" },
 		"listQueryFromData": func(root map[string]any) string { return "" },
 		"sortLink":        func(basePath string, page int, currentSort, currentDir, col string) string { return basePath },
 		"sortLinkRoot":    func(root map[string]any, col string) string { return "/admin/test" },
 		"containsUint":    func(ids []uint, id uint) bool { return false },
+		"containsString":  func(list []string, value string) bool { return false },
+		"providerName":    func(name string) string { return name },
 		"uintPtrEq":       func(a *uint, b uint) bool { return a != nil && *a == b },
 		"groupName":       func(name string) string { return name },
+		"roleName":        func(name string) string { return name },
 		"joinRoleNames":   func(roles any) string { return "" },
 		"joinGroupNames":  func(groups any) string { return "" },
 		"helpURL":         func(extensionName, articlePath string) string { return "#" },
@@ -27,7 +31,13 @@ func testAdminFuncs() map[string]any {
 		"csrfField":       func() string { return "" },
 		"csrfToken":       func() string { return "test-csrf" },
 		"showRouteTitle":  func() bool { return true },
+		"fieldOptions": func(string) []map[string]string { return nil },
+		"fieldValueContains": func(string, string) bool { return false },
 	}
+	for k, v := range lang.TestFuncMap() {
+		funcs[k] = v
+	}
+	return funcs
 }
 
 func TestAdminTemplateLookup(t *testing.T) {

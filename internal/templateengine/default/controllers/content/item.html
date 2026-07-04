@@ -1,4 +1,7 @@
 <article class="mb-4 site-item-detail">
+  {{if .PreviewMode}}
+  <div class="alert alert-warning mb-4" role="status">Preview mode — this unpublished item is visible only through this secret link.</div>
+  {{end}}
   {{if .ContentSettings.ShowTitle}}
   {{template "pageHeader" (dict "Title" .Item.Title)}}
   {{end}}
@@ -41,15 +44,13 @@
   {{end}}
 
   {{if .FieldDisplays}}
-  <section class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h2 class="h5 card-title">Details</h2>
-      <dl class="row mb-0">
-        {{range .FieldDisplays}}
-        <dt class="col-sm-3">{{.Label}}</dt><dd class="col-sm-9">{{safeHTML .HTML}}</dd>
-        {{end}}
-      </dl>
-    </div>
+  <section class="site-item-fields mb-4" aria-labelledby="item-fields-heading">
+    <h2 id="item-fields-heading" class="h5 mb-3">Details</h2>
+    <dl class="row mb-0 site-item-fields__list">
+      {{range .FieldDisplays}}
+      <dt class="col-sm-3">{{.Label}}</dt><dd class="col-sm-9">{{safeHTML .HTML}}</dd>
+      {{end}}
+    </dl>
   </section>
   {{end}}
 
@@ -68,6 +69,7 @@
   <section class="card shadow-sm" id="comments">
     <div class="card-body">
       <h2 class="h5 card-title">Comments {{if .CommentCount}}<span class="badge text-bg-secondary">{{.CommentCount}}</span>{{end}}</h2>
+      {{if .CommentError}}<div class="alert alert-danger" role="alert">{{.CommentError}}</div>{{end}}
       {{if .CommentSettings.AllowComments}}
         {{if .Comments}}
         <div class="vstack gap-3 mb-4">

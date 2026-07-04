@@ -25,7 +25,7 @@ func TestResolveAdminErrorTemplate(t *testing.T) {
 }
 
 func TestErrorTemplate404(t *testing.T) {
-	e := New(nil, themes.Selection{}, nil, nil, nil)
+	e := New(nil, themes.Selection{}, nil, nil, testFrontendFuncs())
 	tmpl, err := e.parse("default/error/404.html")
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestAdminErrorTemplate404(t *testing.T) {
 }
 
 func TestDefaultErrorTemplateFallback(t *testing.T) {
-	e := New(nil, themes.Selection{}, nil, nil, nil)
+	e := New(nil, themes.Selection{}, nil, nil, testFrontendFuncs())
 	tmpl, err := e.parse("default/error.html")
 	if err != nil {
 		t.Fatal(err)

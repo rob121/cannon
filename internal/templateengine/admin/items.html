@@ -1,6 +1,6 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
-  <div class="admin-table-toolbar">
+  {{template "list_toolbar_open" .}}
     <form method="get" action="{{.BasePath}}" class="admin-filter-form admin-list-filter-form">
       {{template "sort_preserve_fields" .}}
       <div class="admin-filter-field">
@@ -8,6 +8,7 @@
         <select class="admin-form-control admin-form-control-sm" id="items-status-filter" name="status" onchange="this.form.submit()">
           <option value="">All Statuses</option>
           <option value="draft" {{if eq .StatusFilter "draft"}}selected{{end}}>Draft</option>
+          <option value="pending" {{if eq .StatusFilter "pending"}}selected{{end}}>Pending Review</option>
           <option value="published" {{if eq .StatusFilter "published"}}selected{{end}}>Published</option>
           <option value="archived" {{if eq .StatusFilter "archived"}}selected{{end}}>Archived</option>
           <option value="trashed" {{if eq .StatusFilter "trashed"}}selected{{end}}>Trashed</option>
@@ -44,19 +45,22 @@
         </div>
       </div>
     </form>
-  </div>
+  {{template "list_toolbar_close" .}}
 
   <form method="post" action="{{.BasePath}}/bulk{{.ListQuery}}" class="admin-bulk-form">
     {{csrfField}}
-    <div class="admin-table-toolbar admin-table-toolbar-secondary">
+  {{template "list_toolbar_open" (dict "Secondary" true)}}
       <div class="admin-bulk-toolbar">
         <span class="admin-bulk-toolbar-label">With Selected</span>
         <select class="admin-form-control admin-form-control-sm admin-bulk-action-select" name="bulk_action" id="item-bulk-action">
           <option value="">Bulk Action</option>
           <option value="publish">Publish</option>
+          <option value="approve">Approve Pending</option>
           <option value="draft">Mark Draft</option>
+          <option value="reject">Return Pending to Draft</option>
           <option value="archive">Archive</option>
           <option value="trash">Move To Trash</option>
+          <option value="restore">Restore From Trash</option>
           <option value="assign_category">Assign Category</option>
           <option value="assign_tags">Assign Tags</option>
           <option value="delete">Delete Permanently</option>
@@ -74,7 +78,7 @@
         </select>
         <button type="submit" class="btn-admin-outline btn-admin-sm" onclick="return confirm('Apply bulk action to selected items?')">Apply</button>
       </div>
-    </div>
+  {{template "list_toolbar_close" .}}
     <div class="admin-table-scroll">
       <table class="admin-table">
         <thead>
@@ -104,7 +108,7 @@
             <td>{{if .Featured}}Yes{{else}}—{{end}}</td>
             <td>{{template "sort_controls" (dict "Root" $ "ID" .ItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
             <td>{{if .Featured}}{{template "sort_controls" (dict "Root" $ "ID" .ItemID "CanMoveUp" .CanFeaturedMoveUp "CanMoveDown" .CanFeaturedMoveDown "MoveUpAction" "move-featured-up" "MoveDownAction" "move-featured-down")}}{{else}}<span class="admin-cell-muted">—</span>{{end}}</td>
-            {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ItemID "ListQuery" $.ListQuery)}}
+            {{template "row_actions_item" (dict "BasePath" $.BasePath "ID" .ItemID "ListQuery" $.ListQuery)}}
           </tr>
           {{else}}
           <tr><td colspan="9" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-journal-richtext" "Title" "No items yet" "Message" "Create your first content item to start publishing." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>

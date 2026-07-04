@@ -1,7 +1,6 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
-  <div class="admin-list-card-header">
-    <div class="admin-table-toolbar">
+  {{template "list_toolbar_open" .}}
       <form class="admin-filter-form" method="get" action="{{.BasePath}}">
         {{template "sort_preserve_fields" .}}
         <label class="admin-form-label" for="space-filter">Space</label>
@@ -15,8 +14,7 @@
         <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear filter</a>
         {{end}}
       </form>
-    </div>
-  </div>
+  {{template "list_toolbar_close" .}}
   <div class="admin-table-scroll">
     <table class="admin-table">
       <thead>

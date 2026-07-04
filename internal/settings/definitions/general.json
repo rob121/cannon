@@ -6,12 +6,7 @@
       "site_name": {
         "type": "string",
         "title": "Site Display Name",
-        "description": "Shown in admin headers and system emails."
-      },
-      "site_meta_description": {
-        "type": "string",
-        "title": "Site Meta Description",
-        "description": "Default meta description for public pages without item-specific SEO."
+        "description": "Shown in admin headers, page titles, and system emails."
       },
       "allow_login": {
         "type": "boolean",
@@ -24,6 +19,35 @@
         "title": "Allow Signup",
         "default": true,
         "description": "When disabled, public account registration is unavailable."
+      },
+      "allow_mfa_totp": {
+        "type": "boolean",
+        "title": "Allow MFA (TOTP)",
+        "default": false,
+        "description": "When enabled, users can enroll an authenticator app and must complete MFA at sign-in when enrolled."
+      },
+      "allow_passkeys": {
+        "type": "boolean",
+        "title": "Allow Passkeys",
+        "default": false,
+        "description": "When enabled, users can register passkeys for second-factor or passwordless sign-in."
+      },
+      "captcha_enabled": {
+        "type": "boolean",
+        "title": "Enable Captcha",
+        "default": false,
+        "description": "When enabled, Cannon expands <captcha> placeholders using the active captcha extension."
+      },
+      "captcha_active_extension": {
+        "type": "string",
+        "title": "Active Captcha Extension",
+        "description": "Extension name that handles <captcha provider=\"any\"> placeholders. Ignored when captcha is disabled."
+      },
+      "captcha_skip_authenticated": {
+        "type": "boolean",
+        "title": "Skip Captcha For Signed-In Users",
+        "default": true,
+        "description": "When enabled, authenticated users do not see captcha widgets and verification is not required on submit."
       },
       "site_offline": {
         "type": "boolean",
@@ -70,6 +94,25 @@
         "default": "admin",
         "enum": ["admin"],
         "description": "Template pack used for the admin UI. Built-in admin uses embedded templates; custom themes live as folders under the site template directory."
+      },
+      "content_multilingual": {
+        "type": "boolean",
+        "title": "Multilingual Content",
+        "default": false,
+        "description": "When enabled, items and categories are scoped by locale and public URLs may use a /{locale} prefix."
+      },
+      "content_default_locale": {
+        "type": "string",
+        "title": "Default Content Locale",
+        "default": "en-US",
+        "description": "Locale used for content without an explicit locale prefix in the URL."
+      },
+      "content_locales": {
+        "type": "array",
+        "title": "Content Locales",
+        "items": { "type": "string" },
+        "default": ["en-US"],
+        "description": "Locales available for content. Falls back to installed language files when empty."
       }
     }
   },
@@ -77,15 +120,34 @@
     "type": "VerticalLayout",
     "elements": [
       {"type": "Control", "scope": "#/properties/site_name"},
-      {"type": "Control", "scope": "#/properties/site_meta_description"},
       {"type": "Control", "scope": "#/properties/allow_login"},
       {"type": "Control", "scope": "#/properties/allow_signup"},
+      {"type": "Control", "scope": "#/properties/allow_mfa_totp"},
+      {"type": "Control", "scope": "#/properties/allow_passkeys"},
+      {
+        "type": "Group",
+        "label": "Captcha",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/captcha_enabled"},
+          {"type": "Control", "scope": "#/properties/captcha_active_extension"},
+          {"type": "Control", "scope": "#/properties/captcha_skip_authenticated"}
+        ]
+      },
       {"type": "Control", "scope": "#/properties/site_offline"},
       {"type": "Control", "scope": "#/properties/default_list_limit"},
       {"type": "Control", "scope": "#/properties/log_level"},
       {"type": "Control", "scope": "#/properties/debug_template_spaces"},
       {"type": "Control", "scope": "#/properties/frontend_theme"},
-      {"type": "Control", "scope": "#/properties/admin_theme"}
+      {"type": "Control", "scope": "#/properties/admin_theme"},
+      {
+        "type": "Group",
+        "label": "Multilingual Content",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/content_multilingual"},
+          {"type": "Control", "scope": "#/properties/content_default_locale"},
+          {"type": "Control", "scope": "#/properties/content_locales"}
+        ]
+      }
     ]
   }
 }

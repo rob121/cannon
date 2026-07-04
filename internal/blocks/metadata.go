@@ -27,8 +27,12 @@ type Metadata struct {
 	PublishStart     *time.Time `json:"publish_start,omitempty"`
 	PublishEnd       *time.Time `json:"publish_end,omitempty"`
 	LoginTitle       string     `json:"login_title,omitempty"`
-	MenuName         string     `json:"menu_name,omitempty"`
-	MenuClass        string     `json:"menu_class,omitempty"`
+	MenuName          string     `json:"menu_name,omitempty"`
+	MenuClass         string     `json:"menu_class,omitempty"`
+	SearchPlaceholder string     `json:"search_placeholder,omitempty"`
+	SearchButton      string     `json:"search_button,omitempty"`
+	SearchLabel       string     `json:"search_label,omitempty"`
+	SearchClass       string     `json:"search_class,omitempty"`
 }
 
 // ParseMetadata decodes block metadata JSON.
@@ -126,6 +130,11 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 	case "menu-vertical", "menu-horizontal":
 		meta["menu_name"] = strings.TrimSpace(values.Get("menu_name"))
 		meta["menu_class"] = strings.TrimSpace(values.Get("menu_class"))
+	case "search-horizontal", "search-vertical":
+		meta["search_placeholder"] = strings.TrimSpace(values.Get("search_placeholder"))
+		meta["search_button"] = strings.TrimSpace(values.Get("search_button"))
+		meta["search_label"] = strings.TrimSpace(values.Get("search_label"))
+		meta["search_class"] = strings.TrimSpace(values.Get("search_class"))
 	case "extension":
 		for key, vals := range values {
 			if !strings.HasPrefix(key, "block_data_") || len(vals) == 0 {

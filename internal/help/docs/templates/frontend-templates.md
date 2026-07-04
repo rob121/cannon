@@ -116,7 +116,7 @@ Named regions in templates for extension blocks:
 {{if gt (lenspace "header") 0}}<div>{{space "header"}}</div>{{end}}
 ```
 
-Enable **Debug Template Spaces** under Configuration → General, then append `?tp=1` to public URLs.
+Enable **Debug Template Spaces** under Configuration → General, then append `?tp=1` to public URLs. The same `?tp=1` query also appends each `{{lang "key"}}` lookup key in parentheses (e.g. `Sign in (nav.sign_in)`) to help when editing locale files.
 
 ---
 

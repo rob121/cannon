@@ -1,0 +1,49 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Cannon Content API",
+    "version": "1.0.0",
+    "description": "Headless read-only content and account self-service API for Cannon CMS."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Cannon-API-Key"
+      },
+      "UserBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [{ "ApiKeyAuth": [] }],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Login",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": { "200": { "description": "JWT issued or MFA required" } }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Account"],
+        "summary": "Current user profile",
+        "security": [{ "ApiKeyAuth": [] }, { "UserBearerAuth": [] }],
+        "responses": { "200": { "description": "Profile" } }
+      }
+    },
+    "/items": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List visible published items",
+        "responses": { "200": { "description": "Paginated items" } }
+      }
+    }
+  }
+}

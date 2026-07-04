@@ -21,7 +21,7 @@ func builtinPartialsFor(name string) []string {
 	var partials []string
 	switch name {
 	case "default/layout.html":
-		partials = append(partials, "default/partials/offline-notice.html")
+		partials = append(partials, "default/partials/meta-tags.html", "default/partials/offline-notice.html", "default/partials/menu-nav.html")
 	case "default/controllers/auth/login.html", "default/partials/blocks/login.html", "default/offline.html":
 		partials = append(partials, loginFormPartial)
 	case errorFallbackPage:
@@ -44,8 +44,15 @@ func builtinPartialsFor(name string) []string {
 	if name == "default/controllers/content/item.html" {
 		partials = append(partials, "default/partials/content/item-media.html")
 	}
-	if name == "default/controllers/content/edit.html" {
-		partials = append(partials, "default/partials/content/custom-field-input.html")
+	if name == "default/partials/blocks/menu-horizontal.html" {
+		partials = append(partials, "default/partials/menu-nav.html")
+	}
+	if name == "default/controllers/content/edit.html" || name == "default/controllers/auth/profile.html" {
+		partials = append(partials,
+			"default/partials/content/custom-field-input.html",
+			"default/partials/content/media-field-input.html",
+			"default/partials/auth/account-security.html",
+		)
 	}
 	return partials
 }

@@ -183,21 +183,37 @@ func (h *Handler) renderExtensionForm(w http.ResponseWriter, r *http.Request, ex
 	if site != nil {
 		templateDir = site.TemplateDir
 	}
+	displayTitle := extensionDisplayTitle(firstNonEmpty(meta.Title, row.Title), row.MenuName, row.Name)
+	subtitle := row.Name
+	if version := firstNonEmpty(meta.Version, row.Version); version != "" {
+		subtitle += " · v" + version
+	}
+	hasConfig := false
+	configURL := ""
+	if rt, ok := extMgr.Runtime(row.Name); ok && strings.TrimSpace(rt.Capabilities.Configuration) != "" {
+		hasConfig = true
+		configURL = configurationBase + "/extensions/" + url.PathEscape(row.Name)
+	}
 	data := formData(map[string]any{
-		"ActiveNav":     "extension_registry",
-		"Row":           row,
-		"Running":       extMgr.IsRunning(row.Name),
-		"Meta":          mergeExtensionMeta(meta, row),
-		"Capabilities":  extMgr.CapabilitiesSummary(row.Name),
-		"Templates":     extMgr.TemplateSummary(row.Name, templateDir),
-		"BasePath":      extensionsBase,
-		"TemplatesBase": templatesBase,
-		"DisplayTitle":  extensionDisplayTitle(firstNonEmpty(meta.Title, row.Title), row.MenuName, row.Name),
+		"ActiveNav":        "extension_registry",
+		"Row":              row,
+		"Running":          extMgr.IsRunning(row.Name),
+		"Meta":             mergeExtensionMeta(meta, row),
+		"Capabilities":     extMgr.CapabilitiesSummary(row.Name),
+		"Templates":        extMgr.TemplateSummary(row.Name, templateDir),
+		"BasePath":         extensionsBase,
+		"TemplatesBase":    templatesBase,
+		"DisplayTitle":     displayTitle,
+		"Subtitle":         subtitle,
+		"ListURL":          extensionsBase,
+		"CancelURL":        extensionsBase,
+		"HasConfiguration": hasConfig,
+		"ConfigurationURL": configURL,
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
-	h.render(w, r, "Edit Extension", "admin/extensions_form.html", data)
+	h.render(w, r, displayTitle, "admin/extensions_form.html", data)
 }
 
 func (h *Handler) extensionTemplateOverride(w http.ResponseWriter, r *http.Request, idStr string) {

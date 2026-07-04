@@ -26,12 +26,13 @@ func Slugify(v string) string {
 	return v
 }
 
-// UniqueItemSlug returns a slug unused by other items.
+// UniqueItemSlug returns a slug unused by other items in the same locale.
 func UniqueItemSlug(ctx context.Context, base string, excludeID uint) (string, error) {
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return "", err
 	}
+	locale := LocaleFromContext(ctx)
 	slug := Slugify(base)
 	for i := 0; i < 100; i++ {
 		candidate := slug
@@ -39,7 +40,7 @@ func UniqueItemSlug(ctx context.Context, base string, excludeID uint) (string, e
 			candidate = slug + "-" + strconv.Itoa(i)
 		}
 		var count int64
-		q := db.Model(&models.Item{}).Where("slug = ?", candidate)
+		q := db.Model(&models.Item{}).Where("slug = ? AND locale = ?", candidate, locale)
 		if excludeID > 0 {
 			q = q.Where("item_id <> ?", excludeID)
 		}
@@ -120,10 +121,11 @@ func uniquifyCategorySlug(ctx context.Context, base string, excludeID uint) (str
 	if err != nil {
 		return "", err
 	}
+	locale := LocaleFromContext(ctx)
 	for i := 0; i < 100; i++ {
 		candidate := categorySlugWithSuffix(base, i)
 		var count int64
-		q := db.Model(&models.Category{}).Where("slug = ?", candidate)
+		q := db.Model(&models.Category{}).Where("slug = ? AND locale = ?", candidate, locale)
 		if excludeID > 0 {
 			q = q.Where("category_id <> ?", excludeID)
 		}
@@ -177,13 +179,17 @@ func UniqueTagSlug(ctx context.Context, base string, excludeID uint) (string, er
 
 // PublishedScope limits queries to viewable published items.
 func PublishedScope(db *gorm.DB, now time.Time) *gorm.DB {
-	return db.Where("status = ?", models.ItemStatusPublished).
-		Where("(publish_start IS NULL OR publish_start <= ?)", now).
-		Where("(publish_end IS NULL OR publish_end >= ?)", now)
+	return db.Where("items.status = ?", models.ItemStatusPublished).
+		Where("(items.publish_start IS NULL OR items.publish_start <= ?)", now).
+		Where("(items.publish_end IS NULL OR items.publish_end >= ?)", now)
 }
 
-// VisibleItemsQuery returns published items visible to viewer groups.
+// VisibleItemsQuery returns published items visible to viewer groups in the active locale.
 func VisibleItemsQuery(ctx context.Context, viewerGroups []uint) (*gorm.DB, error) {
+	return visibleItemsQuery(ctx, viewerGroups, true)
+}
+
+func visibleItemsQuery(ctx context.Context, viewerGroups []uint, localeScoped bool) (*gorm.DB, error) {
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return nil, err
@@ -194,6 +200,9 @@ func VisibleItemsQuery(ctx context.Context, viewerGroups []uint) (*gorm.DB, erro
 		Preload("Tags").
 		Preload("Author").
 		Preload("Groups")
+	if localeScoped {
+		q = applyLocaleScope(q, ctx, "items")
+	}
 	return filterByGroups(q, viewerGroups), nil
 }
 
@@ -213,61 +222,67 @@ func filterByGroups(q *gorm.DB, viewerGroups []uint) *gorm.DB {
 
 // ListItems returns paginated visible items with optional filters.
 func ListItems(ctx context.Context, viewerGroups []uint, opts ListOptions) ([]models.Item, int64, error) {
-	q, err := VisibleItemsQuery(ctx, viewerGroups)
+	q, err := visibleItemsQuery(ctx, viewerGroups, !opts.AllLocales)
 	if err != nil {
 		return nil, 0, err
 	}
 	if len(opts.CategoryIDs) > 0 {
-		q = q.Where("category_id IN ?", opts.CategoryIDs)
+		q = q.Where("items.category_id IN ?", opts.CategoryIDs)
 	} else if opts.CategoryID > 0 {
-		q = q.Where("category_id = ?", opts.CategoryID)
+		q = q.Where("items.category_id = ?", opts.CategoryID)
 	}
 	if opts.AuthorID > 0 {
-		q = q.Where("author_id = ?", opts.AuthorID)
+		q = q.Where("items.author_id = ?", opts.AuthorID)
 	}
 	if opts.Featured {
-		q = q.Where("featured = ?", true)
+		q = q.Where("items.featured = ?", true)
 	}
 	if opts.TagID > 0 {
 		q = q.Joins("JOIN item_tags ON item_tags.item_item_id = items.item_id AND item_tags.tag_tag_id = ?", opts.TagID)
 	}
-	if strings.TrimSpace(opts.Query) != "" {
-		like := "%" + strings.TrimSpace(opts.Query) + "%"
-		q = q.Where("title LIKE ? OR intro LIKE ? OR body LIKE ?", like, like, like)
+	db, dbErr := sites.DB(ctx)
+	if dbErr != nil {
+		return nil, 0, dbErr
+	}
+	q = applyFieldFilters(db, q, opts.FieldFilters)
+	var searchErr error
+	q, searchErr = applySearchQuery(ctx, db, q, opts)
+	if searchErr != nil {
+		return nil, 0, searchErr
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	order := "sort ASC, created_at DESC"
+	order := "items.sort ASC, items.created_at DESC"
 	if opts.Featured && (opts.Sort == "" || opts.Sort == "sort" || opts.Sort == "featured_sort") {
 		if opts.Sort == "featured_sort" && opts.Dir == "desc" {
-			order = "featured_sort DESC, created_at DESC"
+			order = "items.featured_sort DESC, items.created_at DESC"
 		} else {
-			order = "featured_sort ASC, created_at DESC"
+			order = "items.featured_sort ASC, items.created_at DESC"
 		}
 	} else {
 		switch opts.Sort {
 		case "title":
 			if opts.Dir == "desc" {
-				order = "title DESC"
+				order = "items.title DESC"
 			} else {
-				order = "title ASC"
+				order = "items.title ASC"
 			}
 		case "sort":
 			if opts.Dir == "desc" {
-				order = "sort DESC, created_at DESC"
+				order = "items.sort DESC, items.created_at DESC"
 			}
 		case "featured":
-			order = "featured DESC, featured_sort ASC, created_at DESC"
+			order = "items.featured DESC, items.featured_sort ASC, items.created_at DESC"
 		case "featured_sort":
 			if opts.Dir == "desc" {
-				order = "featured_sort DESC, created_at DESC"
+				order = "items.featured_sort DESC, items.created_at DESC"
 			} else {
-				order = "featured_sort ASC, created_at DESC"
+				order = "items.featured_sort ASC, items.created_at DESC"
 			}
 		case "popular":
-			order = "(SELECT COUNT(*) FROM comments WHERE comments.item_id = items.item_id AND comments.approved = 1) DESC, created_at DESC"
+			order = "(SELECT COUNT(*) FROM comments WHERE comments.item_id = items.item_id AND comments.approved = 1) DESC, items.created_at DESC"
 		}
 	}
 	page := opts.Page
@@ -298,12 +313,14 @@ type ListOptions struct {
 	AuthorID       uint
 	TagID          uint
 	Query          string
+	FieldFilters   map[string]string
 	Featured       bool
 	Sort           string
 	Dir            string
 	Page           int
 	Limit          int
 	NoPagination   bool
+	AllLocales     bool
 }
 
 // ItemBySlug loads a published item by slug.
@@ -329,7 +346,8 @@ func CategoryBySlug(ctx context.Context, slug string, viewerGroups []uint) (*mod
 		return nil, err
 	}
 	var cat models.Category
-	if err := db.Preload("Groups").Where("slug = ? AND status = ?", slug, models.StatusActive).First(&cat).Error; err != nil {
+	q := applyLocaleScope(db, ctx, "categories")
+	if err := q.Preload("Groups").Where("slug = ? AND status = ?", slug, models.StatusActive).First(&cat).Error; err != nil {
 		return nil, err
 	}
 	if !groups.CanViewContent(viewerGroups, cat.Groups) {
@@ -351,14 +369,27 @@ func TagBySlug(ctx context.Context, slug string) (*models.Tag, error) {
 	return &tag, nil
 }
 
-// CategoryTree returns active categories sorted for display.
+// CategoryTree returns active categories for the active content locale.
 func CategoryTree(ctx context.Context) ([]models.Category, error) {
+	return categoryTree(ctx, true)
+}
+
+// CategoryTreeAll returns active categories across all locales (admin use).
+func CategoryTreeAll(ctx context.Context) ([]models.Category, error) {
+	return categoryTree(ctx, false)
+}
+
+func categoryTree(ctx context.Context, localeScoped bool) ([]models.Category, error) {
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var rows []models.Category
-	if err := db.Where("status = ?", models.StatusActive).Order("sort ASC, name ASC").Find(&rows).Error; err != nil {
+	q := db.Model(&models.Category{})
+	if localeScoped {
+		q = applyLocaleScope(q, ctx, "categories")
+	}
+	if err := q.Where("status = ?", models.StatusActive).Order("sort ASC, name ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	return rows, nil

@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/auth"
+	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/groups"
@@ -53,6 +55,19 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	userCtx, _ := userContext(ctx)
+	if shouldVerifyExtensionFormCaptcha(r) {
+		applies, err := captcha.AppliesToSubmit(ctx, r, captcha.CaptchaContextForm)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if applies {
+			if err := captcha.VerifySubmit(ctx, r, captcha.CaptchaContextForm); err != nil {
+				http.Error(w, captcha.UserFacingError(err), http.StatusForbidden)
+				return
+			}
+		}
+	}
 	if handled, err := d.ext.ServeExtensionData(ctx, w, r, userCtx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -117,6 +132,30 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		site, _ := sites.FromContext(ctx)
 		path := filepath.Join(site.AssetsDir, route.Target)
 		http.ServeFile(w, r, path)
+	case models.RouteTypeIframe:
+		target := strings.TrimSpace(route.Target)
+		if target == "" {
+			d.renderFrontendError(w, r, http.StatusNotFound, "")
+			return
+		}
+		var contentBuf bytes.Buffer
+		if err := d.tpl.RenderFragment(&contentBuf, "default/partials/route-iframe.html", map[string]any{
+			"URL":   template.URL(target),
+			"Title": route.Name,
+		}); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data := map[string]any{
+			"Title":   route.Name,
+			"Content": template.HTML(contentBuf.String()),
+			"Wide":    true,
+		}
+		d.tpl.SetHookContext(ctx)
+		if err := d.tpl.Render(w, "default/layout.html", "default/page.html", data); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		d.tpl.SetHookContext(nil)
 	case models.RouteTypeExtension:
 		userCtx, _ := userContext(ctx)
 		pageData, err := routemeta.MetadataMap(route.Metadata)
@@ -198,6 +237,19 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		d.renderFrontendError(w, r, http.StatusNotFound, "")
 	}
+}
+
+func shouldVerifyExtensionFormCaptcha(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	switch r.Method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+	default:
+		return false
+	}
+	_, _, ok := extensions.ParseExtensionDataPath(r.URL.Path)
+	return ok
 }
 
 func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path string) (models.Route, bool, error) {

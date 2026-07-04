@@ -9,9 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="/admin/assets/admin.css?v=42" rel="stylesheet">
+  <link href="/admin/assets/admin.css?v=43" rel="stylesheet">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-esm.js"></script>
-  <script src="/admin/assets/admin.js?v=26" defer></script>
+  <script src="/admin/assets/admin.js?v=27" defer></script>
 </head>
 <body class="admin-body">
   <div class="admin-app">
@@ -24,10 +24,13 @@
         <span class="admin-brand-text">Cannon</span>
       </a>
       <nav class="admin-nav">
+        {{if index .NavCan "dashboard"}}
         <div class="admin-nav-label">Overview</div>
         <a class="admin-nav-link{{if eq .ActiveNav "dashboard"}} active{{end}}" href="/admin" data-turbo-frame="_top">
           <i class="bi bi-grid-1x2"></i><span>Dashboard</span>
         </a>
+        {{end}}
+        {{if .NavContentVisible}}
         <div class="admin-nav-label">Content</div>
         <div class="admin-nav-group{{if .NavContentOpen}} open{{end}}" id="nav-content-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavContentOpen}} active{{end}}" aria-expanded="{{if .NavContentOpen}}true{{else}}false{{end}}">
@@ -36,32 +39,60 @@
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
+            {{if index .NavCan "items"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "items"}} active{{end}}" href="/admin/items" data-turbo-frame="_top">
               <span>Items</span>
             </a>
+            {{end}}
+            {{if index .NavCan "review"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "review"}} active{{end}}" href="/admin/review" data-turbo-frame="_top">
+              <span>Review Queue</span>
+            </a>
+            {{end}}
+            {{if index .NavCan "trash"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "trash"}} active{{end}}" href="/admin/trash" data-turbo-frame="_top">
+              <span>Trash</span>
+            </a>
+            {{end}}
+            {{if index .NavCan "categories"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "categories"}} active{{end}}" href="/admin/categories" data-turbo-frame="_top">
               <span>Categories</span>
             </a>
+            {{end}}
+            {{if index .NavCan "tags"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "tags"}} active{{end}}" href="/admin/tags" data-turbo-frame="_top">
               <span>Tags</span>
             </a>
+            {{end}}
+            {{if index .NavCan "field_groups"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "field_groups"}} active{{end}}" href="/admin/field-groups" data-turbo-frame="_top">
               <span>Field Groups</span>
             </a>
+            {{end}}
+            {{if index .NavCan "media"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "media"}} active{{end}}" href="/admin/media" data-turbo-frame="_top">
               <span>Media</span>
             </a>
+            {{end}}
+            {{if index .NavCan "comments"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "comments"}} active{{end}}" href="/admin/comments" data-turbo-frame="_top">
               <span>Comments</span>
             </a>
+            {{end}}
           </div>
         </div>
+        {{end}}
+        {{if index .NavCan "routes"}}
         <a class="admin-nav-link{{if eq .ActiveNav "routes"}} active{{end}}" href="/admin/routes" data-turbo-frame="_top">
           <i class="bi bi-signpost-split"></i><span>Routes</span>
         </a>
+        {{end}}
+        {{if index .NavCan "templates"}}
         <a class="admin-nav-link{{if eq .ActiveNav "templates"}} active{{end}}" href="/admin/templates" data-turbo-frame="_top">
           <i class="bi bi-file-earmark-code"></i><span>Templates</span>
         </a>
+        {{end}}
+        {{if .NavMenusVisible}}
         <div class="admin-nav-group{{if .NavMenusOpen}} open{{end}}" id="nav-menus-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavMenusOpen}} active{{end}}" aria-expanded="{{if .NavMenusOpen}}true{{else}}false{{end}}">
             <i class="bi bi-list-ul"></i>
@@ -69,19 +100,25 @@
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
+            {{if index .NavCan "menus"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "menus"}} active{{end}}" href="/admin/menus" data-turbo-frame="_top">
               <span>Menus</span>
             </a>
+            {{end}}
+            {{if index .NavCan "menu_items"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "menu_items"}} active{{end}}" href="/admin/menu-items" data-turbo-frame="_top">
               <span>Menu Items</span>
             </a>
+            {{end}}
           </div>
         </div>
-        <div class="admin-nav-label">Extensions</div>
+        {{end}}
+        {{if .NavExtensionAppsVisible}}
+        <div class="admin-nav-label">Extension Apps</div>
         <div class="admin-nav-group{{if .NavExtensionAppsOpen}} open{{end}}" id="nav-extension-apps-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavExtensionAppsOpen}} active{{end}}" aria-expanded="{{if .NavExtensionAppsOpen}}true{{else}}false{{end}}">
             <i class="bi bi-puzzle"></i>
-            <span>Extensions</span>
+            <span>Extension Apps</span>
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
@@ -92,7 +129,38 @@
             {{end}}
           </div>
         </div>
+        {{end}}
+        {{if .NavAPIVisible}}
+        <div class="admin-nav-label">API</div>
+        <div class="admin-nav-group{{if .NavAPIOpen}} open{{end}}" id="nav-api-group">
+          <button type="button" class="admin-nav-group-toggle{{if .NavAPIOpen}} active{{end}}" aria-expanded="{{if .NavAPIOpen}}true{{else}}false{{end}}">
+            <i class="bi bi-braces"></i>
+            <span>Headless API</span>
+            <i class="bi bi-chevron-down admin-nav-chevron"></i>
+          </button>
+          <div class="admin-nav-sub">
+            {{if index .NavCan "api_credentials"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "api_credentials"}} active{{end}}" href="/admin/api/credentials" data-turbo-frame="_top">
+              <span>Credentials</span>
+            </a>
+            {{end}}
+            {{if index .NavCan "api_settings"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "api_settings"}} active{{end}}" href="/admin/api/settings" data-turbo-frame="_top">
+              <span>Settings</span>
+            </a>
+            {{end}}
+            {{if index .NavCan "api_credentials"}}
+            <a class="admin-nav-sublink" href="/api/v1/docs" target="_blank" rel="noopener">
+              <span>Documentation</span>
+            </a>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+        {{if or .NavUsersVisible .NavSystemVisible}}
         <div class="admin-nav-label">System</div>
+        {{end}}
+        {{if .NavUsersVisible}}
         <div class="admin-nav-group{{if .NavUsersOpen}} open{{end}}" id="nav-users-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavUsersOpen}} active{{end}}" aria-expanded="{{if .NavUsersOpen}}true{{else}}false{{end}}">
             <i class="bi bi-people"></i>
@@ -100,23 +168,40 @@
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
+            {{if index .NavCan "accounts"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "accounts"}} active{{end}}" href="/admin/users" data-turbo-frame="_top">
               <span>Accounts</span>
             </a>
+            {{end}}
+            {{if index .NavCan "authenticators"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "authenticators"}} active{{end}}" href="/admin/authenticators" data-turbo-frame="_top">
               <span>Authenticators</span>
             </a>
+            {{end}}
+            {{if index .NavCan "profiles"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "profiles"}} active{{end}}" href="/admin/profiles" data-turbo-frame="_top">
               <span>Profiles</span>
             </a>
+            {{end}}
+            {{if index .NavCan "groups"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "groups"}} active{{end}}" href="/admin/groups" data-turbo-frame="_top">
               <span>Groups</span>
             </a>
+            {{end}}
+            {{if index .NavCan "roles"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "roles"}} active{{end}}" href="/admin/roles" data-turbo-frame="_top">
               <span>Roles</span>
             </a>
+            {{end}}
+            {{if index .NavCan "permissions"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "permissions"}} active{{end}}" href="/admin/permissions" data-turbo-frame="_top">
+              <span>Permissions</span>
+            </a>
+            {{end}}
           </div>
         </div>
+        {{end}}
+        {{if .NavSystemVisible}}
         <div class="admin-nav-group{{if .NavSystemOpen}} open{{end}}" id="nav-system-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavSystemOpen}} active{{end}}" aria-expanded="{{if .NavSystemOpen}}true{{else}}false{{end}}">
             <i class="bi bi-gear"></i>
@@ -124,32 +209,49 @@
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
+            {{if index .NavCan "sites"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "sites"}} active{{end}}" href="/admin/sites" data-turbo-frame="_top">
               <span>Sites</span>
             </a>
+            {{end}}
+            {{if index .NavCan "extension_registry"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "extension_registry"}} active{{end}}" href="/admin/extensions" data-turbo-frame="_top">
-              <span>Extensions</span>
+              <span>Extension Registry</span>
             </a>
+            {{end}}
+            {{if index .NavCan "blocks"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "blocks"}} active{{end}}" href="/admin/blocks" data-turbo-frame="_top">
               <span>Blocks</span>
             </a>
+            {{end}}
+            {{if index .NavCan "configuration"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "configuration"}} active{{end}}" href="/admin/configuration" data-turbo-frame="_top">
               <span>Configuration</span>
             </a>
+            {{end}}
+            {{if index .NavCan "notifications"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "notifications"}} active{{end}}" href="/admin/notifications" data-turbo-frame="_top">
               <span>Notifications</span>
             </a>
+            {{end}}
+            {{if index .NavCan "access_log"}}
             <a class="admin-nav-sublink{{if eq .ActiveNav "access_log"}} active{{end}}" href="/admin/system/access-log" data-turbo-frame="_top">
               <span>Access Log</span>
             </a>
+            {{end}}
           </div>
         </div>
+        {{end}}
+        {{if index .NavCan "help"}}
         <a class="admin-nav-link{{if eq .ActiveNav "help"}} active{{end}}" href="/admin/help" data-turbo-frame="_top">
           <i class="bi bi-question-circle"></i><span>Help</span>
         </a>
+        {{end}}
+        {{if index .NavCan "languages"}}
         <a class="admin-nav-link{{if eq .ActiveNav "languages"}} active{{end}}" href="/admin/languages" data-turbo-frame="_top">
           <i class="bi bi-translate"></i><span>Languages</span>
         </a>
+        {{end}}
       </nav>
       <div class="admin-sidebar-footer"><span>Cannon CMS</span></div>
     </aside>
@@ -191,5 +293,8 @@
       </main>
     </div>
   </div>
+  <dialog class="admin-media-picker-dialog" id="media-picker-dialog">
+    <turbo-frame id="media-picker-frame"></turbo-frame>
+  </dialog>
 </body>
 </html>

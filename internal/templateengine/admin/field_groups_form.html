@@ -1,8 +1,9 @@
 {{template "page_header" .}}
+{{template "form_toolbar" (dict "FormID" "field-group-form" "BasePath" .BasePath "CancelURL" .BasePath)}}
 <div class="admin-form-card">
   <div class="admin-form-card-body">
     {{template "error_alert" .}}
-    <form method="post">
+    <form method="post" id="field-group-form">
       {{csrfField}}
       <div class="row g-3">
         <div class="col-md-6">
@@ -10,16 +11,12 @@
           <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
         </div>
       </div>
-      {{template "form_actions" .}}
     </form>
   </div>
 </div>
 {{if not .IsNew}}
 <div class="admin-data-card mt-4">
-  <div class="admin-table-toolbar">
-    <span class="admin-table-count">Custom Fields</span>
-    <a class="btn-admin-outline btn-admin-sm" href="{{.BasePath}}/{{.Row.FieldGroupID}}/fields/new">Add Field</a>
-  </div>
+  {{template "list_toolbar_action" (dict "Title" "Custom Fields" "ActionURL" (printf "%s/%d/fields/new" .BasePath .Row.FieldGroupID) "ActionLabel" "Add Field" "ActionIcon" "bi-plus-lg")}}
   <div class="admin-table-scroll">
     <table class="admin-table">
       <thead>
@@ -27,28 +24,34 @@
           <th>Label</th>
           <th>Name</th>
           <th>Type</th>
-          <th>Sort</th>
+          <th>Order</th>
           <th>Status</th>
           <th class="admin-col-actions"></th>
         </tr>
       </thead>
       <tbody>
-        {{range .Row.Fields}}
+        {{range .FieldRows}}
         <tr>
-          <td>{{.Label}}</td>
+          <td>{{.Label}}{{if .Required}} <span class="admin-cell-muted">*</span>{{end}}</td>
           <td><code class="admin-code">{{.Name}}</code></td>
           <td>{{.Type}}</td>
-          <td>{{.Sort}}</td>
-          <td>{{.Status}}</td>
+          <td>{{template "sort_controls" (dict "Root" (dict "BasePath" (printf "%s/%d/fields" $.BasePath $.Row.FieldGroupID)) "ID" .FieldID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
+          <td>{{template "status_toggle" (dict "BasePath" (printf "%s/%d/fields" $.BasePath $.Row.FieldGroupID) "ID" .FieldID "Status" .Status)}}</td>
           <td class="admin-col-actions">
-            <a class="btn-admin-icon" href="{{$.BasePath}}/{{$.Row.FieldGroupID}}/fields/{{.FieldID}}" title="Edit"><i class="bi bi-pencil"></i></a>
+            <a class="btn-admin-icon" href="{{$.BasePath}}/{{$.Row.FieldGroupID}}/fields/{{.FieldID}}" data-turbo-frame="_top" title="Edit"><i class="bi bi-pencil"></i></a>
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No fields defined" "Message" "Add custom fields to collect extra data on items in this group.")}}</td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-ui-checks" "Title" "No fields defined" "Message" "Add custom fields to collect extra data on items in this group." "ActionURL" (printf "%s/%d/fields/new" .BasePath .Row.FieldGroupID) "ActionLabel" "Add Field" "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>
+  </div>
+</div>
+{{else}}
+<div class="admin-data-card mt-4">
+  <div class="admin-form-card-body">
+    <p class="admin-form-help mb-0">Save this field group first, then you can add custom fields.</p>
   </div>
 </div>
 {{end}}

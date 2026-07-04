@@ -54,7 +54,7 @@ func categoryBySlugTestContext(t *testing.T) (context.Context, uint) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	row := models.Category{Name: "Home", Slug: "home", Status: models.StatusActive}
+	row := models.Category{Name: "Home", Slug: "home", Locale: "en-US", Status: models.StatusActive}
 	if err := db.Create(&row).Error; err != nil {
 		t.Fatal(err)
 	}

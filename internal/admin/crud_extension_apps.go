@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
@@ -41,6 +42,16 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 	if !ok || rt.Capabilities.Admin == "" {
 		h.notFound(w, r)
 		return
+	}
+	svc, err := user.FromContext(r.Context())
+	if err == nil {
+		if userID, ok := svc.CurrentID(); ok {
+			allowed, checkErr := security.CanAccessExtensionAdmin(r.Context(), userID, name)
+			if checkErr != nil || !allowed {
+				h.forbidden(w, r)
+				return
+			}
+		}
 	}
 	userCtx, err := extensionAdminUserContext(r)
 	if err != nil {
@@ -78,7 +89,18 @@ func (h *Handler) adminExtensionNav(r *http.Request) []AdminExtensionNav {
 	db, _ := sites.DB(r.Context())
 	menuNames := extensionMenuNames(db)
 	items := make([]AdminExtensionNav, 0)
+	var userID uint
+	hasUser := false
+	if svc, err := user.FromContext(r.Context()); err == nil {
+		userID, hasUser = svc.CurrentID()
+	}
 	for _, rt := range h.chain.Extensions(site).AdminRuntimes() {
+		if hasUser {
+			allowed, err := security.CanAccessExtensionAdmin(r.Context(), userID, rt.Model.Name)
+			if err != nil || !allowed {
+				continue
+			}
+		}
 		items = append(items, AdminExtensionNav{
 			Name:      extensionMenuLabel(rt.Model.Name, menuNames),
 			URL:       extensionAppsBase + "/" + url.PathEscape(rt.Model.Name),

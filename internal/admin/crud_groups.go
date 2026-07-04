@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
-	"github.com/rob121/cannon/internal/user"
 )
 
 const groupsBase = "/admin/groups"
@@ -38,7 +38,7 @@ func (h *Handler) groupList(w http.ResponseWriter, r *http.Request) {
 	var total int64
 	db.Model(&models.Group{}).Count(&total)
 	data := listPage(r, page, total, groupsBase,
-		"User groups that bundle roles for access control.",
+		"Organizational groups that assign roles to members.",
 		"Add Group", map[string]any{"ActiveNav": "groups"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
@@ -61,14 +61,7 @@ func (h *Handler) groupForm(w http.ResponseWriter, r *http.Request, id uint) {
 	var allRoles []models.Role
 	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&allRoles)
 	var allGroups []models.Group
-	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&allGroups)
-	adminRoutes := loadGroupAdminRoutes(db, row.GroupID)
-	canManagePerms := false
-	if svc, err := user.FromContext(r.Context()); err == nil {
-		if uid, ok := svc.CurrentID(); ok {
-			canManagePerms = canManageGroupPermissions(r.Context(), uid)
-		}
-	}
+	allGroups = loadMembershipGroups(db)
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
@@ -76,6 +69,7 @@ func (h *Handler) groupForm(w http.ResponseWriter, r *http.Request, id uint) {
 			return
 		}
 		row.Name = formString(r, "name")
+		row.Description = formString(r, "description")
 		row.Status = formStatus(r)
 		row.Kind = models.GroupKind(formString(r, "kind"))
 		if row.Kind == "" {
@@ -89,7 +83,7 @@ func (h *Handler) groupForm(w http.ResponseWriter, r *http.Request, id uint) {
 			err = db.Save(&row).Error
 		}
 		if err != nil {
-			h.renderGroupForm(w, r, row, allRoles, allGroups, adminRoutes, canManagePerms, isNew, err.Error())
+			h.renderGroupForm(w, r, row, allRoles, allGroups, isNew, err.Error())
 			return
 		}
 		roleIDs := formUintList(r, "role_ids")
@@ -98,45 +92,37 @@ func (h *Handler) groupForm(w http.ResponseWriter, r *http.Request, id uint) {
 			db.Where("role_id IN ?", roleIDs).Find(&selected)
 		}
 		if err := db.Model(&row).Association("Roles").Replace(selected); err != nil {
-			h.renderGroupForm(w, r, row, allRoles, allGroups, adminRoutes, canManagePerms, isNew, err.Error())
+			h.renderGroupForm(w, r, row, allRoles, allGroups, isNew, err.Error())
 			return
 		}
-		if canManagePerms {
-			if err := saveGroupAdminRoutes(db, row.GroupID, r); err != nil {
-				h.renderGroupForm(w, r, row, allRoles, allGroups, adminRoutes, canManagePerms, isNew, err.Error())
-				return
-			}
-		}
+		security.InvalidateSiteContext(r.Context())
 		redirectList(w, r, groupsBase)
 		return
 	}
-	h.renderGroupForm(w, r, row, allRoles, allGroups, adminRoutes, canManagePerms, isNew, "")
+	h.renderGroupForm(w, r, row, allRoles, allGroups, isNew, "")
 }
 
-func (h *Handler) renderGroupForm(w http.ResponseWriter, r *http.Request, row models.Group, allRoles []models.Role, allGroups []models.Group, adminRoutes map[string]models.GroupAdminRoute, canManagePerms, isNew bool, errMsg string) {
+func (h *Handler) renderGroupForm(w http.ResponseWriter, r *http.Request, row models.Group, allRoles []models.Role, allGroups []models.Group, isNew bool, errMsg string) {
 	selected := make([]uint, 0, len(row.Roles))
 	for _, role := range row.Roles {
 		selected = append(selected, role.RoleID)
 	}
 	title := "Add Group"
-	subtitle := "Create a user group and assign roles."
+	subtitle := "Create an organizational group and assign roles."
 	if !isNew {
 		title = "Edit Group"
-		subtitle = "Update group membership roles and status."
+		subtitle = "Update group details and role assignments."
 	}
 	data := formData(map[string]any{
-		"ActiveNav":        "groups",
-		"Row":              row,
-		"IsNew":            isNew,
-		"BasePath":         groupsBase,
-		"Subtitle":         subtitle,
-		"AllRoles":         allRoles,
-		"AllGroups":        allGroups,
-		"SelectedIDs":      selected,
-		"Protected":        !isNew && isProtectedGroupName(row.Name),
-		"AdminRoutes":      AdminRoutes,
-		"GroupAdminRoutes": adminRoutes,
-		"CanManagePerms":   canManagePerms,
+		"ActiveNav":   "groups",
+		"Row":         row,
+		"IsNew":       isNew,
+		"BasePath":    groupsBase,
+		"Subtitle":    subtitle,
+		"AllRoles":    allRoles,
+		"AllGroups":   allGroups,
+		"SelectedIDs": selected,
+		"Protected":   !isNew && isProtectedGroupName(row.Name),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
@@ -164,10 +150,6 @@ func (h *Handler) groupDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		http.Error(w, "the "+row.Name+" group cannot be deleted", http.StatusBadRequest)
 		return
 	}
-	if err := db.Exec("DELETE FROM group_admin_routes WHERE group_id = ?", row.GroupID).Error; err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 	if err := db.Exec("DELETE FROM group_roles WHERE group_group_id = ?", row.GroupID).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -180,5 +162,6 @@ func (h *Handler) groupDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	security.InvalidateSiteContext(r.Context())
 	redirectList(w, r, groupsBase)
 }

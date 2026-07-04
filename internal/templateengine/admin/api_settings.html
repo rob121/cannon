@@ -1,0 +1,37 @@
+{{template "page_header" .}}
+{{if .Saved}}<div class="alert alert-success">API settings saved.</div>{{end}}
+<form method="post" class="admin-form-card" data-turbo-frame="_top">
+  {{.CSRF}}
+  <div class="row g-3">
+    <div class="col-md-4">
+      <label class="admin-form-label" for="jwt_ttl_seconds">JWT TTL (seconds)</label>
+      <input class="admin-form-control" type="number" min="300" max="86400" id="jwt_ttl_seconds" name="jwt_ttl_seconds" value="{{index .Settings "jwt_ttl_seconds"}}" placeholder="3600">
+    </div>
+    <div class="col-md-4">
+      <label class="admin-form-label" for="rate_limit_per_minute">Rate limit / minute</label>
+      <input class="admin-form-control" type="number" min="10" id="rate_limit_per_minute" name="rate_limit_per_minute" value="{{index .Settings "rate_limit_per_minute"}}" placeholder="120">
+    </div>
+    <div class="col-md-4">
+      <label class="admin-form-label" for="login_rate_limit_per_minute">Login rate limit / minute</label>
+      <input class="admin-form-control" type="number" min="5" id="login_rate_limit_per_minute" name="login_rate_limit_per_minute" value="{{index .Settings "login_rate_limit_per_minute"}}" placeholder="20">
+    </div>
+    <div class="col-12">
+      <label class="admin-form-label" for="cors_origins">CORS allowed origins</label>
+      <input class="admin-form-control" id="cors_origins" name="cors_origins" value="{{index .Settings "cors_origins"}}" placeholder="https://app.example.com, https://www.example.com">
+      <p class="admin-form-help">Comma-separated. Leave empty to disable cross-origin browser access.</p>
+    </div>
+    <div class="col-12">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="rotate_jwt_secret" value="1" id="rotate_jwt_secret">
+        <label class="form-check-label" for="rotate_jwt_secret">Rotate JWT signing secret (invalidates all user tokens)</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <p class="admin-form-help mb-0">OpenAPI docs: <a href="{{.DocsURL}}" target="_blank" rel="noopener">{{.DocsURL}}</a></p>
+    </div>
+  </div>
+  <div class="admin-form-actions">
+    <a class="btn-admin-outline" href="/admin/api/credentials" data-turbo-frame="_top">Back to credentials</a>
+    <button type="submit" class="btn-admin-primary">Save settings</button>
+  </div>
+</form>

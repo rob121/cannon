@@ -51,6 +51,35 @@
   </div>
   {{else}}
   <div class="admin-help-browser">
+    {{if or .Folders .BuiltinGuides .ExtensionFolders .Files}}
+    {{if .BuiltinGuides}}
+    <div class="admin-help-browser-section">
+      <h2 class="admin-help-browser-section-title">Cannon Guides</h2>
+      <div class="admin-help-grid">
+        {{range .BuiltinGuides}}
+        <a class="admin-help-item admin-help-file" href="{{.URL}}" data-turbo-frame="_top">
+          <span class="admin-help-item-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+          <span class="admin-help-item-name">{{.Label}}</span>
+          <span class="admin-help-item-meta">Document</span>
+        </a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
+    {{if .ExtensionFolders}}
+    <div class="admin-help-browser-section">
+      <h2 class="admin-help-browser-section-title">Installed Extensions</h2>
+      <div class="admin-help-grid">
+        {{range .ExtensionFolders}}
+        <a class="admin-help-item admin-help-folder" href="{{.URL}}" data-turbo-frame="_top">
+          <span class="admin-help-item-icon"><i class="bi bi-puzzle-fill" aria-hidden="true"></i></span>
+          <span class="admin-help-item-name">{{.Label}}</span>
+          <span class="admin-help-item-meta">{{.Count}} {{if eq .Count 1}}item{{else}}items{{end}}</span>
+        </a>
+        {{end}}
+      </div>
+    </div>
+    {{end}}
     {{if or .Folders .Files}}
     <div class="admin-help-grid">
       {{range .Folders}}
@@ -68,6 +97,7 @@
       </a>
       {{end}}
     </div>
+    {{end}}
     {{else}}
     <div class="admin-empty">This folder is empty.</div>
     {{end}}

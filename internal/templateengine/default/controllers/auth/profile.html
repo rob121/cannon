@@ -1,0 +1,334 @@
+<article class="site-profile-page mb-4">
+  {{template "pageHeader" (dict "Title" (lang "profile.title") "Subtitle" (lang "profile.subtitle"))}}
+
+  {{if or .Saved .PasswordSaved .NotificationsSaved .Error .FlashTOTPEnabled .FlashTOTPDisabled .FlashTOTPError .FlashPasskeyAdded .FlashPasskeyRemoved}}
+  <div class="site-profile-alerts vstack gap-2 mb-4" role="status" aria-live="polite">
+    {{if .Saved}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "profile.saved"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .PasswordSaved}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "profile.password_saved"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .NotificationsSaved}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "notifications.saved"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .Error}}<div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">{{.Error}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .FlashTOTPEnabled}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "security.totp_enabled_flash"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .FlashTOTPDisabled}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "security.totp_disabled_flash"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .FlashTOTPError}}<div class="alert alert-danger alert-dismissible fade show mb-0" role="alert">{{lang "security.totp_error_flash"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .FlashPasskeyAdded}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "security.passkey_added_flash"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+    {{if .FlashPasskeyRemoved}}<div class="alert alert-success alert-dismissible fade show mb-0" role="alert">{{lang "security.passkey_removed_flash"}}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{lang "common.close"}}"></button></div>{{end}}
+  </div>
+  {{end}}
+
+  <div class="row g-4 g-lg-5">
+    <div class="col-lg-4 col-xl-3">
+      <aside class="site-profile-sidebar">
+        <div class="site-profile-identity card shadow-sm">
+          <div class="card-body text-center">
+            <div class="site-profile-identity__avatar mx-auto mb-3">
+              {{if .AvatarURL}}
+              <img src="{{.AvatarURL}}" alt="" class="site-profile-avatar-image rounded-circle" id="profile-avatar-preview" width="112" height="112">
+              {{else}}
+              <span class="site-profile-avatar-fallback rounded-circle" id="profile-avatar-preview">{{initials .Account.GivenName .Account.FamilyName .Account.Username}}</span>
+              {{end}}
+            </div>
+            <h2 class="h5 mb-1">{{.DisplayName}}</h2>
+            <p class="text-muted small mb-0">@{{.Account.Username}}</p>
+            {{if .Account.Email}}<p class="text-muted small mb-0 mt-1">{{.Account.Email}}</p>{{end}}
+          </div>
+        </div>
+        <nav class="site-profile-nav card shadow-sm" aria-label="{{lang "profile.title"}}">
+          <p class="site-profile-nav__heading mb-0">{{title (lang "profile.nav_heading")}}</p>
+          <ul class="site-profile-nav__list list-unstyled mb-0">
+            <li><a class="site-profile-nav__link active" href="#profile-personal" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span><span class="site-profile-nav__label">{{title (lang "profile.nav_personal")}}</span></a></li>
+            <li><a class="site-profile-nav__link" href="#profile-avatar" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span><span class="site-profile-nav__label">{{title (lang "profile.nav_photo")}}</span></a></li>
+            <li><a class="site-profile-nav__link" href="#profile-password" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg></span><span class="site-profile-nav__label">{{title (lang "profile.nav_password")}}</span></a></li>
+            {{if .ProfileFields}}<li><a class="site-profile-nav__link" href="#profile-details" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span><span class="site-profile-nav__label">{{if .AuthorProfileName}}{{title .AuthorProfileName}}{{else}}{{title (lang "profile.additional_details")}}{{end}}</span></a></li>{{end}}
+            {{if or .TOTPAllowed .PasskeysAllowed}}<li><a class="site-profile-nav__link" href="#account-security" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span><span class="site-profile-nav__label">{{title (lang "profile.nav_security")}}</span></a></li>{{end}}
+            <li><a class="site-profile-nav__link" href="#profile-notifications" data-profile-nav><span class="site-profile-nav__icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="site-profile-nav__label">{{title (lang "notifications.nav_label")}}</span></a></li>
+          </ul>
+        </nav>
+      </aside>
+    </div>
+
+    <div class="col-lg-8 col-xl-9">
+      <form method="post" enctype="multipart/form-data" class="site-profile-form">
+        {{.CSRF}}
+        <input type="hidden" name="form" value="profile">
+
+        <section class="site-profile-card card shadow-sm mb-4" id="profile-personal" aria-labelledby="profile-personal-heading">
+          <div class="card-body">
+            <div class="site-profile-card__header mb-4">
+              <h2 id="profile-personal-heading" class="site-profile-card__title h5 mb-1">{{lang "profile.personal_info"}}</h2>
+              <p class="site-profile-card__desc text-muted small mb-0">{{lang "profile.personal_info_desc"}}</p>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="profile-given-name">{{lang "profile.given_name"}}</label>
+                <input class="form-control" id="profile-given-name" name="given_name" value="{{.Account.GivenName}}" autocomplete="given-name">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="profile-family-name">{{lang "profile.family_name"}}</label>
+                <input class="form-control" id="profile-family-name" name="family_name" value="{{.Account.FamilyName}}" autocomplete="family-name">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="profile-username">{{lang "profile.username_label"}}</label>
+                <div class="input-group">
+                  <span class="input-group-text">@</span>
+                  <input class="form-control" id="profile-username" name="username" value="{{.Account.Username}}" autocomplete="username" required>
+                </div>
+                <p class="form-text mb-0">{{lang "profile.username_hint"}}</p>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="profile-email">{{lang "profile.email_label"}}</label>
+                <input class="form-control" type="email" id="profile-email" name="email" value="{{.Account.Email}}" autocomplete="email">
+                <p class="form-text mb-0">{{lang "profile.email_hint"}}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="site-profile-card card shadow-sm mb-4" id="profile-avatar" aria-labelledby="profile-avatar-heading">
+          <div class="card-body">
+            <div class="site-profile-card__header mb-4">
+              <h2 id="profile-avatar-heading" class="site-profile-card__title h5 mb-1">{{lang "profile.photo_title"}}</h2>
+              <p class="site-profile-card__desc text-muted small mb-0">{{lang "profile.photo_desc"}}</p>
+            </div>
+            <div class="site-avatar-upload">
+              <div class="site-avatar-upload__preview">
+                {{if .AvatarURL}}
+                <img src="{{.AvatarURL}}" alt="" class="site-profile-avatar-image rounded-circle site-avatar-upload__image" data-avatar-preview width="96" height="96">
+                {{else}}
+                <span class="site-profile-avatar-fallback rounded-circle site-avatar-upload__fallback" data-avatar-preview>{{initials .Account.GivenName .Account.FamilyName .Account.Username}}</span>
+                {{end}}
+              </div>
+              <div class="site-avatar-upload__controls">
+                <label class="form-label" for="profile-avatar">{{lang "profile.upload_image"}}</label>
+                <input class="form-control" type="file" id="profile-avatar" name="avatar" accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml">
+                {{if .SSOAvatarURL}}
+                <p class="form-text mb-2">{{lang "profile.sso_photo_hint"}}</p>
+                {{end}}
+                {{if .AvatarURL}}
+                <div class="form-check mt-2">
+                  <input class="form-check-input" type="checkbox" id="profile-remove-avatar" name="remove_avatar" value="1">
+                  <label class="form-check-label" for="profile-remove-avatar">{{lang "profile.remove_photo"}}</label>
+                </div>
+                {{end}}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {{if .ProfileFields}}
+        <section class="site-profile-card card shadow-sm mb-4" id="profile-details" aria-labelledby="profile-fields-heading">
+          <div class="card-body">
+            <div class="site-profile-card__header mb-4">
+              <h2 id="profile-fields-heading" class="site-profile-card__title h5 mb-1">{{if .AuthorProfileName}}{{.AuthorProfileName}}{{else}}{{lang "profile.additional_details"}}{{end}}</h2>
+              <p class="site-profile-card__desc text-muted small mb-0">{{lang "profile.additional_details_desc"}}</p>
+            </div>
+            <div class="row g-4">
+              {{range .ProfileFields}}
+              <div class="{{if or (eq .Type "textarea") (eq .Type "rich_text") (eq .Type "image") (eq .Type "file")}}col-12{{else}}col-md-6{{end}}">
+                {{if ne .Type "image"}}<label class="form-label" for="field-{{.FieldID}}">{{.Label}}</label>{{end}}
+                {{template "customFieldInput" (dict "Field" . "Value" (index $.ProfileValues .FieldID))}}
+              </div>
+              {{end}}
+            </div>
+          </div>
+        </section>
+        {{end}}
+
+        <div class="site-profile-save card shadow-sm mb-4">
+          <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <p class="text-muted small mb-0">{{lang "profile.save_hint"}}</p>
+            <button type="submit" class="btn btn-primary px-4">{{lang "profile.save_changes"}}</button>
+          </div>
+        </div>
+      </form>
+
+      <section class="site-profile-card card shadow-sm mb-4" id="profile-password" aria-labelledby="profile-password-heading">
+        <div class="card-body">
+          <div class="site-profile-card__header mb-4">
+            <h2 id="profile-password-heading" class="site-profile-card__title h5 mb-1">{{lang "profile.password_title"}}</h2>
+            <p class="site-profile-card__desc text-muted small mb-0">{{if .HasLocalPassword}}{{lang "profile.password_desc"}}{{else}}{{lang "profile.password_set_desc"}}{{end}}</p>
+          </div>
+          <form method="post" action="{{controllerURL "auth" "profile"}}" class="site-profile-password-form">
+            {{.CSRF}}
+            <input type="hidden" name="form" value="password">
+            <div class="row g-3">
+              {{if .HasLocalPassword}}
+              <div class="col-md-6">
+                <label class="form-label" for="profile-current-password">{{lang "profile.current_password"}}</label>
+                <input class="form-control" type="password" id="profile-current-password" name="current_password" autocomplete="current-password">
+              </div>
+              {{end}}
+              <div class="col-md-6">
+                <label class="form-label" for="profile-new-password">{{lang "profile.new_password"}}</label>
+                <input class="form-control" type="password" id="profile-new-password" name="new_password" minlength="8" autocomplete="new-password" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="profile-confirm-password">{{lang "profile.confirm_password"}}</label>
+                <input class="form-control" type="password" id="profile-confirm-password" name="confirm_password" minlength="8" autocomplete="new-password" required>
+                <p class="form-text mb-0">{{lang "profile.password_min_hint"}}</p>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mt-4 pt-3 border-top">
+              <a class="small" href="{{.ResetPasswordURL}}">{{lang "profile.forgot_password_link"}}</a>
+              <button type="submit" class="btn btn-outline-primary">{{lang "profile.update_password"}}</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="site-profile-card card shadow-sm mb-4" id="profile-notifications" aria-labelledby="profile-notifications-heading">
+        <div class="card-body">
+          <div class="site-profile-card__header mb-4">
+            <h2 id="profile-notifications-heading" class="site-profile-card__title h5 mb-1">{{lang "notifications.title"}}</h2>
+            <p class="site-profile-card__desc text-muted small mb-0">{{lang "notifications.subtitle"}}</p>
+          </div>
+          <form method="post" action="{{controllerURL "auth" "profile"}}" class="site-profile-notifications-form">
+            {{.CSRF}}
+            <input type="hidden" name="form" value="notifications">
+            <div class="vstack gap-4">
+              {{range .NotificationGroups}}
+              <div>
+                <h3 class="h6 mb-2">{{lang (print "notifications.group." .ID)}}</h3>
+                <div class="vstack gap-2">
+                  {{range .Events}}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="notif-{{.}}" name="notification_events" value="{{.}}" {{if index $.NotificationChecked .}}checked{{end}}>
+                    <label class="form-check-label" for="notif-{{.}}">
+                      {{lang (print "notifications.event." .)}}
+                      {{if index $.NotificationRoleDefaults .}}<span class="text-muted small d-block">{{lang "notifications.role_default_hint"}}</span>{{end}}
+                    </label>
+                  </div>
+                  {{end}}
+                </div>
+              </div>
+              {{end}}
+            </div>
+            <div class="d-flex justify-content-end mt-4 pt-3 border-top">
+              <button type="submit" class="btn btn-outline-primary">{{lang "notifications.save"}}</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      {{template "accountSecurity" .}}
+    </div>
+  </div>
+</article>
+<script>
+(function () {
+  function bindAvatarPreview(input) {
+    if (!input) return;
+    var sidebarPreview = document.getElementById('profile-avatar-preview');
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file || !file.type.startsWith('image/')) return;
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        document.querySelectorAll('[data-avatar-preview]').forEach(function (el) {
+          if (el.tagName === 'IMG') {
+            el.src = e.target.result;
+          } else {
+            var img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = '';
+            img.className = el.className.replace('site-profile-avatar-fallback', 'site-profile-avatar-image');
+            img.width = el.offsetWidth || 96;
+            img.height = el.offsetHeight || 96;
+            img.setAttribute('data-avatar-preview', '');
+            el.replaceWith(img);
+          }
+        });
+        if (sidebarPreview && sidebarPreview.tagName === 'SPAN') {
+          var sideImg = document.createElement('img');
+          sideImg.src = e.target.result;
+          sideImg.alt = '';
+          sideImg.className = 'site-profile-avatar-image rounded-circle';
+          sideImg.id = 'profile-avatar-preview';
+          sideImg.width = 112;
+          sideImg.height = 112;
+          sidebarPreview.replaceWith(sideImg);
+        } else if (sidebarPreview && sidebarPreview.tagName === 'IMG') {
+          sidebarPreview.src = e.target.result;
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function bindMediaFields() {
+    document.querySelectorAll('[data-media-field]').forEach(function (field) {
+      var preview = field.querySelector('[data-media-field-preview]');
+      var urlInput = field.querySelector('[data-media-field-url]');
+      var fileInput = field.querySelector('[data-media-field-file]');
+      var clearBtn = field.querySelector('[data-media-field-clear]');
+
+      function setPreview(url) {
+        if (clearBtn) clearBtn.hidden = !url;
+        if (!preview) return;
+        preview.classList.toggle('is-empty', !url);
+        if (!url) {
+          preview.innerHTML = '<span class="site-media-field__placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10.5" r="1.5"/><path d="m21 16-5.5-5.5L5 21"/></svg><span>No image</span></span>';
+          return;
+        }
+        preview.innerHTML = '<img src="' + url.replace(/"/g, '&quot;') + '" alt="" class="site-media-field__image">';
+      }
+
+      if (urlInput) {
+        urlInput.addEventListener('input', function () {
+          setPreview(urlInput.value.trim());
+        });
+      }
+      if (fileInput) {
+        fileInput.addEventListener('change', function () {
+          var file = fileInput.files && fileInput.files[0];
+          if (!file || !file.type.startsWith('image/')) return;
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            setPreview(e.target.result);
+            if (urlInput) urlInput.value = '';
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          if (urlInput) urlInput.value = '';
+          if (fileInput) fileInput.value = '';
+          setPreview('');
+        });
+      }
+    });
+  }
+
+  bindAvatarPreview(document.getElementById('profile-avatar'));
+  bindMediaFields();
+
+  (function () {
+    var links = document.querySelectorAll('[data-profile-nav]');
+    if (!links.length) return;
+    var sections = [];
+    links.forEach(function (link) {
+      var id = link.getAttribute('href');
+      if (id && id.charAt(0) === '#') {
+        var el = document.querySelector(id);
+        if (el) sections.push({ link: link, el: el });
+      }
+      link.addEventListener('click', function () {
+        links.forEach(function (l) { l.classList.remove('active'); });
+        link.classList.add('active');
+      });
+    });
+    function syncActive() {
+      if (!sections.length) return;
+      var scrollY = window.scrollY + 120;
+      var current = sections[0];
+      sections.forEach(function (item) {
+        if (item.el.offsetTop <= scrollY) current = item;
+      });
+      links.forEach(function (l) { l.classList.remove('active'); });
+      current.link.classList.add('active');
+    }
+    window.addEventListener('scroll', syncActive, { passive: true });
+    syncActive();
+  })();
+})();
+</script>

@@ -1,30 +1,36 @@
-<article class="mb-4">
-  {{template "pageHeader" (dict "Title" .Author.Username "Subtitle" (printf "%d items" .Total))}}
+<div class="site-page mb-4">
+  {{template "pageHeader" (dict "Title" .Author.Username "Subtitle" (lang "content.author_items_subtitle" "Count" (printf "%d" .Total)))}}
 
   {{if .AuthorProfile}}
-  <section class="card shadow-sm mb-4">
-    <div class="card-body">
-      <h2 class="h5 card-title">{{if .AuthorProfile.DisplayName}}{{.AuthorProfile.DisplayName}}{{else}}{{.Author.Username}}{{end}}</h2>
-      {{if .AuthorProfile.Fields}}
-      <dl class="row mb-0">
-        {{range .AuthorProfile.Fields}}
-        <dt class="col-sm-3">{{.Label}}</dt>
-        <dd class="col-sm-9">{{safeHTML .HTML}}</dd>
-        {{end}}
-      </dl>
-      {{else}}
-      <p class="text-muted mb-0">No public profile details yet.</p>
+  <section class="site-author-profile mb-4" aria-labelledby="author-profile-heading">
+    <div class="d-flex flex-wrap gap-3 align-items-center mb-3">
+      {{if .AuthorProfile.AvatarURL}}
+      <img src="{{.AuthorProfile.AvatarURL}}" alt="" class="site-profile-avatar-image rounded-circle" width="96" height="96">
       {{end}}
+      <div>
+        <h2 id="author-profile-heading" class="h5 mb-1">{{if .AuthorProfile.DisplayName}}{{.AuthorProfile.DisplayName}}{{else}}{{.Author.Username}}{{end}}</h2>
+        {{if .AuthorProfile.Email}}<p class="text-muted mb-0">{{.AuthorProfile.Email}}</p>{{end}}
+      </div>
     </div>
+    {{if .AuthorProfile.Fields}}
+    <dl class="row mb-0">
+      {{range .AuthorProfile.Fields}}
+      <dt class="col-sm-3">{{.Label}}</dt>
+      <dd class="col-sm-9">{{safeHTML .HTML}}</dd>
+      {{end}}
+    </dl>
+    {{else}}
+    <p class="text-muted mb-0">{{lang "content.no_author_profile"}}</p>
+    {{end}}
   </section>
   {{end}}
 
-  <section>
-    <h2 class="h4 mb-3">Items</h2>
-    <div class="row g-3">
+  <section aria-labelledby="author-items-heading">
+    <h2 id="author-items-heading" class="h4 mb-3">{{lang "content.items_heading"}}</h2>
+    <div class="site-item-list site-item-list--grid">
       {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
-      <div class="col-12"><p class="text-muted mb-0">No items by this author yet.</p></div>
+      <p class="text-muted mb-0">{{lang "content.no_author_items"}}</p>
       {{end}}
     </div>
   </section>
-</article>
+</div>

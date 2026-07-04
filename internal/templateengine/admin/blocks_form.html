@@ -119,6 +119,30 @@
             </div>
           </div>
 
+          <div class="block-fields-search" id="block-fields-search" hidden>
+            {{template "form_section_header" (dict "Title" "Search Form" "Description" "Renders a keyword search form that submits to the site search page. No captcha is used.")}}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-search-label">Label</label>
+                <input class="admin-form-control" id="block-search-label" name="search_label" value="{{.Meta.SearchLabel}}" placeholder="Search">
+                <p class="admin-form-help">Optional visible label (vertical) or screen-reader label (horizontal). Leave blank to use the placeholder for accessibility.</p>
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-search-placeholder">Placeholder</label>
+                <input class="admin-form-control" id="block-search-placeholder" name="search_placeholder" value="{{.Meta.SearchPlaceholder}}" placeholder="Search…">
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-search-button">Button Text</label>
+                <input class="admin-form-control" id="block-search-button" name="search_button" value="{{.Meta.SearchButton}}" placeholder="Search">
+              </div>
+              <div class="col-md-6">
+                <label class="admin-form-label" for="block-search-class">CSS Class</label>
+                <input class="admin-form-control" id="block-search-class" name="search_class" value="{{.Meta.SearchClass}}" placeholder="mb-3">
+                <p class="admin-form-help">Optional classes added to the search form wrapper.</p>
+              </div>
+            </div>
+          </div>
+
           <div class="block-fields-extension" id="block-fields-extension" hidden>
             <div class="row g-3">
               <div class="col-md-6">
@@ -283,6 +307,8 @@
                 <option value="login" {{if eq .Row.Type "login"}}selected{{end}}>Login</option>
                 <option value="menu-vertical" {{if eq .Row.Type "menu-vertical"}}selected{{end}}>Menu Vertical</option>
                 <option value="menu-horizontal" {{if eq .Row.Type "menu-horizontal"}}selected{{end}}>Menu Horizontal</option>
+                <option value="search-horizontal" {{if eq .Row.Type "search-horizontal"}}selected{{end}}>Search Horizontal</option>
+                <option value="search-vertical" {{if eq .Row.Type "search-vertical"}}selected{{end}}>Search Vertical</option>
                 <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
               </select>
             </div>

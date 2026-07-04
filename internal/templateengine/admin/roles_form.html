@@ -7,15 +7,60 @@
       <div class="row g-3">
         <div class="col-md-6">
           <label class="admin-form-label">Name</label>
-          <input class="admin-form-control" name="name" value="{{.Row.Name}}" required {{if .Protected}}readonly{{end}}>
-          {{if .Protected}}<p class="admin-form-help">The admin role name cannot be changed.</p>{{end}}
+          <input class="admin-form-control" name="name" value="{{if .Protected}}{{roleName .Row.Name}}{{else}}{{.Row.Name}}{{end}}" required {{if .Protected}}readonly{{end}}>
+          {{if .Protected}}<p class="admin-form-help">System role names cannot be changed.</p>{{end}}
         </div>
         <div class="col-md-6">
           <label class="admin-form-label">Status</label>
+          {{if .Protected}}
+          {{template "status_badge" .Row.Status}}
+          <input type="hidden" name="status" value="{{.Row.Status}}">
+          <p class="admin-form-help">System roles cannot be deactivated.</p>
+          {{else}}
           <select class="admin-form-control" name="status">
             <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
             <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
           </select>
+          {{end}}
+        </div>
+        <div class="col-12">
+          <label class="admin-form-label">Description</label>
+          <textarea class="admin-form-control" name="description" rows="2">{{.Row.Description}}</textarea>
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Inherits Roles</label>
+          <p class="admin-form-help mb-3">This role receives all permissions from the selected parent roles.</p>
+          <div class="admin-role-inherit-grid">
+            {{range .AllRoles}}
+            {{if ne .RoleID $.Row.RoleID}}
+            <label class="admin-form-toggle admin-form-toggle-inline">
+              <input type="checkbox" class="admin-form-toggle-input" name="parent_role_ids" value="{{.RoleID}}" {{if containsUint $.SelectedParentIDs .RoleID}}checked{{end}}>
+              <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+              <span class="admin-form-toggle-label">{{roleName .Name}}</span>
+            </label>
+            {{end}}
+            {{else}}
+            <p class="admin-cell-muted">No other roles available.</p>
+            {{end}}
+          </div>
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Default Email Notifications</label>
+          <p class="admin-form-help mb-3">Users with this role receive email for the selected events unless they opt out in their account profile.</p>
+          {{range .SubscribableGroups}}
+          <div class="mb-3">
+            <p class="admin-form-label mb-2">{{.Label}}</p>
+            {{template "toggle_value_grid" (dict "InputName" "role_notification_events" "Values" .Events "Selected" $.SelectedRoleNotificationEvents)}}
+          </div>
+          {{end}}
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Permissions</label>
+          <p class="admin-form-help mb-3">Grant permissions with <strong>Allow</strong> or block them with <strong>Deny</strong>. Explicit denies override inherited allows.</p>
+          {{template "permission_picker" .}}
         </div>
       </div>
       {{template "form_actions" .}}

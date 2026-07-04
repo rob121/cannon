@@ -15,6 +15,10 @@ const (
 	MenuVerticalBlockTemplate = "default/partials/blocks/menu-vertical.html"
 	// MenuHorizontalBlockTemplate renders horizontal menu blocks.
 	MenuHorizontalBlockTemplate = "default/partials/blocks/menu-horizontal.html"
+	// SearchHorizontalBlockTemplate renders inline search blocks.
+	SearchHorizontalBlockTemplate = "default/partials/blocks/search-horizontal.html"
+	// SearchVerticalBlockTemplate renders stacked search blocks.
+	SearchVerticalBlockTemplate = "default/partials/blocks/search-vertical.html"
 )
 
 var legacyBlockTemplates = map[string]string{

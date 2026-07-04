@@ -1,11 +1,14 @@
 {{define "loginForm"}}
 {{if .Disabled}}
 <div class="alert alert-info mb-0" role="alert">{{.DisabledMessage}}</div>
-<a class="btn btn-outline-primary mt-3" href="{{homeURL}}">Back to home</a>
+<a class="btn btn-outline-primary mt-3" href="{{homeURL}}">{{lang "auth.back_to_home"}}</a>
 
 {{else if .Authenticated}}
-<p class="mb-3">Signed in as <strong>{{.Username}}</strong></p>
-<a class="btn btn-outline-secondary btn-sm" href="{{.LogoutURL}}">Sign out</a>
+<p class="mb-3">{{lang "auth.signed_in_as" "Username" .Username}}</p>
+<div class="d-flex flex-wrap gap-2">
+  <a class="btn btn-outline-secondary btn-sm" href="{{.LogoutURL}}">{{lang "nav.sign_out"}}</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{{controllerURL "auth" "profile"}}">{{lang "nav.profile"}}</a>
+</div>
 
 {{else}}
 {{if .Error}}<div class="alert alert-danger" role="alert">{{.Error}}</div>{{end}}
@@ -15,27 +18,45 @@
   {{.CSRF}}
   {{if .Return}}<input type="hidden" name="return" value="{{.Return}}">{{end}}
   <div class="mb-3">
-    <label class="form-label" for="login-username-{{.BlockID}}">Username</label>
+    <label class="form-label" for="login-username-{{.BlockID}}">{{lang "auth.username"}}</label>
     <input class="form-control" id="login-username-{{.BlockID}}" name="username" required{{if not .BlockID}} autofocus{{end}} autocomplete="username">
   </div>
   <div class="mb-3">
-    <label class="form-label" for="login-password-{{.BlockID}}">Password</label>
+    <label class="form-label" for="login-password-{{.BlockID}}">{{lang "auth.password"}}</label>
     <input class="form-control" id="login-password-{{.BlockID}}" name="password" type="password" required autocomplete="current-password">
   </div>
+  <div class="mb-3">{{captcha "login"}}</div>
   <div class="d-flex flex-wrap gap-2 align-items-center">
-    <button type="submit" class="btn btn-primary">Sign In</button>
-    {{if .ShowResetLink}}<a class="btn btn-link px-0" href="{{.ResetURL}}">Forgot password</a>{{end}}
+    <button type="submit" class="btn btn-primary">{{lang "auth.sign_in_button"}}</button>
+    {{if .ShowResetLink}}<a class="btn btn-link px-0" href="{{.ResetURL}}">{{lang "auth.forgot_password"}}</a>{{end}}
   </div>
 </form>
 {{end}}
 
 {{if .Providers}}
-{{if .LocalEnabled}}<div class="text-center text-muted small my-3">or continue with</div>{{end}}
+{{if or .LocalEnabled .PasskeysEnabled}}<div class="text-center text-muted small my-3">{{lang "auth.or_continue_with"}}</div>{{end}}
 <div class="d-grid gap-2">
+  {{if .PasskeysEnabled}}
+  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.sign_in_passkey"}}</button>
+  <div class="text-danger small d-none" id="login-passkey-error"></div>
+  {{end}}
   {{range .Providers}}
-  <a class="btn btn-outline-primary" href="{{.URL}}">Sign in with {{.Label}}</a>
+  <a class="btn btn-outline-primary" href="{{.URL}}">{{lang "auth.sign_in_provider" "Label" .Label}}</a>
   {{end}}
 </div>
+{{else if .PasskeysEnabled}}
+<div class="d-grid gap-2 mt-3">
+  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.sign_in_passkey"}}</button>
+  <div class="text-danger small d-none" id="login-passkey-error"></div>
+</div>
+{{end}}
+{{if .PasskeysEnabled}}
+<script src="/theme/site-mfa.js?v=1"></script>
+<script>
+document.getElementById('login-passkey-btn')?.addEventListener('click', function () {
+  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'login-passkey-error');
+});
+</script>
 {{end}}
 {{end}}
 {{end}}

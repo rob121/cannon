@@ -1,0 +1,16 @@
+{{define "metaTags"}}
+  {{if .MetaDescription}}<meta name="description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta name="description" content="{{siteMetaDescription}}">{{end}}
+  {{if .MetaKeywords}}<meta name="keywords" content="{{.MetaKeywords}}">{{else if siteMetaKeywords}}<meta name="keywords" content="{{siteMetaKeywords}}">{{end}}
+  {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
+  {{if .MetaTitle}}<meta property="og:title" content="{{.MetaTitle}}">{{else if siteOGTitle}}<meta property="og:title" content="{{siteOGTitle}}">{{else if siteName}}<meta property="og:title" content="{{siteName}}">{{end}}
+  {{if .MetaDescription}}<meta property="og:description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta property="og:description" content="{{siteMetaDescription}}">{{end}}
+  {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{else if siteOGImage}}<meta property="og:image" content="{{siteOGImage}}">{{end}}
+  {{if siteName}}<meta property="og:site_name" content="{{siteName}}">{{end}}
+  <meta name="twitter:card" content="{{siteTwitterCard}}">
+  {{if .MetaTitle}}<meta name="twitter:title" content="{{.MetaTitle}}">{{else if siteOGTitle}}<meta name="twitter:title" content="{{siteOGTitle}}">{{else if siteName}}<meta name="twitter:title" content="{{siteName}}">{{end}}
+  {{if .MetaDescription}}<meta name="twitter:description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta name="twitter:description" content="{{siteMetaDescription}}">{{end}}
+  {{if .OGImage}}<meta name="twitter:image" content="{{.OGImage}}">{{else if siteOGImage}}<meta name="twitter:image" content="{{siteOGImage}}">{{end}}
+  {{if siteTwitterSite}}<meta name="twitter:site" content="{{siteTwitterSite}}">{{end}}
+  {{if siteTwitterCreator}}<meta name="twitter:creator" content="{{siteTwitterCreator}}">{{end}}
+  {{siteHeadExtra}}
+{{end}}

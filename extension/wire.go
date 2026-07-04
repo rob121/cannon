@@ -22,6 +22,10 @@ type WireRequest struct {
 	EndpointItem string        `json:"endpoint_item,omitempty"`
 	EndpointData map[string]any `json:"endpoint_data,omitempty"`
 	DataPath     string        `json:"data_path,omitempty"`
+	CaptchaContext string      `json:"captcha_context,omitempty"`
+	CaptchaAction  string      `json:"captcha_action,omitempty"`
+	CaptchaToken   string      `json:"captcha_token,omitempty"`
+	CaptchaRemoteIP string     `json:"captcha_remote_ip,omitempty"`
 }
 
 // WireResponse is the JSON payload capability handlers return to Cannon.

@@ -35,17 +35,15 @@ func DispatchEvent(ctx context.Context, event string, args map[string]any) {
 		Where("notification_events.event = ? AND notifications.status = ?", event, models.StatusActive).
 		Find(&rows).Error; err != nil {
 		log.Printf("notifications: load for %s: %v", event, err)
-		return
-	}
-	if len(rows) == 0 {
-		return
-	}
-	message := formatMessage(event, args)
-	for _, row := range rows {
-		if err := Send(ctx, row.ShoutrrURL, message); err != nil {
-			log.Printf("notifications: send %q (%s): %v", row.Name, event, err)
+	} else if len(rows) > 0 {
+		message := formatMessage(event, args)
+		for _, row := range rows {
+			if err := Send(ctx, row.ShoutrrURL, message); err != nil {
+				log.Printf("notifications: send %q (%s): %v", row.Name, event, err)
+			}
 		}
 	}
+	dispatchLayer2(ctx, event, args)
 }
 
 func formatMessage(event string, args map[string]any) string {

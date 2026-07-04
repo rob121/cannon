@@ -96,6 +96,33 @@ func (h *Handler) groupToggleStatus(w http.ResponseWriter, r *http.Request, idSt
 }
 
 func (h *Handler) roleToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, err := sites.DB(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var row models.Role
+	if err := db.First(&row, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			h.notFound(w, r)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if row.SystemRole {
+		http.Error(w, "system roles cannot be deactivated", http.StatusBadRequest)
+		return
+	}
 	h.postToggleModel(w, r, idStr, &models.Role{}, rolesBase)
 }
 

@@ -1,16 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{localeTag}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{if .MetaTitle}}{{.MetaTitle}}{{else if .Title}}{{.Title}}{{else}}Home{{end}}{{if siteName}} · {{siteName}}{{end}}</title>
-  {{if .MetaDescription}}<meta name="description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta name="description" content="{{siteMetaDescription}}">{{end}}
-  {{if .MetaKeywords}}<meta name="keywords" content="{{.MetaKeywords}}">{{end}}
-  {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
-  {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{end}}
-  {{if .MetaTitle}}<meta property="og:title" content="{{.MetaTitle}}">{{end}}
-  {{if .MetaDescription}}<meta property="og:description" content="{{.MetaDescription}}">{{else if siteMetaDescription}}<meta property="og:description" content="{{siteMetaDescription}}">{{end}}
-  <meta name="twitter:card" content="summary_large_image">
+  <title>{{if .MetaTitle}}{{.MetaTitle}}{{else if .Title}}{{.Title}}{{else}}{{lang "common.home"}}{{end}}{{if siteName}} · {{siteName}}{{end}}</title>
+  {{template "metaTags" .}}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
@@ -31,23 +25,35 @@
             <path fill-rule="evenodd" clip-rule="evenodd" d="M17.20,14.00 A6.8,6.8 0 1 1 17.18,14.00 Z M17.20,19.45 A1.35,1.35 0 1 0 17.22,19.45 Z M17.15,19.45 L17.25,19.45 L17.44,14.00 L16.96,14.00 Z M17.83,19.61 L17.92,19.66 L20.80,15.03 L20.39,14.80 Z M18.34,20.08 L18.39,20.17 L23.20,17.61 L22.97,17.20 Z M18.55,20.75 L18.55,20.85 L24.00,21.04 L24.00,20.56 Z M18.39,21.43 L18.34,21.52 L22.97,24.40 L23.20,23.99 Z M17.92,21.94 L17.83,21.99 L20.39,26.80 L20.80,26.57 Z M17.25,22.15 L17.15,22.15 L16.96,27.60 L17.44,27.60 Z M16.57,21.99 L16.48,21.94 L13.60,26.57 L14.01,26.80 Z M16.06,21.52 L16.01,21.43 L11.20,23.99 L11.43,24.40 Z M15.85,20.85 L15.85,20.75 L10.40,20.56 L10.40,21.04 Z M16.01,20.17 L16.06,20.08 L11.43,17.20 L11.20,17.61 Z M16.48,19.66 L16.57,19.61 L14.01,14.80 L13.60,15.03 Z"/>
           </svg>
         </span>
-        <span class="site-brand-text">{{if siteName}}{{siteName}}{{else}}Cannon{{end}}</span>
+        <span class="site-brand-text">{{if siteName}}{{siteName}}{{else}}{{lang "common.cannon"}}{{end}}</span>
       </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteNav" aria-controls="siteNav" aria-expanded="false" aria-label="Toggle navigation">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#siteNav" aria-controls="siteNav" aria-expanded="false" aria-label="{{lang "nav.toggle"}}">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="siteNav">
-        {{with .User}}{{if .authenticated}}
-        <p class="navbar-text me-lg-3 mb-2 mb-lg-0 order-lg-last">Hi, <span class="fw-semibold">{{if .display_name}}{{.display_name}}{{else}}{{.username}}{{end}}</span></p>
-        {{end}}{{end}}
-        <ul class="navbar-nav ms-lg-auto mb-2 mb-lg-0">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           {{range menu "main"}}
-          <li class="nav-item"><a class="nav-link {{.Class}}" href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a></li>
+          {{template "menu-nav-node" (dict "Item" . "Depth" 1)}}
           {{else}}
-          <li class="nav-item"><a class="nav-link" href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">{{lang "common.home"}}</a></li>
+          <li class="nav-item"><a class="nav-link" href="/admin">{{lang "common.admin"}}</a></li>
           {{end}}
         </ul>
+        {{with .User}}{{if .authenticated}}
+        <ul class="navbar-nav ms-lg-auto mb-2 mb-lg-0 align-items-lg-center">
+          <li class="nav-item"><span class="navbar-text me-lg-2">{{lang "nav.hi"}} <span class="fw-semibold">{{if .display_name}}{{.display_name}}{{else}}{{.username}}{{end}}</span></span></li>
+          <li class="nav-item"><a class="nav-link" href="{{controllerURL "auth" "profile"}}">{{lang "nav.profile"}}</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{controllerURL "auth" "logout"}}">{{lang "nav.sign_out"}}</a></li>
+        </ul>
+        {{else}}
+        <ul class="navbar-nav ms-lg-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="{{controllerURL "auth" "login"}}">{{lang "nav.sign_in"}}</a></li>
+        </ul>
+        {{end}}{{else}}
+        <ul class="navbar-nav ms-lg-auto mb-2 mb-lg-0">
+          <li class="nav-item"><a class="nav-link" href="{{controllerURL "auth" "login"}}">{{lang "nav.sign_in"}}</a></li>
+        </ul>
+        {{end}}
       </div>
     </div>
   </nav>
@@ -65,7 +71,7 @@
           {{.Main}}
         </div>
         {{if gt (lenspace "sidebar") 0}}
-        <aside class="col-12 col-lg-3" aria-label="Sidebar">
+        <aside class="col-12 col-lg-3" aria-label="{{lang "common.sidebar"}}">
           {{space "sidebar"}}
         </aside>
         {{end}}
@@ -87,18 +93,18 @@
                 <path fill-rule="evenodd" clip-rule="evenodd" d="M17.20,14.00 A6.8,6.8 0 1 1 17.18,14.00 Z M17.20,19.45 A1.35,1.35 0 1 0 17.22,19.45 Z M17.15,19.45 L17.25,19.45 L17.44,14.00 L16.96,14.00 Z M17.83,19.61 L17.92,19.66 L20.80,15.03 L20.39,14.80 Z M18.34,20.08 L18.39,20.17 L23.20,17.61 L22.97,17.20 Z M18.55,20.75 L18.55,20.85 L24.00,21.04 L24.00,20.56 Z M18.39,21.43 L18.34,21.52 L22.97,24.40 L23.20,23.99 Z M17.92,21.94 L17.83,21.99 L20.39,26.80 L20.80,26.57 Z M17.25,22.15 L17.15,22.15 L16.96,27.60 L17.44,27.60 Z M16.57,21.99 L16.48,21.94 L13.60,26.57 L14.01,26.80 Z M16.06,21.52 L16.01,21.43 L11.20,23.99 L11.43,24.40 Z M15.85,20.85 L15.85,20.75 L10.40,20.56 L10.40,21.04 Z M16.01,20.17 L16.06,20.08 L11.43,17.20 L11.20,17.61 Z M16.48,19.66 L16.57,19.61 L14.01,14.80 L13.60,15.03 Z"/>
               </svg>
             </span>
-            {{if siteName}}{{siteName}}{{else}}Cannon{{end}}
+            {{if siteName}}{{siteName}}{{else}}{{lang "common.cannon"}}{{end}}
           </p>
-          <p class="text-muted small mb-0">Thoughts, updates, and stories — powered by Cannon CMS.</p>
+          <p class="text-muted small mb-0">{{lang "footer.tagline"}}</p>
         </div>
         <div class="col-md-6">
-          <p class="text-uppercase text-muted small fw-semibold mb-2">Explore</p>
+          <p class="text-uppercase text-muted small fw-semibold mb-2">{{lang "footer.explore"}}</p>
           <ul class="list-unstyled mb-0">
             {{range menu "main"}}
             <li class="mb-1"><a href="{{.Href}}"{{if .Target}} target="{{.Target}}"{{end}}>{{.Name}}</a></li>
             {{else}}
-            <li class="mb-1"><a href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">Home</a></li>
-            <li class="mb-1"><a href="/admin">Admin</a></li>
+            <li class="mb-1"><a href="{{if $.HomeURL}}{{$.HomeURL}}{{else}}/{{end}}">{{lang "common.home"}}</a></li>
+            <li class="mb-1"><a href="/admin">{{lang "common.admin"}}</a></li>
             {{end}}
           </ul>
         </div>
@@ -107,8 +113,8 @@
       <div class="site-footer-blocks mt-4 pt-4 border-top">{{space "footer"}}</div>
       {{end}}
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 pt-3 border-top text-muted small">
-        <span>© {{year}} {{if siteName}}{{siteName}}{{else}}Cannon{{end}}</span>
-        <a href="/admin">Site admin</a>
+        <span>© {{year}} {{if siteName}}{{siteName}}{{else}}{{lang "common.cannon"}}{{end}}</span>
+        <a href="/admin">{{lang "footer.site_admin"}}</a>
       </div>
     </div>
   </footer>

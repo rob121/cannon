@@ -1,9 +1,14 @@
 <turbo-frame id="media-picker-frame">
-  <div class="admin-media-picker" data-media-picker>
+  <div class="admin-media-picker" data-media-picker{{if .FilesMode}} data-media-picker-files{{end}}>
     <div class="admin-media-picker-header">
       <div class="admin-media-picker-heading">
+        {{if .FilesMode}}
+        <h2 class="admin-media-picker-title">Choose File</h2>
+        <p class="admin-media-picker-desc">Select a file from the media library.</p>
+        {{else}}
         <h2 class="admin-media-picker-title">Choose Image</h2>
         <p class="admin-media-picker-desc">Select an image from the media library.</p>
+        {{end}}
       </div>
       <button type="button" class="btn-admin-icon admin-media-picker-close" data-media-picker-close aria-label="Close">
         <i class="bi bi-x-lg"></i>
@@ -12,7 +17,11 @@
     <div class="admin-media-picker-toolbar">
       <label class="admin-filter-label" for="media-picker-folder">Folder</label>
       <select class="admin-form-control admin-form-control-sm" id="media-picker-folder" data-media-picker-folder>
+        {{if .FilesMode}}
+        <option value="">All Files</option>
+        {{else}}
         <option value="">All Images</option>
+        {{end}}
         {{range .FolderOptions}}
         <option value="{{.Path}}" {{if eq $.FolderFilter .Path}}selected{{end}}>{{.Label}}</option>
         {{end}}
@@ -25,10 +34,14 @@
       {{if .Rows}}
       <div class="admin-media-picker-grid">
         {{range .Rows}}
-        {{if .IsImage}}
+        {{if or $.FilesMode .IsImage}}
         <button type="button" class="admin-media-picker-item" data-media-pick data-media-path="{{.Path}}" title="{{.Name}}">
           <span class="admin-media-picker-thumb">
-            <img src="{{if .ThumbPath}}{{.ThumbPath}}{{else}}{{.Path}}{{end}}" alt="{{if .Alt}}{{.Alt}}{{else}}{{.Name}}{{end}}" loading="lazy">
+            {{if .IsImage}}
+            <img src="{{if .ThumbPath}}{{.ThumbPath}}{{else}}{{.Path}}{{end}}" alt="{{if .Alt}}{{.Alt}}{{else}}{{.Name}}{{end}}">
+            {{else}}
+            <span class="admin-media-picker-file-icon" aria-hidden="true"><i class="bi {{.IconClass}}"></i></span>
+            {{end}}
           </span>
           <span class="admin-media-picker-name">{{.Name}}</span>
         </button>
@@ -37,7 +50,11 @@
       </div>
       {{else}}
       <div class="admin-empty-state-wrap">
+        {{if .FilesMode}}
+        {{template "table_empty_state" (dict "Icon" "bi-folder2-open" "Title" "No files found" "Message" "Upload a file or choose another folder from the toolbar above.")}}
+        {{else}}
         {{template "table_empty_state" (dict "Icon" "bi-images" "Title" "No images found" "Message" "Upload a file or choose another folder from the toolbar above.")}}
+        {{end}}
       </div>
       {{end}}
     </div>

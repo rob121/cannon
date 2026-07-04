@@ -31,6 +31,10 @@ func testServer(t *testing.T) *extension.Server {
 		return extension.HTML(200, "<p>admin</p>")
 	})
 	s.OnInstall(func(req extension.WireRequest) error { return nil })
+	s.RegisterPermissions([]extension.PermissionDef{
+		{ID: "manage", DisplayName: "Manage Test Extension"},
+		{ID: "reports.read", DisplayName: "View Reports"},
+	})
 	return s
 }
 
@@ -66,6 +70,26 @@ func TestCapabilities(t *testing.T) {
 	}
 	if got.Defaults.Admin.MenuName != "Test Admin" {
 		t.Fatalf("admin menu: got %q", got.Defaults.Admin.MenuName)
+	}
+}
+
+func TestCapabilitiesIncludesPermissions(t *testing.T) {
+	s := testServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/capabilities", nil)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+
+	var got struct {
+		Permissions []extension.PermissionDef `json:"permissions"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.Permissions) != 2 {
+		t.Fatalf("permissions: got %#v", got.Permissions)
+	}
+	if got.Permissions[0].ID != "manage" {
+		t.Fatalf("first permission id: got %q", got.Permissions[0].ID)
 	}
 }
 

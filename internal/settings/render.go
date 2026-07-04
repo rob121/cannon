@@ -12,9 +12,15 @@ import (
 	gojsonforms "github.com/TobiEiss/go-jsonforms"
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/csrf"
+	"github.com/rob121/cannon/internal/models"
 )
 
-var booleanFieldRE = regexp.MustCompile(`(?s)<div class="form-group column col-12">\s*<label class="form-label admin-form-label" for="([^"]+)">([^<]*)</label>\s*<input class="form-input admin-form-control" id="([^"]+)" name="([^"]+)"\s+type="boolean"([^>]*)/>\s*(<small[^>]*>[\s\S]*?</small>)?\s*</div>`)
+// FormRenderContext supplies optional data for specialized configuration field types.
+type FormRenderContext struct {
+	Categories []models.Category
+}
+
+var booleanFieldRE = regexp.MustCompile(`(?s)<div class="form-group( column col-12)?">\s*<label class="form-label admin-form-label" for="([^"]+)">([^<]*)</label>\s*<input class="form-input admin-form-control" id="([^"]+)" name="([^"]+)"\s+type="boolean"([^>]*)/>\s*(<small[^>]*>[\s\S]*?</small>)?\s*</div>`)
 
 var selectWithoutNameRE = regexp.MustCompile(`<select class="form-select admin-form-control" id="([^"]+)" list="`)
 
@@ -23,9 +29,10 @@ var selectBlockRE = regexp.MustCompile(`(?s)(<select class="form-select admin-fo
 var selectOptionRE = regexp.MustCompile(`<option value="([^"]*)">([^<]*)</option>`)
 
 // RenderForm builds HTML for a JSON Forms section using admin styling hooks.
-func RenderForm(section extension.ConfigurationSection, postURL, csrfToken string) (string, error) {
+func RenderForm(section extension.ConfigurationSection, postURL, csrfToken string, renderCtx *FormRenderContext) (string, error) {
+	schema := normalizeSchemaForForms(section.Schema)
 	builder := gojsonforms.NewBuilder().
-		WithSchemaBytes(section.Schema).
+		WithSchemaBytes(schema).
 		WithUISchemaBytes(section.UISchema)
 	if len(section.Data) > 0 {
 		builder = builder.WithDataBytes(section.Data)
@@ -36,7 +43,7 @@ func RenderForm(section extension.ConfigurationSection, postURL, csrfToken strin
 		return "", err
 	}
 	html = injectCSRFField(html, csrfToken)
-	return normalizeFormHTML(html, section), nil
+	return normalizeFormHTML(html, section, renderCtx), nil
 }
 
 func injectCSRFField(html, token string) string {
@@ -57,17 +64,18 @@ func injectCSRFField(html, token string) string {
 }
 
 // FormDataFromRequest parses posted configuration values and applies boolean defaults.
-func FormDataFromRequest(r *http.Request, schema json.RawMessage) map[string]any {
+func FormDataFromRequest(r *http.Request, schema, uiSchema json.RawMessage) map[string]any {
 	data := map[string]any{}
 	if result := gojsonforms.Verify(r.Form); result != nil {
 		if parsed, ok := result.(map[string]any); ok {
 			data = parsed
 		}
 	}
-	return ApplyBooleanFormDefaults(schema, data, r.Form)
+	data = ApplyBooleanFormDefaults(schema, data, r.Form)
+	return ApplyCategoryFormDefaults(schema, uiSchema, data, r.Form)
 }
 
-func normalizeFormHTML(html string, section extension.ConfigurationSection) string {
+func normalizeFormHTML(html string, section extension.ConfigurationSection, renderCtx *FormRenderContext) string {
 	replacements := []struct{ old, new string }{
 		{`class="form-input"`, `class="form-input admin-form-control"`},
 		{`class="form-select"`, `class="form-select admin-form-control"`},
@@ -83,10 +91,64 @@ func normalizeFormHTML(html string, section extension.ConfigurationSection) stri
 	data := parseSectionData(section.Data)
 	html = normalizeSelectFields(html, data)
 	html = normalizeBooleanFields(html, data)
+	html = normalizeTextareaFields(html, section.UISchema, data)
+	categories := []models.Category(nil)
+	if renderCtx != nil {
+		categories = renderCtx.Categories
+	}
+	html = normalizeCategoryFields(html, section.Schema, section.UISchema, data, categories)
 	return injectDefaultPlaceholders(html, section.Schema, data)
 }
 
 var stringInputTagRE = regexp.MustCompile(`(?s)<input class="form-input admin-form-control" id="(#[^"]+)" name="([^"]+)"([^>]*)/>`)
+
+func normalizeTextareaFields(formHTML string, uiSchema json.RawMessage, data map[string]any) string {
+	for _, scope := range textareaScopes(uiSchema) {
+		key := propertyKey(scope)
+		value := html.EscapeString(formFieldValue(data, key))
+		scopeRE := regexp.MustCompile(`(?s)<input class="form-input admin-form-control" id="` + regexp.QuoteMeta(scope) + `" name="` + regexp.QuoteMeta(scope) + `"([^>]*)/>`)
+		formHTML = scopeRE.ReplaceAllStringFunc(formHTML, func(match string) string {
+			aria := ""
+			if m := regexp.MustCompile(`aria-describedby="([^"]*)"`).FindStringSubmatch(match); len(m) > 1 {
+				aria = ` aria-describedby="` + m[1] + `"`
+			}
+			return fmt.Sprintf(`<textarea class="form-input admin-form-control admin-form-textarea" id="%s" name="%s" rows="4"%s>%s</textarea>`, scope, scope, aria, value)
+		})
+	}
+	return formHTML
+}
+
+func textareaScopes(uiSchema json.RawMessage) []string {
+	var node map[string]any
+	if err := json.Unmarshal(uiSchema, &node); err != nil {
+		return nil
+	}
+	var scopes []string
+	collectTextareaScopes(node, &scopes)
+	return scopes
+}
+
+func collectTextareaScopes(node map[string]any, scopes *[]string) {
+	if node == nil {
+		return
+	}
+	if nodeType, _ := node["type"].(string); nodeType == "Control" {
+		if scope, _ := node["scope"].(string); scope != "" {
+			if options, ok := node["options"].(map[string]any); ok {
+				if multi, ok := options["multi"].(bool); ok && multi {
+					*scopes = append(*scopes, scope)
+				}
+			}
+		}
+	}
+	if elements, ok := node["elements"].([]any); ok {
+		for _, el := range elements {
+			if child, ok := el.(map[string]any); ok {
+				collectTextareaScopes(child, scopes)
+			}
+		}
+	}
+}
 
 func injectDefaultPlaceholders(formHTML string, schema json.RawMessage, data map[string]any) string {
 	defaults := stringDefaultPlaceholders(schema)
@@ -193,20 +255,21 @@ func formFieldValue(data map[string]any, key string) string {
 func normalizeBooleanFields(html string, data map[string]any) string {
 	return booleanFieldRE.ReplaceAllStringFunc(html, func(match string) string {
 		parts := booleanFieldRE.FindStringSubmatch(match)
-		if len(parts) < 5 {
+		if len(parts) < 6 {
 			return match
 		}
-		scope := parts[1]
-		title := parts[2]
+		columnClass := parts[1]
+		scope := parts[2]
+		title := parts[3]
 		smallHTML := ""
-		if len(parts) > 6 {
-			smallHTML = parts[6]
+		if len(parts) > 7 {
+			smallHTML = parts[7]
 		}
-		return renderBooleanToggle(scope, title, smallHTML, data)
+		return renderBooleanToggle(scope, title, smallHTML, data, columnClass)
 	})
 }
 
-func renderBooleanToggle(scope, title, smallHTML string, data map[string]any) string {
+func renderBooleanToggle(scope, title, smallHTML string, data map[string]any, columnClass string) string {
 	key := propertyKey(scope)
 	checked := Bool(data, key)
 	checkedAttr := ""
@@ -217,7 +280,7 @@ func renderBooleanToggle(scope, title, smallHTML string, data map[string]any) st
 	if strings.TrimSpace(smallHTML) != "" {
 		smallBlock = "\n  " + smallHTML
 	}
-	return fmt.Sprintf(`<div class="form-group column col-12">
+	return fmt.Sprintf(`<div class="form-group%s">
   <label class="form-label admin-form-label" for="%s">%s</label>
   <label class="admin-form-toggle admin-jsonforms-toggle">
     <input type="checkbox" class="admin-form-toggle-input" id="%s" name="%s" value="true"%s>
@@ -227,7 +290,7 @@ func renderBooleanToggle(scope, title, smallHTML string, data map[string]any) st
       <span class="admin-form-toggle-label-off">Disabled</span>
     </span>
   </label>%s
-</div>`, scope, title, scope, scope, checkedAttr, smallBlock)
+</div>`, columnClass, scope, title, scope, scope, checkedAttr, smallBlock)
 }
 
 func parseSectionData(raw json.RawMessage) map[string]any {

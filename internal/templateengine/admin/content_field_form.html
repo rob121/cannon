@@ -1,8 +1,9 @@
 {{template "page_header" .}}
+{{template "form_toolbar" (dict "FormID" "content-field-form" "CancelURL" (printf "%s/%d" .BasePath .GroupID))}}
 <div class="admin-form-card">
   <div class="admin-form-card-body">
     {{template "error_alert" .}}
-    <form method="post" action="{{.BasePath}}/{{.GroupID}}/fields/{{if .IsNew}}new{{else}}{{.Row.FieldID}}{{end}}">
+    <form method="post" action="{{.BasePath}}/{{.GroupID}}/fields/{{if .IsNew}}new{{else}}{{.Row.FieldID}}{{end}}" id="content-field-form" data-turbo-frame="_top">
       {{csrfField}}
       <input type="hidden" name="field_group_id" value="{{.GroupID}}">
       <div class="row g-3">
@@ -17,22 +18,7 @@
         </div>
         <div class="col-md-4">
           <label class="admin-form-label">Type</label>
-          <select class="admin-form-control" name="type">
-            <option value="text" {{if eq .Row.Type "text"}}selected{{end}}>text</option>
-            <option value="textarea" {{if eq .Row.Type "textarea"}}selected{{end}}>textarea</option>
-            <option value="rich_text" {{if eq .Row.Type "rich_text"}}selected{{end}}>rich_text</option>
-            <option value="select" {{if eq .Row.Type "select"}}selected{{end}}>select</option>
-            <option value="multi_select" {{if eq .Row.Type "multi_select"}}selected{{end}}>multi_select</option>
-            <option value="radio" {{if eq .Row.Type "radio"}}selected{{end}}>radio</option>
-            <option value="checkbox" {{if eq .Row.Type "checkbox"}}selected{{end}}>checkbox</option>
-            <option value="date" {{if eq .Row.Type "date"}}selected{{end}}>date</option>
-            <option value="datetime" {{if eq .Row.Type "datetime"}}selected{{end}}>datetime</option>
-            <option value="number" {{if eq .Row.Type "number"}}selected{{end}}>number</option>
-            <option value="url" {{if eq .Row.Type "url"}}selected{{end}}>url</option>
-            <option value="image" {{if eq .Row.Type "image"}}selected{{end}}>image</option>
-            <option value="file" {{if eq .Row.Type "file"}}selected{{end}}>file</option>
-            <option value="boolean" {{if eq .Row.Type "boolean"}}selected{{end}}>boolean</option>
-          </select>
+          {{template "field_type_select" (dict "Name" "type" "Value" .Row.Type "Required" true)}}
         </div>
         <div class="col-md-4">
           <label class="admin-form-label">Sort</label>
@@ -54,7 +40,6 @@
           <textarea class="admin-form-control" name="configuration" rows="4">{{.Row.Configuration}}</textarea>
         </div>
       </div>
-      {{template "form_actions" (dict "BasePath" (printf "%s/%d" .BasePath .GroupID) "CancelURL" (printf "%s/%d" .BasePath .GroupID))}}
     </form>
   </div>
 </div>

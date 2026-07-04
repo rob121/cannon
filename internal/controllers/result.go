@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -161,4 +162,16 @@ func (r rawResult) Write(w http.ResponseWriter, _ *http.Request, _ *Context) err
 		_, _ = w.Write(r.Body)
 	}
 	return nil
+}
+
+// JSON encodes data as a JSON response.
+func JSON(code int, data any) Result {
+	if code == 0 {
+		code = http.StatusOK
+	}
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return Error(http.StatusInternalServerError, err.Error())
+	}
+	return Raw(code, "application/json", raw)
 }

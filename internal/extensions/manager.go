@@ -23,6 +23,7 @@ import (
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
@@ -38,10 +39,12 @@ type Capabilities struct {
 	Configuration string `json:"configuration"`
 	Hooks         string `json:"hooks"`
 	Templates     string `json:"templates"`
+	Captcha       string `json:"captcha"`
 }
 
 type CapabilitiesResponse struct {
-	Capabilities Capabilities `json:"capabilities"`
+	Capabilities Capabilities              `json:"capabilities"`
+	Permissions  []extension.PermissionDef `json:"permissions,omitempty"`
 	Defaults     struct {
 		Admin struct {
 			MenuName string `json:"menu_name"`
@@ -55,6 +58,7 @@ type WireResponse = extension.WireResponse
 type Runtime struct {
 	Model                models.Extension
 	Capabilities         Capabilities
+	Permissions          []extension.PermissionDef
 	Blocks               []extension.BlockDefinition
 	Pages                []extension.PageDefinition
 	Endpoints            []extension.EndpointDefinition
@@ -208,6 +212,13 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 	}
 	rt.Capabilities = payload.Capabilities
 	rt.DefaultAdminMenuName = strings.TrimSpace(payload.Defaults.Admin.MenuName)
+	rt.Permissions = append([]extension.PermissionDef(nil), payload.Permissions...)
+	if len(payload.Permissions) > 0 {
+		security.RegisterExtensionPermissions(rt.Model.Name, payload.Permissions)
+		if db, err := sites.DB(ctx); err == nil {
+			_ = security.SyncToDB(db)
+		}
+	}
 	rt.Blocks = nil
 	rt.Pages = nil
 	rt.Endpoints = nil

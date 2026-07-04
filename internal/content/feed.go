@@ -1,6 +1,7 @@
 package content
 
 import (
+	"context"
 	"encoding/xml"
 	"html"
 	"strings"
@@ -57,7 +58,7 @@ func BuildRSS(siteName, siteURL, feedTitle, feedLink, feedDesc string, items []m
 		Items:       make([]rssItem, 0, len(items)),
 	}
 	for _, item := range items {
-		link := base + ItemURL(item.Slug)
+		link := base + ItemURLForContext(WithLocale(context.Background(), item.Locale), item.Slug)
 		desc := strings.TrimSpace(item.Intro)
 		if desc == "" {
 			desc = strings.TrimSpace(item.Body)

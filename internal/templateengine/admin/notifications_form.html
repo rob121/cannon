@@ -23,13 +23,14 @@
         </div>
         <div class="col-12">
           <label class="admin-form-label">Hook Events</label>
-          <div class="admin-check-grid">
-            {{range .HookEvents}}
-            <label class="admin-check-label">
-              <input type="checkbox" name="events" value="{{.}}" {{if inString $.SelectedEvents .}}checked{{end}}> {{.}}
-            </label>
-            {{end}}
+          {{range .SubscribableGroups}}
+          <div class="mb-3">
+            <p class="admin-form-help mb-2"><strong>{{.Label}}</strong></p>
+            {{template "toggle_value_grid" (dict "InputName" "events" "Values" .Events "Selected" $.SelectedEvents)}}
           </div>
+          {{else}}
+          {{template "toggle_value_grid" (dict "InputName" "events" "Values" .HookEvents "Selected" .SelectedEvents)}}
+          {{end}}
         </div>
       </div>
       {{template "form_actions" .}}

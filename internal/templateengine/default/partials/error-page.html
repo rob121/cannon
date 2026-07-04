@@ -1,6 +1,6 @@
 {{define "errorPage"}}
 <article class="mb-4">
   {{template "pageHeader" (dict "AlwaysShow" true "Eyebrow" .ErrorCode "Title" .Title "Subtitle" .ErrorMessage)}}
-  <a class="btn btn-primary" href="{{if .HomeURL}}{{.HomeURL}}{{else}}/{{end}}">Return Home</a>
+  <a class="btn btn-primary" href="{{if .HomeURL}}{{.HomeURL}}{{else}}/{{end}}">{{lang "error.return_home"}}</a>
 </article>
 {{end}}

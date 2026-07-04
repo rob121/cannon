@@ -10,6 +10,7 @@ import (
 	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/session"
 	"github.com/rob121/cannon/internal/sites"
 	"golang.org/x/crypto/bcrypt"
@@ -81,7 +82,7 @@ func (s *Service) Current(ctx context.Context) (*models.User, error) {
 		return nil, err
 	}
 	var u models.User
-	if err := db.Preload("Groups.Roles").First(&u, userID).Error; err != nil {
+	if err := db.Preload("Groups.Roles").Preload("Roles").First(&u, userID).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -135,6 +136,28 @@ func (s *Service) Logout() error {
 	return s.store.Delete(s.id)
 }
 
+// SetSessionValue stores a session value and persists it.
+func (s *Service) SetSessionValue(key string, value any) error {
+	if value == nil {
+		delete(s.data, key)
+	} else {
+		s.data[key] = value
+	}
+	return s.store.Save(s.id, s.data)
+}
+
+// SessionValue returns a stored session value.
+func (s *Service) SessionValue(key string) (any, bool) {
+	v, ok := s.data[key]
+	return v, ok
+}
+
+// ClearSessionValue removes a session value and persists.
+func (s *Service) ClearSessionValue(key string) error {
+	delete(s.data, key)
+	return s.store.Save(s.id, s.data)
+}
+
 // Context returns serializable user context for extensions.
 func (s *Service) Context(ctx context.Context) (map[string]any, error) {
 	_, ok := s.CurrentID()
@@ -145,7 +168,7 @@ func (s *Service) Context(ctx context.Context) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{
+	out := map[string]any{
 		"authenticated": true,
 		"user_id":       u.UserID,
 		"username":      u.Username,
@@ -153,7 +176,15 @@ func (s *Service) Context(ctx context.Context) (map[string]any, error) {
 		"given_name":    u.GivenName,
 		"family_name":   u.FamilyName,
 		"display_name":  DisplayName(u),
-	}, nil
+		"avatar_url":    ResolveAvatar(u),
+	}
+	if perms, ok := security.PermissionsFromContext(ctx); ok {
+		out["permissions"] = security.PermissionKeys(perms)
+		if denied := security.DeniedPermissionKeys(perms); len(denied) > 0 {
+			out["denied_permissions"] = denied
+		}
+	}
+	return out, nil
 }
 
 // DisplayName returns the best label for greeting a user in templates.

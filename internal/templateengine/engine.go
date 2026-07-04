@@ -17,6 +17,7 @@ import (
 	"sync"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -25,7 +26,7 @@ import (
 	"github.com/rob121/cannon/internal/user"
 )
 
-//go:embed default/*.html default/error/*.html default/mail/*.html default/partials/auth/*.html default/partials/blocks/*.html default/partials/content/*.html default/partials/error-page.html default/partials/offline-notice.html default/partials/page-header.html default/controllers/*/*.html default/*.css default/*.svg admin/*.html admin/error/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
+//go:embed default/*.html default/error/*.html default/mail/*.html default/partials/auth/*.html default/partials/blocks/*.html default/partials/content/*.html default/partials/error-page.html default/partials/meta-tags.html default/partials/offline-notice.html default/partials/page-header.html default/partials/menu-nav.html default/partials/route-iframe.html default/controllers/*/*.html default/*.css default/*.svg admin/*.html admin/error/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
 var coreFS embed.FS
 
 // BlockRenderer renders named template spaces via extensions.
@@ -171,6 +172,12 @@ func (e *Engine) render(w io.Writer, layout, page string, data any, status int) 
 	}
 	output := rendered.Bytes()
 
+	if e.hookCtx != nil {
+		if expanded, err := captcha.ExpandHTML(e.hookCtx, string(output)); err == nil {
+			output = []byte(expanded)
+		}
+	}
+
 	if rw, ok := w.(interface{ Header() http.Header }); ok {
 		if rw.Header().Get("Content-Type") == "" {
 			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -221,7 +228,18 @@ func (e *Engine) RenderFragment(w io.Writer, name string, data any) error {
 	if err != nil {
 		return err
 	}
-	return tmpl.Execute(w, data)
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+	out := buf.String()
+	if e.hookCtx != nil {
+		if expanded, err := captcha.ExpandHTML(e.hookCtx, out); err == nil {
+			out = expanded
+		}
+	}
+	_, err = io.WriteString(w, out)
+	return err
 }
 
 // AdminAsset returns embedded admin static files.

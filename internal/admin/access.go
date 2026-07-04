@@ -3,11 +3,10 @@ package admin
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 
-	"github.com/rob121/cannon/internal/models"
-	"github.com/rob121/cannon/internal/roles"
-	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/user"
 )
 
@@ -18,7 +17,7 @@ type AdminRoute struct {
 	FormKey string
 }
 
-// AdminRoutes lists admin sections assignable to groups.
+// AdminRoutes lists admin sections used for permission path mapping.
 var AdminRoutes = []AdminRoute{
 	{Path: "/items", Label: "Items", FormKey: "items"},
 	{Path: "/categories", Label: "Categories", FormKey: "categories"},
@@ -34,60 +33,45 @@ var AdminRoutes = []AdminRoute{
 	{Path: "/users", Label: "Users", FormKey: "users"},
 	{Path: "/groups", Label: "Groups", FormKey: "groups"},
 	{Path: "/roles", Label: "Roles", FormKey: "roles"},
+	{Path: "/permissions", Label: "Permissions", FormKey: "permissions"},
 	{Path: "/notifications", Label: "Notifications", FormKey: "notifications"},
 	{Path: "/configuration", Label: "Configuration", FormKey: "configuration"},
 	{Path: "/extensions", Label: "Extensions", FormKey: "extensions"},
+	{Path: "/extension-apps", Label: "Extension Apps", FormKey: "extension-apps"},
 	{Path: "/help", Label: "Help", FormKey: "help"},
 	{Path: "/languages", Label: "Languages", FormKey: "languages"},
 	{Path: "/sites", Label: "Sites", FormKey: "sites"},
 	{Path: "/system", Label: "System", FormKey: "system"},
 	{Path: "/authenticators", Label: "Authenticators", FormKey: "authenticators"},
 	{Path: "/profiles", Label: "Profiles", FormKey: "profiles"},
+	{Path: "/api", Label: "API", FormKey: "api"},
 }
 
 // CanAccessAdmin reports whether the user may access an admin path.
 func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write bool) (bool, error) {
-	if ok, err := roles.HasRole(ctx, userID, roles.AdminRole); err != nil {
-		return false, err
-	} else if ok {
-		return true, nil
-	}
-	db, err := sites.DB(ctx)
-	if err != nil {
-		return false, err
-	}
-	var u models.User
-	if err := db.Preload("Groups").First(&u, userID).Error; err != nil {
-		return false, err
-	}
-	groupIDs := make([]uint, 0, len(u.Groups))
-	for _, g := range u.Groups {
-		if g.Status == models.StatusActive {
-			groupIDs = append(groupIDs, g.GroupID)
-		}
-	}
-	if len(groupIDs) == 0 {
-		return false, nil
+	if name := extensionNameFromAdminPath(requestPath); name != "" {
+		return security.CanAccessExtensionAdmin(ctx, userID, name)
 	}
 	section := adminSection(requestPath)
-	if section == "" {
-		return false, nil
+	if section == "/extension-apps" {
+		return security.Can(ctx, userID, security.PermAdminExtensionAppsRead)
 	}
-	if section == "/" {
-		return true, nil
+	perm := security.AdminPermissionForPath(section, write)
+	return security.Can(ctx, userID, perm)
+}
+
+func extensionNameFromAdminPath(requestPath string) string {
+	path := strings.TrimPrefix(requestPath, "/admin")
+	path = strings.TrimPrefix(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 || parts[0] != "extension-apps" {
+		return ""
 	}
-	var count int64
-	q := db.Model(&models.GroupAdminRoute{}).
-		Where("group_id IN ? AND path = ?", groupIDs, section)
-	if write {
-		q = q.Where("can_write = ?", true)
-	} else {
-		q = q.Where("can_read = ?", true)
+	name, err := url.PathUnescape(parts[1])
+	if err != nil {
+		return ""
 	}
-	if err := q.Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
+	return strings.TrimSpace(name)
 }
 
 func adminSection(path string) string {
@@ -122,4 +106,13 @@ func (h *Handler) requireAccess(w http.ResponseWriter, r *http.Request) bool {
 
 func httpxRedirectLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+}
+
+// CanManageSecurity reports whether the user may manage roles and permissions.
+func CanManageSecurity(ctx context.Context, userID uint) (bool, error) {
+	ok, err := security.Can(ctx, userID, security.PermRolesManage)
+	if err != nil || ok {
+		return ok, err
+	}
+	return security.Can(ctx, userID, security.PermWildcardAll)
 }

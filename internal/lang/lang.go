@@ -2,6 +2,7 @@ package lang
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,9 @@ import (
 	"github.com/rob121/cannon/internal/config"
 	"gopkg.in/ini.v1"
 )
+
+//go:embed default/*.ini
+var defaultLocaleFS embed.FS
 
 // LanguageFile describes a locale ini file on disk.
 type LanguageFile struct {
@@ -99,57 +103,78 @@ func NewManager(site *config.SiteConfig, locale string) (*Manager, error) {
 	return m, nil
 }
 
+// NewEmbeddedManager loads only built-in locale strings (for tests).
+func NewEmbeddedManager(locale string) (*Manager, error) {
+	if locale == "" {
+		locale = "en-US"
+	}
+	m := &Manager{
+		locale:  locale,
+		bundles: make(map[string]*Bundle),
+	}
+	if err := m.applyEmbeddedSite(); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// Locale returns the active locale code.
+func (m *Manager) Locale() string {
+	return m.locale
+}
+
+// LocaleTag returns a BCP 47 language tag suitable for html lang attributes.
+func (m *Manager) LocaleTag() string {
+	tag := strings.TrimSpace(m.locale)
+	if tag == "" {
+		return "en"
+	}
+	if idx := strings.IndexAny(tag, "-_"); idx > 0 {
+		return tag[:idx]
+	}
+	return tag
+}
+
 // Reload reads all matching ini files.
 func (m *Manager) Reload() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if err := os.MkdirAll(m.dir, 0755); err != nil {
-		return err
-	}
-
-	entries, err := os.ReadDir(m.dir)
-	if err != nil {
-		return err
-	}
-
 	m.bundles = make(map[string]*Bundle)
-	prefix := m.locale
 
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) {
-			continue
-		}
-		if name != prefix+".ini" && !strings.HasPrefix(name, prefix+"-") {
-			continue
+	if m.dir != "" {
+		if err := os.MkdirAll(m.dir, 0755); err != nil {
+			return err
 		}
 
-		scope := scopeFromFilename(prefix, name)
-
-		file, err := ini.Load(filepath.Join(m.dir, name))
+		entries, err := os.ReadDir(m.dir)
 		if err != nil {
 			return err
 		}
 
-		b := &Bundle{Locale: m.locale, Scope: scope, Values: map[string]string{}}
-		for _, section := range file.Sections() {
-			sec := section.Name()
-			for _, key := range section.Keys() {
-				id := key.Name()
-				if sec != "DEFAULT" {
-					id = sec + "." + id
-				}
-				b.Values[id] = key.String()
+		prefix := m.locale
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
 			}
+			name := entry.Name()
+			if !strings.HasPrefix(name, prefix) {
+				continue
+			}
+			if name != prefix+".ini" && !strings.HasPrefix(name, prefix+"-") {
+				continue
+			}
+
+			scope := scopeFromFilename(prefix, name)
+			b, err := loadBundleFromPath(m.locale, scope, filepath.Join(m.dir, name))
+			if err != nil {
+				return err
+			}
+			m.bundles[scope] = b
 		}
-		m.bundles[scope] = b
 	}
 
-	return nil
+	return m.applyEmbeddedSite()
 }
 
 // Fmt formats a translation key with named placeholders.
@@ -384,19 +409,87 @@ func (m *Manager) ScopeExists(scope string) bool {
 }
 
 func (m *Manager) lookup(key string) (string, bool) {
-	for _, scope := range []string{"admin", "site"} {
+	for _, scope := range []string{"site", "admin", "default"} {
 		if b, ok := m.bundles[scope]; ok {
 			if v, ok := b.Values[key]; ok {
 				return v, true
 			}
 		}
 	}
-	for _, b := range m.bundles {
-		if v, ok := b.Values[key]; ok {
-			return v, true
+	return "", false
+}
+
+func (m *Manager) applyEmbeddedSite() error {
+	embedded, err := loadEmbeddedSiteBundle(m.locale)
+	if err != nil {
+		return err
+	}
+	if embedded == nil {
+		return nil
+	}
+	if disk, ok := m.bundles["site"]; ok {
+		m.bundles["site"] = &Bundle{
+			Locale: m.locale,
+			Scope:  "site",
+			Values: mergeValues(embedded.Values, disk.Values),
+		}
+		return nil
+	}
+	m.bundles["site"] = embedded
+	return nil
+}
+
+func loadEmbeddedSiteBundle(locale string) (*Bundle, error) {
+	for _, loc := range []string{locale, "en-US"} {
+		if loc == "" {
+			continue
+		}
+		path := "default/" + loc + "-site.ini"
+		data, err := defaultLocaleFS.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		return bundleFromINI(loc, "site", data)
+	}
+	return nil, nil
+}
+
+func loadBundleFromPath(locale, scope, path string) (*Bundle, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return bundleFromINI(locale, scope, data)
+}
+
+func bundleFromINI(locale, scope string, data []byte) (*Bundle, error) {
+	file, err := ini.Load(data)
+	if err != nil {
+		return nil, err
+	}
+	b := &Bundle{Locale: locale, Scope: scope, Values: map[string]string{}}
+	for _, section := range file.Sections() {
+		sec := section.Name()
+		for _, key := range section.Keys() {
+			id := key.Name()
+			if sec != "DEFAULT" {
+				id = sec + "." + id
+			}
+			b.Values[id] = key.String()
 		}
 	}
-	return "", false
+	return b, nil
+}
+
+func mergeValues(base, override map[string]string) map[string]string {
+	out := make(map[string]string, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range override {
+		out[k] = v
+	}
+	return out
 }
 
 // ResolveLocale picks locale from cookie or Accept-Language.
@@ -418,15 +511,64 @@ func ResolveLocale(rCookie, acceptLanguage string) string {
 	return lang
 }
 
-// EnsureDefaults creates starter language files.
+// InstalledLocales returns locale codes discovered from ini files in dir.
+func InstalledLocales(dir string) []string {
+	if strings.TrimSpace(dir) == "" {
+		return []string{"en-US"}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return []string{"en-US"}
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".ini") {
+			continue
+		}
+		locale := localeCodeFromFilename(name)
+		if locale == "" {
+			continue
+		}
+		if _, ok := seen[locale]; ok {
+			continue
+		}
+		seen[locale] = struct{}{}
+		out = append(out, locale)
+	}
+	sort.Strings(out)
+	if len(out) == 0 {
+		return []string{"en-US"}
+	}
+	return out
+}
+
+func localeCodeFromFilename(name string) string {
+	name = strings.TrimSuffix(name, ".ini")
+	for _, suffix := range []string{"-admin", "-site", "-default"} {
+		if strings.HasSuffix(name, suffix) {
+			return strings.TrimSuffix(name, suffix)
+		}
+	}
+	return name
+}
+
+// EnsureDefaults creates starter language files from built-in defaults.
 func EnsureDefaults(dir string) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 	sitePath := filepath.Join(dir, "en-US-site.ini")
 	if _, err := os.Stat(sitePath); os.IsNotExist(err) {
-		content := "[user]\nregistered = \"You have successfully registered as {{.Username}}\"\n"
-		if err := os.WriteFile(sitePath, []byte(content), 0644); err != nil {
+		data, err := defaultLocaleFS.ReadFile("default/en-US-site.ini")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(sitePath, data, 0644); err != nil {
 			return err
 		}
 	}

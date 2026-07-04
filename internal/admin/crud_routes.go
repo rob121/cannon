@@ -22,6 +22,12 @@ import (
 
 const routesBase = "/admin/routes"
 
+type routeListRow struct {
+	models.Route
+	CanMoveUp   bool
+	CanMoveDown bool
+}
+
 type extensionRouteOption struct {
 	Name      string
 	Label     string
@@ -70,6 +76,10 @@ func (h *Handler) routes(w http.ResponseWriter, r *http.Request, path string) {
 		h.routeDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
 		h.routeToggleStatus(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "move-up":
+		h.routeMoveSort(w, r, parts[0], -1)
+	case len(parts) == 2 && parts[1] == "move-down":
+		h.routeMoveSort(w, r, parts[0], 1)
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -90,14 +100,31 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 		"Custom URL paths and handlers. Built-in content, auth, and account routes are listed separately below.",
 		"Add Route", map[string]any{"ActiveNav": "routes"})
 	order := applyListSort(r, data, map[string]string{
-		"name": "name", "path": "path", "type": "type", "status": "status",
-	}, "name")
+		"name": "name", "path": "path", "type": "type", "status": "status", "sort": "sort",
+	}, "sort")
 	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
-	userRows := make([]models.Route, 0, len(rows))
-	for _, row := range rows {
+
+	var ordered []models.Route
+	var allRoutes []models.Route
+	db.Order("sort asc, route_id asc").Find(&allRoutes)
+	for _, row := range allRoutes {
 		if !router.IsBuiltinControllerRoute(row) {
-			userRows = append(userRows, row)
+			ordered = append(ordered, row)
 		}
+	}
+	sortPos := routeSortPositions(ordered)
+
+	userRows := make([]routeListRow, 0, len(rows))
+	for _, row := range rows {
+		if router.IsBuiltinControllerRoute(row) {
+			continue
+		}
+		item := routeListRow{Route: row}
+		if pos, ok := sortPos[row.RouteID]; ok {
+			item.CanMoveUp = pos.canMoveUp
+			item.CanMoveDown = pos.canMoveDown
+		}
+		userRows = append(userRows, item)
 	}
 	data["Rows"] = userRows
 	data["SystemRoutes"] = router.SystemRoutes()
@@ -158,7 +185,7 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 			return
 		}
 	}
-	allGroups := loadActiveGroups(db)
+	allGroups := loadFrontendGroups(db)
 	extOptions := extensionRouteOptions(extMgr, db, row.ExtensionName)
 
 	if r.Method == http.MethodPost {
@@ -178,6 +205,7 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 		row.ControllerAction = formString(r, "controller_action")
 		row.IsDefault = formBool(r, "is_default")
 		row.ShowTitle = formBool(r, "show_title")
+		row.Sort = formInt(r, "sort", row.Sort)
 
 		if row.Type == models.RouteTypeExtension {
 			if row.ExtensionName == "" || row.ExtensionPageID == "" {
@@ -200,6 +228,12 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 				metaRaw, _ := routemeta.MetadataFromForm(r.Form)
 				row.Metadata = metaRaw
 				h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "Controller and action are required.")
+				return
+			}
+		}
+		if row.Type == models.RouteTypeIframe {
+			if strings.TrimSpace(row.Target) == "" {
+				h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "Iframe URL is required.")
 				return
 			}
 		}
@@ -245,13 +279,18 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 			row.Controller = ""
 			row.ControllerAction = ""
 		}
-		if row.Type != models.RouteTypeURL && row.Type != models.RouteTypeLocalFile {
+		if row.Type != models.RouteTypeURL && row.Type != models.RouteTypeLocalFile && row.Type != models.RouteTypeIframe {
 			row.Target = ""
 		}
 
 		var saveErr error
 		saveErr = db.Transaction(func(tx *gorm.DB) error {
 			if isNew {
+				if row.Sort == 0 {
+					var maxSort int
+					_ = tx.Model(&models.Route{}).Select("COALESCE(MAX(sort), -1)").Scan(&maxSort)
+					row.Sort = maxSort + 1
+				}
 				if err := tx.Create(&row).Error; err != nil {
 					return err
 				}
@@ -271,10 +310,35 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, err.Error())
 			return
 		}
-		redirectList(w, r, routesBase)
+		menuAdded := false
+		if menuID, ok := parseID(formString(r, "add_to_menu_id")); ok {
+			parentID := formUintPtr(r, "add_to_menu_parent_id")
+			added, err := addRouteToMenu(db, row, menuID, parentID, formString(r, "add_to_menu_name"))
+			if err != nil {
+				h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), false, err.Error())
+				return
+			}
+			menuAdded = added
+		}
+		redirectURL := fmt.Sprintf("%s/%d?saved=1", routesBase, row.RouteID)
+		if menuAdded {
+			redirectURL += "&menu_added=1"
+		}
+		redirectList(w, r, redirectURL)
 		return
 	}
 	h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "")
+}
+
+func routeFormSuccessMessage(r *http.Request) string {
+	if r == nil || r.URL.Query().Get("saved") != "1" {
+		return ""
+	}
+	msg := "Route saved."
+	if r.URL.Query().Get("menu_added") == "1" {
+		msg += " Added to menu."
+	}
+	return msg
 }
 
 func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row models.Route, allGroups []models.Group, extOptions []extensionRouteOption, ctrlOptions []controllerRouteOption, isNew bool, errMsg string) {
@@ -283,7 +347,7 @@ func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row mo
 		title = "Edit Route"
 	}
 	db, _ := sites.DB(r.Context())
-	categories, _ := content.CategoryTree(r.Context())
+	categories, _ := content.CategoryTreeAll(r.Context())
 	tags, _ := content.ListTags(r.Context())
 	var items []models.Item
 	db.Where("status <> ?", models.ItemStatusTrashed).Order("title asc").Limit(250).Find(&items)
@@ -307,6 +371,7 @@ func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row mo
 			Label:      templateOverride + " (custom)",
 		})
 	}
+	menuParentOptions, _ := allMenuItemParentOptions(db, 0)
 	data := formData(map[string]any{
 		"ActiveNav":                   "routes",
 		"Row":                         row,
@@ -320,9 +385,14 @@ func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row mo
 		"TemplateOverride":            templateOverride,
 		"ControllerTemplateOptions":   controllerTemplateOptions,
 		"Categories":                  categories,
-		"Tags":               tags,
-		"Items":              items,
-		"Users":              users,
+		"Tags":                        tags,
+		"Items":                       items,
+		"Users":                       users,
+		"AllMenus":                    h.loadMenus(r),
+		"MenuParentOptions":           menuParentOptions,
+		"RouteMenuLinks":              loadRouteMenuLinks(db, row.RouteID),
+		"MenuItemsBase":               menuItemsBase,
+		"Success":                     routeFormSuccessMessage(r),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
@@ -503,4 +573,89 @@ func (h *Handler) routeDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		}
 	}
 	redirectList(w, r, routesBase)
+}
+
+type routeSortPosition struct {
+	canMoveUp   bool
+	canMoveDown bool
+}
+
+func routeSortPositions(rows []models.Route) map[uint]routeSortPosition {
+	out := map[uint]routeSortPosition{}
+	if len(rows) == 0 {
+		return out
+	}
+	last := len(rows) - 1
+	for i, row := range rows {
+		out[row.RouteID] = routeSortPosition{
+			canMoveUp:   i > 0,
+			canMoveDown: i < last,
+		}
+	}
+	return out
+}
+
+func (h *Handler) routeMoveSort(w http.ResponseWriter, r *http.Request, idStr string, direction int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	if err := routeReorder(db, id, direction); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, routesBase+listRedirectQuery(r))
+}
+
+func routeReorder(db *gorm.DB, id uint, direction int) error {
+	if direction == 0 {
+		return nil
+	}
+	var row models.Route
+	if err := db.First(&row, id).Error; err != nil {
+		return err
+	}
+	if router.IsBuiltinControllerRoute(row) {
+		return nil
+	}
+	var siblings []models.Route
+	var allRoutes []models.Route
+	if err := db.Order("sort asc, route_id asc").Find(&allRoutes).Error; err != nil {
+		return err
+	}
+	for _, item := range allRoutes {
+		if !router.IsBuiltinControllerRoute(item) {
+			siblings = append(siblings, item)
+		}
+	}
+	idx := -1
+	for i, item := range siblings {
+		if item.RouteID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return gorm.ErrRecordNotFound
+	}
+	target := idx + direction
+	if target < 0 || target >= len(siblings) {
+		return nil
+	}
+	siblings[idx], siblings[target] = siblings[target], siblings[idx]
+	for i, item := range siblings {
+		if item.Sort == i {
+			continue
+		}
+		if err := db.Model(&models.Route{}).Where("route_id = ?", item.RouteID).Update("sort", i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

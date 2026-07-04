@@ -194,6 +194,16 @@ func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block
 		if err != nil {
 			return "", err
 		}
+	case models.BlockTypeSearchHorizontal:
+		html, err = RenderSearchHorizontalBlock(ctx, BlockRow{BlockID: row.BlockID}, meta, render)
+		if err != nil {
+			return "", err
+		}
+	case models.BlockTypeSearchVertical:
+		html, err = RenderSearchVerticalBlock(ctx, BlockRow{BlockID: row.BlockID}, meta, render)
+		if err != nil {
+			return "", err
+		}
 	default:
 		return "", nil
 	}
