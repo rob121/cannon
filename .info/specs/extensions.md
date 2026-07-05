@@ -27,7 +27,7 @@ A json response that tells the parent process what this extension can do
 }
 ```
 
-Hooks exposes event subscriptions Cannon dispatches (`onBeforeRoute`, `onUserBeforeLogin`, etc.). `GET /hooks` returns `{"hooks":["onBeforeRoute"]}`. `POST /hooks` receives `event`, `arguments`, and the normal wire request. Register with `OnHook(event, fn)`. See `.info/specs/event_hooks.md`.
+Hooks exposes event subscriptions Cannon dispatches (`onBeforeRoute`, `onPrepareDocumentHead`, `onItemTrash`, `onSitemapGenerate`, etc.). `GET /hooks` returns `{"hooks":["onBeforeRoute"]}`. `POST /hooks` receives `event`, `arguments`, and the normal wire request. Register with `OnHook(event, fn)`. Fragment keys (`head_html`, `body_html`, `robots_append`, `sitemap_urls`) are appended across listeners. See `.info/specs/event_hooks.md`.
 
 Captcha provides render and verify handlers for protected forms (login, registration, comments, extension forms). Cannon uses **one active captcha extension per site** — see the Captcha capability section below. Register with `RegisterCaptcha`. Multiple captcha extensions may be installed, but only the site-selected provider is called.
 

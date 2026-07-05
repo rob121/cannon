@@ -12,6 +12,7 @@
   <link href="/admin/assets/admin.css?v=48" rel="stylesheet">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-esm.js"></script>
   <script src="/admin/assets/admin.js?v=31" defer></script>
+  {{if .HeadExtra}}{{.HeadExtra}}{{end}}
 </head>
 <body class="admin-body">
   <div class="turbo-progress-bar" id="admin-turbo-progress"></div>
@@ -316,5 +317,6 @@
       <p class="admin-command-hint">Type to filter · <kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>Enter</kbd> open</p>
     </div>
   </dialog>
+  {{if .BodyEndExtra}}{{.BodyEndExtra}}{{end}}
 </body>
 </html>

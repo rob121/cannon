@@ -67,7 +67,7 @@ func FireLocal(ctx context.Context, r *http.Request, event string, args map[stri
 			continue
 		}
 		if len(out.Arguments) > 0 {
-			args = mergeArgs(args, out.Arguments)
+			args = MergeArgs(args, out.Arguments)
 			e.Arguments = args
 		}
 		if out.Stop {
@@ -98,17 +98,6 @@ func loginBlocked(args map[string]any) (bool, string) {
 		return true, msg
 	}
 	return false, ""
-}
-
-func mergeArgs(base, patch map[string]any) map[string]any {
-	out := map[string]any{}
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range patch {
-		out[k] = v
-	}
-	return out
 }
 
 // StringArg reads a string argument.

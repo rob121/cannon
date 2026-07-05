@@ -10,6 +10,7 @@ import (
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/themes"
@@ -100,6 +101,11 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 			h.renderConfigurationError(w, r, extMgr, "global", sectionID, def.Title, "", err.Error())
 			return
 		}
+		_, _ = hooks.Fire(r.Context(), hooks.OnSettingsSave, map[string]any{
+			"scope":   settings.ScopeGlobal,
+			"section": sectionID,
+			"data":    data,
+		})
 		redirectList(w, r, postURL+"?saved=1")
 		return
 	}

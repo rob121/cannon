@@ -3,13 +3,13 @@
 <nav class="mt-4" aria-label="{{lang "pagination.label"}}">
   <ul class="pagination justify-content-center mb-0">
     <li class="page-item{{if le .Page 1}} disabled{{end}}">
-      <a class="page-link" href="{{if gt .Page 1}}{{.PaginationBaseURL}}?page={{sub .Page 1}}{{else}}#{{end}}" aria-label="{{lang "pagination.previous"}}">{{lang "pagination.previous"}}</a>
+      <a class="page-link" href="{{if gt .Page 1}}{{paginationURL .PaginationBaseURL (sub .Page 1)}}{{else}}#{{end}}" aria-label="{{lang "pagination.previous"}}">{{lang "pagination.previous"}}</a>
     </li>
     <li class="page-item disabled" aria-current="page">
       <span class="page-link">{{lang "pagination.page_of" "Page" (printf "%d" .Page) "Total" (printf "%d" .TotalPages)}}</span>
     </li>
     <li class="page-item{{if ge .Page .TotalPages}} disabled{{end}}">
-      <a class="page-link" href="{{if lt .Page .TotalPages}}{{.PaginationBaseURL}}?page={{add .Page 1}}{{else}}#{{end}}" aria-label="{{lang "pagination.next"}}">{{lang "pagination.next"}}</a>
+      <a class="page-link" href="{{if lt .Page .TotalPages}}{{paginationURL .PaginationBaseURL (add .Page 1)}}{{else}}#{{end}}" aria-label="{{lang "pagination.next"}}">{{lang "pagination.next"}}</a>
     </li>
   </ul>
 </nav>

@@ -7,7 +7,6 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
-	"gorm.io/gorm"
 )
 
 const (
@@ -70,8 +69,10 @@ func (h *Handler) itemTrashRestore(w http.ResponseWriter, r *http.Request, idStr
 		return
 	}
 	db, _ := sites.DB(r.Context())
-	db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusTrashed).
-		Update("status", models.ItemStatusDraft)
+	if err := content.RestoreItem(r.Context(), db, id); err != nil {
+		h.notFound(w, r)
+		return
+	}
 	redirectList(w, r, trashBase+listRedirectQuery(r))
 }
 
@@ -88,7 +89,7 @@ func (h *Handler) itemTrashEmpty(w http.ResponseWriter, r *http.Request) {
 	var ids []uint
 	db.Model(&models.Item{}).Where("status = ?", models.ItemStatusTrashed).Pluck("item_id", &ids)
 	for _, id := range ids {
-		deleteItemPermanent(db, id)
+		_ = content.DeleteItemPermanent(r.Context(), db, id)
 	}
 	redirectList(w, r, trashBase)
 }
@@ -252,6 +253,10 @@ func (h *Handler) itemRevisionRestore(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 	editorID, editorName := currentEditor(r)
+	if err := content.FireRevisionRestore(r.Context(), id, revID); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err := content.RollbackItemRevision(r.Context(), id, revID, editorID, editorName); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -304,14 +309,4 @@ func currentEditor(r *http.Request) (*uint, string) {
 	id := u.UserID
 	name := u.Username
 	return &id, name
-}
-
-func deleteItemPermanent(db *gorm.DB, id uint) {
-	content.RemoveSearchIndex(db, id)
-	db.Exec("DELETE FROM item_groups WHERE item_item_id = ?", id)
-	db.Exec("DELETE FROM item_tags WHERE item_item_id = ?", id)
-	db.Where("item_id = ?", id).Delete(&models.ItemFieldValue{})
-	db.Where("item_id = ?", id).Delete(&models.ItemRevision{})
-	db.Where("item_id = ?", id).Delete(&models.Comment{})
-	db.Delete(&models.Item{}, id)
 }

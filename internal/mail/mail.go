@@ -9,6 +9,7 @@ import (
 	"net/smtp"
 	"strings"
 
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/settings"
 )
 
@@ -94,6 +95,28 @@ func Send(ctx context.Context, cfg Settings, msg Message) error {
 	html := strings.TrimSpace(msg.HTML)
 	if text == "" && html == "" {
 		return fmt.Errorf("message body is required")
+	}
+	mailArgs := map[string]any{
+		"to":      to,
+		"subject": subject,
+		"text":    text,
+		"html":    html,
+	}
+	if out, err := hooks.Fire(ctx, hooks.OnBeforeMailSend, mailArgs); err != nil {
+		return err
+	} else {
+		if v, ok := out["to"].(string); ok && strings.TrimSpace(v) != "" {
+			to = strings.TrimSpace(v)
+		}
+		if v, ok := out["subject"].(string); ok && strings.TrimSpace(v) != "" {
+			subject = strings.TrimSpace(v)
+		}
+		if v, ok := out["text"].(string); ok {
+			text = strings.TrimSpace(v)
+		}
+		if v, ok := out["html"].(string); ok {
+			html = strings.TrimSpace(v)
+		}
 	}
 	if html == "" && cfg.UseHTML && text != "" {
 		html = wrapTextAsHTML(text)

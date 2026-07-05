@@ -12,7 +12,7 @@ Status key: `[ ]` pending · `[~]` partial · `[x]` done
 - [x] **Category permission groups** — Removed; frontend actions use `core.content.frontend.*` on roles; visibility groups stay on Access tabs
 - [x] **Editorial group hierarchy** — Flatten
 - [x] **Author/writer ownership** — `core.content.frontend.edit.own` permission policy
-- [x] **`HasBackendAccess`** — `core.admin.access`
+- [x] `**HasBackendAccess`** — `core.admin.access`
 - [x] **Visibility groups** — Stay separate from RBAC
 - [x] **Package name** — `internal/security`
 
@@ -28,7 +28,7 @@ Status key: `[ ]` pending · `[~]` partial · `[x]` done
 - [x] `RegisterRole(...)` — default/system roles with metadata
 - [x] `RegisterPolicy(...)` — stub for future ABAC
 - [x] `Can(ctx, userID, permissionID string) (bool, error)` — default deny
-- [x] Wildcard matching (`blog.article.update` → `blog.article.*`, `blog.*`, `*`)
+- [x] Wildcard matching (`blog.article.update` → `blog.article.`*, `blog.*`, `*`)
 - [x] Permission resolver: direct roles + group roles → expand inheritance → dedupe
 - [x] In-memory cache per user (O(1) map lookup)
 - [x] Cache invalidation triggers

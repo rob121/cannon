@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/media"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -203,6 +204,10 @@ func (h *Handler) mediaUpload(w http.ResponseWriter, r *http.Request) {
 			h.renderMediaUpload(w, r, folder, err.Error())
 			return
 		}
+		_, _ = hooks.Fire(r.Context(), hooks.OnMediaUpload, map[string]any{
+			"asset":  asset,
+			"folder": folder,
+		})
 		if strings.HasPrefix(mimeType, "image/") {
 			_, _ = media.GenerateThumbnail(destPath)
 		}
@@ -334,7 +339,18 @@ func (h *Handler) mediaDelete(w http.ResponseWriter, r *http.Request, idStr stri
 	site, _ := sites.FromContext(r.Context())
 	db, _ := sites.DB(r.Context())
 	var asset models.MediaAsset
-	if err := db.First(&asset, id).Error; err == nil && site != nil {
+	if err := db.First(&asset, id).Error; err != nil {
+		h.notFound(w, r)
+		return
+	}
+	if _, err := hooks.Fire(r.Context(), hooks.OnMediaDelete, map[string]any{
+		"asset_id": id,
+		"asset":    asset,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if site != nil {
 		local := strings.TrimPrefix(asset.Path, "/assets/")
 		_ = os.Remove(filepath.Join(site.AssetsDir, local))
 	}

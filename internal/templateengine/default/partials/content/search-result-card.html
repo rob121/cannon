@@ -1,0 +1,27 @@
+{{define "searchResultCard"}}
+{{$item := .Item}}
+<article class="site-search-result">
+  <div class="site-search-result__body">
+    <header class="site-search-result__header">
+      <h3 class="site-search-result__title"><a href="{{itemURL $item.Slug}}">{{$item.Title}}</a></h3>
+      {{if or $item.Category $item.Author (not $item.CreatedAt.IsZero)}}
+      <p class="site-search-result__meta">
+        {{if $item.Category}}<a class="site-search-result__category" href="{{categoryURL $item.Category.Slug}}">{{$item.Category.Name}}</a>{{end}}
+        {{if and $item.Category $item.Author}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
+        {{if $item.Author}}<span class="site-search-result__author">{{lang "content.by"}} <a href="{{authorURL $item.Author.Username}}">{{if $item.Author.GivenName}}{{$item.Author.GivenName}} {{$item.Author.FamilyName}}{{else}}{{$item.Author.Username}}{{end}}</a></span>{{end}}
+        {{if not $item.CreatedAt.IsZero}}
+        {{if or $item.Category $item.Author}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
+        <time datetime="{{if $item.PublishStart}}{{$item.PublishStart.Format "2006-01-02"}}{{else}}{{$item.CreatedAt.Format "2006-01-02"}}{{end}}">{{if $item.PublishStart}}{{$item.PublishStart.Format "January 2, 2006"}}{{else}}{{$item.CreatedAt.Format "January 2, 2006"}}{{end}}</time>
+        {{end}}
+      </p>
+      {{end}}
+    </header>
+    {{if $item.Intro}}<div class="site-search-result__excerpt">{{richText $item.Intro}}</div>{{end}}
+  </div>
+  {{if $item.Image}}
+  <a class="site-search-result__media" href="{{itemURL $item.Slug}}" tabindex="-1" aria-hidden="true">
+    <img src="{{$item.Image}}" alt="" loading="lazy" decoding="async">
+  </a>
+  {{end}}
+</article>
+{{end}}

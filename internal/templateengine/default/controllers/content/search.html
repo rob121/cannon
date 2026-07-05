@@ -1,69 +1,122 @@
-<div class="site-page mb-4">
+<div class="site-page site-search-page mb-4">
   {{template "pageHeader" (dict "Title" (lang "search.title") "Subtitle" (lang "search.subtitle"))}}
 
-  <form method="get" action="/content/search" class="card shadow-sm mb-4">
+  <form method="get" action="/content/search" class="site-search-form card shadow-sm mb-4" role="search">
     <div class="card-body">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-6 col-lg-3">
-          <label class="form-label" for="search-q">{{lang "search.keywords"}}</label>
-          <input type="search" class="form-control" id="search-q" name="q" value="{{.Query}}" placeholder="{{lang "search.placeholder"}}">
-        </div>
-        <div class="col-md-6 col-lg-2">
-          <label class="form-label" for="search-category">{{lang "search.category"}}</label>
-          <select class="form-select" id="search-category" name="category">
-            <option value="">{{lang "search.all_categories"}}</option>
-            {{range .Categories}}
-            <option value="{{.CategoryID}}" {{if eq $.CategoryID .CategoryID}}selected{{end}}>{{.Label}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-md-6 col-lg-2">
-          <label class="form-label" for="search-tag">{{lang "search.tag"}}</label>
-          <select class="form-select" id="search-tag" name="tag">
-            <option value="">{{lang "search.all_tags"}}</option>
-            {{range .Tags}}
-            <option value="{{.TagID}}" {{if eq $.TagID .TagID}}selected{{end}}>{{.Name}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-md-6 col-lg-2">
-          <label class="form-label" for="search-author">{{lang "search.author"}}</label>
-          <select class="form-select" id="search-author" name="author">
-            <option value="">{{lang "search.all_authors"}}</option>
-            {{range .Authors}}
-            <option value="{{.UserID}}" {{if eq $.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
-            {{end}}
-          </select>
-        </div>
-        <div class="col-md-6 col-lg-2">
-          <label class="form-label" for="search-sort">{{lang "search.sort"}}</label>
-          <select class="form-select" id="search-sort" name="sort">
-            <option value="" {{if eq .Sort ""}}selected{{end}}>{{lang "search.sort_newest"}}</option>
-            <option value="title" {{if eq .Sort "title"}}selected{{end}}>{{lang "search.sort_title"}}</option>
-            <option value="sort" {{if eq .Sort "sort"}}selected{{end}}>{{lang "search.sort_manual"}}</option>
-            <option value="featured" {{if eq .Sort "featured"}}selected{{end}}>{{lang "search.sort_featured"}}</option>
-            <option value="popular" {{if eq .Sort "popular"}}selected{{end}}>{{lang "search.sort_popular"}}</option>
-          </select>
-        </div>
-        {{range .SearchFields}}
-        <div class="col-md-6 col-lg-2">
-          <label class="form-label" for="search-cf-{{.Name}}">{{.Label}}</label>
-          <input type="search" class="form-control" id="search-cf-{{.Name}}" name="cf_{{.Name}}" value="{{index $.FieldFilters .Name}}">
-        </div>
-        {{end}}
-        <div class="col-12">
+      <div class="site-search-form__primary mb-3">
+        <label class="form-label visually-hidden" for="search-q">{{lang "search.keywords"}}</label>
+        <div class="input-group input-group-lg">
+          <input type="search" class="form-control" id="search-q" name="q" value="{{.Query}}" placeholder="{{lang "search.placeholder"}}" autocomplete="off" autofocus>
           <button type="submit" class="btn btn-primary">{{lang "search.submit"}}</button>
         </div>
       </div>
+
+      <div class="site-search-form__advanced">
+        <button class="btn btn-link btn-sm px-0 site-search-form__toggle" type="button" data-bs-toggle="collapse" data-bs-target="#search-advanced-filters" aria-expanded="{{if .HasFilters}}true{{else}}false{{end}}" aria-controls="search-advanced-filters">
+          {{lang "search.advanced_filters"}}
+        </button>
+        <div class="collapse{{if .HasFilters}} show{{end}}" id="search-advanced-filters">
+          <div class="row g-3 align-items-end mt-1">
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" for="search-category">{{lang "search.category"}}</label>
+              <select class="form-select" id="search-category" name="category">
+                <option value="">{{lang "search.all_categories"}}</option>
+                {{range .Categories}}
+                <option value="{{.CategoryID}}" {{if eq $.CategoryID .CategoryID}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" for="search-tag">{{lang "search.tag"}}</label>
+              <select class="form-select" id="search-tag" name="tag">
+                <option value="">{{lang "search.all_tags"}}</option>
+                {{range .Tags}}
+                <option value="{{.TagID}}" {{if eq $.TagID .TagID}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" for="search-author">{{lang "search.author"}}</label>
+              <select class="form-select" id="search-author" name="author">
+                <option value="">{{lang "search.all_authors"}}</option>
+                {{range .Authors}}
+                <option value="{{.UserID}}" {{if eq $.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
+                {{end}}
+              </select>
+            </div>
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" for="search-sort">{{lang "search.sort"}}</label>
+              <select class="form-select" id="search-sort" name="sort">
+                <option value="" {{if eq .Sort ""}}selected{{end}}>{{lang "search.sort_newest"}}</option>
+                <option value="title" {{if eq .Sort "title"}}selected{{end}}>{{lang "search.sort_title"}}</option>
+                <option value="sort" {{if eq .Sort "sort"}}selected{{end}}>{{lang "search.sort_manual"}}</option>
+                <option value="featured" {{if eq .Sort "featured"}}selected{{end}}>{{lang "search.sort_featured"}}</option>
+                <option value="popular" {{if eq .Sort "popular"}}selected{{end}}>{{lang "search.sort_popular"}}</option>
+              </select>
+            </div>
+            {{range .SearchFields}}
+            <div class="col-md-6 col-lg-3">
+              <label class="form-label" for="search-cf-{{.Name}}">{{.Label}}</label>
+              <input type="search" class="form-control" id="search-cf-{{.Name}}" name="cf_{{.Name}}" value="{{index $.FieldFilters .Name}}">
+            </div>
+            {{end}}
+          </div>
+        </div>
+      </div>
+
+      {{if .HasFilters}}
+      <div class="site-search-form__actions mt-3 pt-3 border-top">
+        <a class="btn btn-sm btn-outline-secondary" href="{{.ClearFiltersURL}}">{{lang "search.clear_filters"}}</a>
+      </div>
+      {{end}}
     </div>
   </form>
 
+  {{if .HasFilters}}
+  <div class="site-search-active-filters mb-4" aria-label="{{lang "search.active_filters"}}">
+    {{if .SelectedCategory}}<span class="badge rounded-pill text-bg-light border">{{lang "search.category"}}: {{.SelectedCategory}}</span>{{end}}
+    {{if .SelectedTag}}<span class="badge rounded-pill text-bg-light border">{{lang "search.tag"}}: {{.SelectedTag}}</span>{{end}}
+    {{if .SelectedAuthor}}<span class="badge rounded-pill text-bg-light border">{{lang "search.author"}}: {{.SelectedAuthor}}</span>{{end}}
+    {{if .Sort}}
+    <span class="badge rounded-pill text-bg-light border">{{lang "search.sort"}}:
+      {{if eq .Sort "title"}}{{lang "search.sort_title"}}{{else if eq .Sort "sort"}}{{lang "search.sort_manual"}}{{else if eq .Sort "featured"}}{{lang "search.sort_featured"}}{{else if eq .Sort "popular"}}{{lang "search.sort_popular"}}{{else}}{{lang "search.sort_newest"}}{{end}}
+    </span>
+    {{end}}
+    {{range .SearchFields}}{{if index $.FieldFilters .Name}}<span class="badge rounded-pill text-bg-light border">{{.Label}}: {{index $.FieldFilters .Name}}</span>{{end}}{{end}}
+  </div>
+  {{end}}
+
   <section aria-labelledby="search-results-heading">
-    <h2 id="search-results-heading" class="h4 mb-3">{{if .Query}}{{lang "search.results_for" "Query" .Query}}{{else}}{{lang "search.results"}}{{end}}</h2>
-    <div class="site-item-list site-item-list--grid">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
-      <p class="text-muted mb-0">{{lang "search.no_results"}}</p>
+    <div class="site-search-results-header d-flex flex-wrap align-items-baseline justify-content-between gap-2 mb-3">
+      <h2 id="search-results-heading" class="h4 mb-0">
+        {{if .Query}}{{lang "search.results_for_prefix"}} <span class="site-search-query">{{.Query}}</span>{{else}}{{lang "search.results"}}{{end}}
+      </h2>
+      {{if gt .Total 0}}
+      <p class="site-search-results-meta text-muted small mb-0">
+        {{if gt .TotalPages 1}}{{lang "search.results_range" "From" (printf "%d" .ResultFrom) "To" (printf "%d" .ResultTo) "Total" (printf "%d" .Total)}}{{else if eq .Total 1}}{{lang "search.result_count" "Count" (printf "%d" .Total)}}{{else}}{{lang "search.results_count" "Count" (printf "%d" .Total)}}{{end}}
+      </p>
       {{end}}
     </div>
+
+    {{if .Items}}
+    <div class="site-search-results">
+      {{range .Items}}{{template "searchResultCard" (dict "Item" .)}}{{end}}
+    </div>
+    {{template "contentPagination" .}}
+    {{else if .HasQueryOrFilters}}
+    <div class="site-search-empty card border-0 shadow-sm">
+      <div class="card-body text-center py-5">
+        <p class="h5 mb-2">{{lang "search.no_results"}}</p>
+        <p class="text-muted mb-0">{{lang "search.no_results_hint"}}</p>
+      </div>
+    </div>
+    {{else}}
+    <div class="site-search-empty card border-0 shadow-sm">
+      <div class="card-body text-center py-5">
+        <p class="h5 mb-2">{{lang "search.no_query_title"}}</p>
+        <p class="text-muted mb-0">{{lang "search.no_query_hint"}}</p>
+      </div>
+    </div>
+    {{end}}
   </section>
 </div>

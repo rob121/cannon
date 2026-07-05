@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/content"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
@@ -172,6 +173,15 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.ListPagination = formBool(r, "list_pagination")
 		row.ListPageSize = content.NormalizeCategoryListPageSize(formInt(r, "list_page_size", content.DefaultCategoryListPageSize))
 		row.FieldGroupID = formUintPtr(r, "field_group_id")
+		beforeArgs := map[string]any{
+			"category": row,
+			"is_new":   isNew,
+			"form":     r.Form,
+		}
+		if _, err := hooks.Fire(r.Context(), hooks.OnCategoryBeforeSave, beforeArgs); err != nil {
+			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
+			return
+		}
 		var saveErr error
 		if isNew {
 			saveErr = db.Select(
@@ -189,6 +199,10 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 			h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, err.Error())
 			return
 		}
+		_, _ = hooks.Fire(r.Context(), hooks.OnCategoryAfterSave, map[string]any{
+			"category": row,
+			"is_new":   isNew,
+		})
 		redirectList(w, r, categoriesBase)
 		return
 	}
@@ -232,6 +246,18 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request, idStr s
 		return
 	}
 	db, _ := sites.DB(r.Context())
+	var row models.Category
+	if err := db.First(&row, id).Error; err != nil {
+		h.notFound(w, r)
+		return
+	}
+	if _, err := hooks.Fire(r.Context(), hooks.OnCategoryBeforeDelete, map[string]any{
+		"category_id": id,
+		"category":    row,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	db.Exec("DELETE FROM category_groups WHERE category_category_id = ?", id)
 	db.Exec("DELETE FROM category_create_groups WHERE category_category_id = ?", id)
 	db.Exec("DELETE FROM category_edit_groups WHERE category_category_id = ?", id)

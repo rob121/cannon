@@ -8,6 +8,7 @@ import (
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/content"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 )
@@ -28,10 +29,7 @@ func (s *Server) serveSitemapXML(w http.ResponseWriter, r *http.Request) {
 	categories, _ := content.CategoryTreeAll(ctx)
 	tags, _ := content.ListTags(ctx)
 
-	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
-	fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
-	writeSitemapURL(w, base+"/", time.Now())
+	entries := []hooks.SitemapURL{{Loc: base + "/", LastMod: time.Now().UTC().Format("2006-01-02")}}
 	for _, item := range items {
 		if item.Status != models.ItemStatusPublished {
 			continue
@@ -40,24 +38,60 @@ func (s *Server) serveSitemapXML(w http.ResponseWriter, r *http.Request) {
 		if lastMod.IsZero() {
 			lastMod = item.CreatedAt
 		}
-		writeSitemapURL(w, base+content.ItemURLForContext(content.WithLocale(ctx, item.Locale), item.Slug), lastMod)
+		entries = append(entries, hooks.SitemapURL{
+			Loc:     base + content.ItemURLForContext(content.WithLocale(ctx, item.Locale), item.Slug),
+			LastMod: lastMod.UTC().Format("2006-01-02"),
+		})
 	}
 	for _, cat := range categories {
-		writeSitemapURL(w, base+content.CategoryURLForContext(content.WithLocale(ctx, cat.Locale), cat.Slug), cat.UpdatedAt)
+		entries = append(entries, hooks.SitemapURL{
+			Loc:     base + content.CategoryURLForContext(content.WithLocale(ctx, cat.Locale), cat.Slug),
+			LastMod: cat.UpdatedAt.UTC().Format("2006-01-02"),
+		})
 	}
 	for _, tag := range tags {
-		writeSitemapURL(w, base+content.TagURL(tag.Slug), tag.UpdatedAt)
+		entries = append(entries, hooks.SitemapURL{
+			Loc:     base + content.TagURL(tag.Slug),
+			LastMod: tag.UpdatedAt.UTC().Format("2006-01-02"),
+		})
+	}
+
+	hookArgs := map[string]any{
+		"base_url": base,
+		"sitemap_urls": sitemapEntriesToMaps(entries),
+	}
+	if out, err := hooks.Fire(ctx, hooks.OnSitemapGenerate, hookArgs); err == nil {
+		entries = append(entries, hooks.SitemapURLs(out)...)
+	}
+
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
+	fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
+	for _, entry := range entries {
+		writeSitemapURL(w, entry.Loc, entry.LastMod)
 	}
 	fmt.Fprint(w, `</urlset>`)
 }
 
-func writeSitemapURL(w http.ResponseWriter, loc string, lastMod time.Time) {
+func sitemapEntriesToMaps(entries []hooks.SitemapURL) []map[string]any {
+	out := make([]map[string]any, 0, len(entries))
+	for _, entry := range entries {
+		row := map[string]any{"loc": entry.Loc}
+		if entry.LastMod != "" {
+			row["lastmod"] = entry.LastMod
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
+func writeSitemapURL(w http.ResponseWriter, loc, lastMod string) {
 	fmt.Fprint(w, `<url><loc>`)
 	fmt.Fprint(w, xmlEscape(loc))
 	fmt.Fprint(w, `</loc>`)
-	if !lastMod.IsZero() {
+	if strings.TrimSpace(lastMod) != "" {
 		fmt.Fprint(w, `<lastmod>`)
-		fmt.Fprint(w, lastMod.UTC().Format("2006-01-02"))
+		fmt.Fprint(w, xmlEscape(lastMod))
 		fmt.Fprint(w, `</lastmod>`)
 	}
 	fmt.Fprint(w, `</url>`)

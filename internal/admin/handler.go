@@ -244,6 +244,8 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	eng.SetHookContext(r.Context())
+	defer eng.SetHookContext(nil)
 	if err := eng.Render(w, "admin/layout.html", page, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -262,6 +264,8 @@ func (h *Handler) renderFragment(w http.ResponseWriter, r *http.Request, page st
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	eng.SetHookContext(r.Context())
+	defer eng.SetHookContext(nil)
 	if err := eng.RenderFragment(w, page, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

@@ -75,7 +75,7 @@ func (m *Manager) FireHook(ctx context.Context, r *http.Request, userCtx map[str
 			return args, err
 		}
 		if len(out.Arguments) > 0 {
-			args = mergeHookArgs(args, out.Arguments)
+			args = hooks.MergeArgs(args, out.Arguments)
 		}
 		if out.Stop {
 			return args, hookAbortErr(args)
@@ -131,13 +131,3 @@ func (m *Manager) invokeHook(ctx context.Context, rt *Runtime, event string, r *
 	return out, nil
 }
 
-func mergeHookArgs(base, patch map[string]any) map[string]any {
-	out := map[string]any{}
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range patch {
-		out[k] = v
-	}
-	return out
-}

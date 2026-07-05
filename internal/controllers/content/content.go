@@ -3,6 +3,7 @@ package content
 import (
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -407,13 +408,15 @@ func (c *Controller) handleFeatured(ctx *controllers.Context) controllers.Result
 	})
 }
 
+const searchPageSize = 20
+
 func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 	query := strings.TrimSpace(ctx.Request.URL.Query().Get("q"))
 	page := queryPage(ctx.Request)
 	categoryID := queryUint(ctx.Request, "category")
 	tagID := queryUint(ctx.Request, "tag")
 	authorID := queryUint(ctx.Request, "author")
-	sort := ctx.Request.URL.Query().Get("sort")
+	sort := strings.TrimSpace(ctx.Request.URL.Query().Get("sort"))
 	opts := cms.ListOptions{
 		Query:        query,
 		CategoryID:   categoryID,
@@ -421,35 +424,105 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 		AuthorID:     authorID,
 		Sort:         sort,
 		Page:         page,
-		Limit:        20,
+		Limit:        searchPageSize,
 		FieldFilters: cms.ParseFieldFilters(ctx.Request.URL.Query()),
+	}
+	searchArgs := map[string]any{
+		"query":         query,
+		"category_id":   categoryID,
+		"tag_id":        tagID,
+		"author_id":     authorID,
+		"sort":          sort,
+		"page":          page,
+		"field_filters": opts.FieldFilters,
+	}
+	if out, err := hooks.Fire(ctx.GoContext(), hooks.OnBeforeSearch, searchArgs); err != nil {
+		return controllers.Error(http.StatusBadRequest, err.Error())
+	} else {
+		if v, ok := out["query"].(string); ok {
+			query = strings.TrimSpace(v)
+			opts.Query = query
+		}
 	}
 	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, opts)
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
+	_, _ = hooks.Fire(ctx.GoContext(), hooks.OnAfterSearch, map[string]any{
+		"query": query,
+		"total": total,
+		"page":  page,
+		"items": items,
+	})
 	categories, _ := cms.CategoryTree(ctx.GoContext())
+	categoryOptions := cms.FlattenCategoryOptions(categories)
 	tags, _ := cms.ListTags(ctx.GoContext())
 	authors, _ := cms.ListAuthorsWithItems(ctx.GoContext(), ctx.ViewerGroups)
 	searchFields, _ := cms.SearchableFields(ctx.GoContext())
+
+	hasFilters := categoryID > 0 || tagID > 0 || authorID > 0 || sort != "" || len(opts.FieldFilters) > 0
+	hasQueryOrFilters := query != "" || hasFilters
+
+	var selectedCategory, selectedTag, selectedAuthor string
+	for _, cat := range categoryOptions {
+		if cat.CategoryID == categoryID {
+			selectedCategory = cat.Label
+			break
+		}
+	}
+	for _, tag := range tags {
+		if tag.TagID == tagID {
+			selectedTag = tag.Name
+			break
+		}
+	}
+	for _, author := range authors {
+		if author.UserID == authorID {
+			selectedAuthor = authorDisplayName(&author)
+			break
+		}
+	}
+
+	resultFrom := int64(0)
+	resultTo := int64(0)
+	if total > 0 {
+		resultFrom = int64((page-1)*searchPageSize + 1)
+		resultTo = int64(page * searchPageSize)
+		if resultTo > total {
+			resultTo = total
+		}
+	}
+
 	title := "Search"
 	if query != "" {
 		title = "Search: " + query
 	}
 	return controllers.HTML(title, map[string]any{
-		"Query":          query,
-		"Items":          items,
-		"Total":          total,
-		"Page":           page,
-		"Categories":     cms.FlattenCategoryOptions(categories),
-		"Tags":           tags,
-		"Authors":        authors,
-		"CategoryID":     categoryID,
-		"TagID":          tagID,
-		"AuthorID":       authorID,
-		"Sort":           sort,
-		"SearchFields":   searchFields,
-		"FieldFilters":   opts.FieldFilters,
+		"Query":               query,
+		"Items":               items,
+		"Total":               total,
+		"Page":                page,
+		"PageSize":            searchPageSize,
+		"TotalPages":          cms.ListTotalPages(total, searchPageSize),
+		"Pagination":          true,
+		"PaginationBaseURL":   searchPaginationBaseURL(ctx.Request),
+		"ResultFrom":          resultFrom,
+		"ResultTo":            resultTo,
+		"Categories":          categoryOptions,
+		"Tags":                tags,
+		"Authors":             authors,
+		"CategoryID":          categoryID,
+		"TagID":               tagID,
+		"AuthorID":            authorID,
+		"Sort":                sort,
+		"SearchFields":        searchFields,
+		"FieldFilters":        opts.FieldFilters,
+		"HasFilters":          hasFilters,
+		"HasQueryOrFilters":   hasQueryOrFilters,
+		"ClearFiltersURL":     searchClearFiltersURL(query),
+		"SelectedCategory":    selectedCategory,
+		"SelectedTag":         selectedTag,
+		"SelectedAuthor":      selectedAuthor,
 	})
 }
 
@@ -578,6 +651,22 @@ func authorDisplayName(user *models.User) string {
 		return user.Username
 	}
 	return name
+}
+
+func searchPaginationBaseURL(r *http.Request) string {
+	values := r.URL.Query()
+	values.Del("page")
+	if encoded := values.Encode(); encoded != "" {
+		return "/content/search?" + encoded
+	}
+	return "/content/search"
+}
+
+func searchClearFiltersURL(query string) string {
+	if query == "" {
+		return "/content/search"
+	}
+	return "/content/search?q=" + url.QueryEscape(query)
 }
 
 func queryPage(r *http.Request) int {

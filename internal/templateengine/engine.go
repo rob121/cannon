@@ -114,8 +114,9 @@ func (e *Engine) RenderWithStatus(w io.Writer, status int, layout, page string, 
 func (e *Engine) render(w io.Writer, layout, page string, data any, status int) error {
 	if e.hookCtx != nil {
 		out, err := hooks.Fire(e.hookCtx, hooks.OnBeforeRender, map[string]any{
-			"layout": layout,
-			"page":   page,
+			"layout":  layout,
+			"page":    page,
+			"context": renderContextForLayout(layout),
 		})
 		if err != nil {
 			return err
@@ -165,6 +166,9 @@ func (e *Engine) render(w io.Writer, layout, page string, data any, status int) 
 		if offline, err := settings.SiteOffline(e.hookCtx); err == nil {
 			layoutData["IsOffline"] = offline
 		}
+	}
+	if err := e.applyDocumentHooks(layoutData, layout, page); err != nil {
+		return err
 	}
 	var rendered bytes.Buffer
 	if err := e.renderLayout(&rendered, layout, layoutData); err != nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/settings"
 )
 
@@ -31,6 +32,16 @@ func (s *Server) serveRobotsTXT(w http.ResponseWriter, r *http.Request) {
 			b.WriteString("\n")
 		}
 		body = b.String()
+	}
+	args := map[string]any{"body": body}
+	if out, err := hooks.Fire(r.Context(), hooks.OnRobotsGenerate, args); err == nil {
+		body = hooks.StringArg(out, "body")
+		if append := hooks.HTMLFragment(out, "robots_append"); append != "" {
+			if strings.TrimSpace(body) != "" && !strings.HasSuffix(body, "\n") {
+				body += "\n"
+			}
+			body += append
+		}
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	fmt.Fprint(w, body)

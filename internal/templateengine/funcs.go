@@ -79,6 +79,13 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			return m, nil
 		},
 		"queryEscape": url.QueryEscape,
+		"paginationURL": func(base string, page any) string {
+			sep := "?"
+			if strings.Contains(base, "?") {
+				sep = "&"
+			}
+			return fmt.Sprintf("%s%spage=%d", base, sep, asInt(page))
+		},
 		"initials": func(parts ...string) string {
 			var out string
 			for _, p := range parts {

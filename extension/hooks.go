@@ -3,6 +3,7 @@ package extension
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // HookWireRequest is the JSON payload Cannon POSTs to extension hook handlers.
@@ -60,6 +61,48 @@ func HookArguments(req HookWireRequest) map[string]any {
 		return map[string]any{}
 	}
 	return req.Arguments
+}
+
+// HookString reads a string hook argument.
+func HookString(args map[string]any, key string) string {
+	v, ok := args[key].(string)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(v)
+}
+
+// HookHeadHTML returns accumulated head_html from hook arguments.
+func HookHeadHTML(args map[string]any) string {
+	return HookString(args, "head_html")
+}
+
+// HookBodyHTML returns accumulated body_html from hook arguments.
+func HookBodyHTML(args map[string]any) string {
+	return HookString(args, "body_html")
+}
+
+// HookRobotsAppend returns extra robots.txt lines from hook arguments.
+func HookRobotsAppend(args map[string]any) string {
+	return HookString(args, "robots_append")
+}
+
+// HookSitemapURLs returns extra sitemap entries from hook arguments.
+func HookSitemapURLs(args map[string]any) []map[string]any {
+	switch rows := args["sitemap_urls"].(type) {
+	case []map[string]any:
+		return append([]map[string]any(nil), rows...)
+	case []any:
+		out := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			if m, ok := row.(map[string]any); ok {
+				out = append(out, m)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
 }
 
 // DecodeHookWireRequest reads a hook wire request from an HTTP request body.

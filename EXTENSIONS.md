@@ -602,11 +602,17 @@ Cannon validates the token on incoming browser POSTs to `/ext/{route_hash}/…` 
 
 ### Event hooks
 
-Cannon dispatches named event hooks during routing, rendering, login/logout, blocks, and content display. See `.info/specs/event_hooks.md` for the full event list and argument reference.
+Cannon dispatches named event hooks during routing, rendering, document assembly, login/logout, blocks, content lifecycle, search, mail, sitemap/robots generation, and settings saves. See `.info/specs/event_hooks.md` for the full event list and argument reference.
 
 Extensions subscribe with `OnHook`:
 
 ```go
+s.OnHook("onPrepareDocumentHead", func(req extension.HookWireRequest) extension.HookWireResponse {
+    return extension.HookOK(map[string]any{
+        "head_html": `<script src="https://example.com/analytics.js" defer></script>`,
+    })
+})
+
 s.OnHook("onUserBeforeLogin", func(req extension.HookWireRequest) extension.HookWireResponse {
     username, _ := extension.HookArguments(req)["username"].(string)
     if username == "blocked" {
@@ -615,6 +621,8 @@ s.OnHook("onUserBeforeLogin", func(req extension.HookWireRequest) extension.Hook
     return extension.HookOK(nil)
 })
 ```
+
+Document hooks (`onPrepareDocumentHead`, `onPrepareDocumentBody`, and their `onAdmin*` counterparts) are the preferred way to inject scripts or styles. Cannon appends each listener's `head_html` / `body_html` into the layout. Use `extension.HookHeadHTML` and `extension.HookBodyHTML` to read merged fragments from responses.
 
 Cannon reads subscriptions from `GET /hooks`:
 
@@ -635,7 +643,7 @@ Hook dispatches use `POST /hooks` with the normal wire fields plus `event` and `
 }
 ```
 
-Respond with optional `arguments` updates and `stop: true` to halt further listeners. Use `extension.HookOK`, `extension.HookStop`, and `extension.HookAbort`.
+Respond with optional `arguments` updates and `stop: true` to halt further listeners. Use `extension.HookOK`, `extension.HookStop`, `extension.HookAbort`, `extension.HookHeadHTML`, `extension.HookBodyHTML`, `extension.HookRobotsAppend`, and `extension.HookSitemapURLs`.
 
 Core code can register in-process listeners with `github.com/rob121/cannon/internal/hooks`.Register and fire them with `hooks.Fire(ctx, event, args)` (context is wired per request by middleware).
 

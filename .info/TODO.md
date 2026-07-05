@@ -32,6 +32,9 @@ Status key: `[ ]` pending · `[~]` partial · `[x]` done
 ## Specs — event_hooks.md
 
 - [x] All documented events wired (in-process + extension)
+- [x] Document head/body hooks (`onPrepareDocumentHead`, `onAdminPrepareDocumentHead`, etc.)
+- [x] Content lifecycle hooks (delete, trash, restore, category, media, revision)
+- [x] Search, mail, sitemap, robots, settings hooks
 - [x] `onUserLocked` — fire from admin user lock toggle
 - [x] `onUserSignup` / `onUserVerified` — fired from auth flows
 

@@ -38,7 +38,10 @@ func builtinPartialsFor(name string) []string {
 	if _, ok := contentListTemplates[name]; ok {
 		partials = append(partials, "default/partials/content/item-card.html")
 	}
-	if name == "default/controllers/content/category.html" {
+	if name == "default/controllers/content/search.html" {
+		partials = append(partials, "default/partials/content/search-result-card.html")
+	}
+	if name == "default/controllers/content/category.html" || name == "default/controllers/content/search.html" {
 		partials = append(partials, "default/partials/content/pagination.html")
 	}
 	if name == "default/controllers/content/item.html" {

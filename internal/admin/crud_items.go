@@ -445,7 +445,10 @@ func (h *Handler) itemDelete(w http.ResponseWriter, r *http.Request, idStr strin
 		return
 	}
 	db, _ := sites.DB(r.Context())
-	deleteItemPermanent(db, id)
+	if err := content.DeleteItemPermanent(r.Context(), db, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	redirectList(w, r, itemsBase+listRedirectQuery(r))
 }
 
@@ -473,10 +476,9 @@ func (h *Handler) itemBulk(w http.ResponseWriter, r *http.Request) {
 		case "archive":
 			db.Model(&models.Item{}).Where("item_id = ?", id).Update("status", models.ItemStatusArchived)
 		case "trash":
-			db.Model(&models.Item{}).Where("item_id = ?", id).Update("status", models.ItemStatusTrashed)
+			_ = content.TrashItem(r.Context(), db, id)
 		case "restore":
-			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusTrashed).
-				Update("status", models.ItemStatusDraft)
+			_ = content.RestoreItem(r.Context(), db, id)
 		case "approve":
 			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusPending).
 				Update("status", models.ItemStatusPublished)
@@ -484,7 +486,7 @@ func (h *Handler) itemBulk(w http.ResponseWriter, r *http.Request) {
 			db.Model(&models.Item{}).Where("item_id = ? AND status = ?", id, models.ItemStatusPending).
 				Update("status", models.ItemStatusDraft)
 		case "delete":
-			deleteItemPermanent(db, id)
+			_ = content.DeleteItemPermanent(r.Context(), db, id)
 		case "assign_category":
 			catID := formUintPtr(r, "bulk_category_id")
 			if catID != nil {

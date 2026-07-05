@@ -48,3 +48,19 @@ func TestLocaleTag(t *testing.T) {
 		t.Fatalf("LocaleTag: %q", got)
 	}
 }
+
+func TestSearchResultsForFmt(t *testing.T) {
+	mgr, err := NewEmbeddedManager("en-US")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := mgr.Fmt("search.results_for_prefix"); got != "Results for" {
+		t.Fatalf("search.results_for_prefix: %q", got)
+	}
+	if got := mgr.Fmt("search.result_count", "Count", "1"); got != "1 result" {
+		t.Fatalf("search.result_count: %q", got)
+	}
+	if got := mgr.Fmt("search.results_count", "Count", "3"); got != "3 results" {
+		t.Fatalf("search.results_count: %q", got)
+	}
+}
