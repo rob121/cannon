@@ -204,7 +204,7 @@
               <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
                 <option value="">Select category</option>
                 {{range $.Categories}}
-                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Name}}</option>
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Label}}</option>
                 {{end}}
               </select>
               {{else if eq .Type "item"}}

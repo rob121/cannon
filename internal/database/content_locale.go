@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const defaultContentLocale = "en-US"
@@ -31,7 +32,7 @@ func MigrateSearchIndex(db *gorm.DB) error {
 	if db == nil || db.Dialector.Name() != "sqlite" {
 		return nil
 	}
-	err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS item_search_fts USING fts5(
+	err := sqliteSilentExec(db, `CREATE VIRTUAL TABLE IF NOT EXISTS item_search_fts USING fts5(
 		item_id UNINDEXED,
 		locale UNINDEXED,
 		title,
@@ -39,7 +40,7 @@ func MigrateSearchIndex(db *gorm.DB) error {
 		body,
 		fields,
 		tokenize='porter unicode61'
-	)`).Error
+	)`)
 	if err != nil && ftsUnavailable(err) {
 		return nil
 	}
@@ -52,6 +53,13 @@ func ftsUnavailable(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "no such module: fts5") || strings.Contains(msg, "unknown tokenizer")
+}
+
+func sqliteSilentExec(db *gorm.DB, sql string, args ...any) error {
+	if db == nil {
+		return nil
+	}
+	return db.Session(&gorm.Session{Logger: logger.Discard}).Exec(sql, args...).Error
 }
 
 func dropSlugOnlyUniqueIndexes(db *gorm.DB, table string) error {

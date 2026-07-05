@@ -36,7 +36,7 @@
   <div class="admin-page-actions">
     {{if .PageSecondaryActionURL}}
     <a class="btn-admin-outline" href="{{.PageSecondaryActionURL}}" data-turbo-frame="_top">
-      <i class="bi bi-git"></i> {{.PageSecondaryActionLabel}}
+      <i class="bi {{if .PageSecondaryActionIcon}}{{.PageSecondaryActionIcon}}{{else}}bi-three-dots{{end}}"></i> {{.PageSecondaryActionLabel}}
     </a>
     {{end}}
     {{if .PageActionURL}}
@@ -441,7 +441,9 @@
 
 {{define "menu_item_tree_name"}}
 <span class="admin-tree-cell{{if .Current}} is-current{{end}}" style="--tree-depth: {{.Depth}};">
-  {{if gt .Depth 0}}<i class="bi bi-arrow-return-right admin-tree-icon" aria-hidden="true"></i>{{end}}
+  <span class="admin-tree-glyphs" aria-hidden="true">
+    {{range intRange .Depth}}<i class="bi bi-arrow-return-right admin-tree-icon"></i>{{end}}
+  </span>
   {{if .Current}}
   <span class="admin-tree-label">{{.Label}}</span>
   {{else}}

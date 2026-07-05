@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,11 +10,52 @@ import (
 	"github.com/rob121/cannon/internal/api"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 )
 
 const apiCredentialsBase = "/admin/api/credentials"
+
+const (
+	sessionAPICredentialToken   = "admin_api_credential_token"
+	sessionAPICredentialTokenID = "admin_api_credential_token_id"
+)
+
+func stashAPICredentialToken(r *http.Request, credentialID uint, token string) {
+	if token == "" {
+		return
+	}
+	svc, err := user.FromContext(r.Context())
+	if err != nil {
+		return
+	}
+	_ = svc.SetSessionValue(sessionAPICredentialToken, token)
+	_ = svc.SetSessionValue(sessionAPICredentialTokenID, strconv.FormatUint(uint64(credentialID), 10))
+}
+
+func popAPICredentialToken(r *http.Request, credentialID uint) string {
+	svc, err := user.FromContext(r.Context())
+	if err != nil {
+		return ""
+	}
+	idRaw, ok := svc.SessionValue(sessionAPICredentialTokenID)
+	if !ok {
+		return ""
+	}
+	idStr, _ := idRaw.(string)
+	if idStr != strconv.FormatUint(uint64(credentialID), 10) {
+		return ""
+	}
+	tokenRaw, ok := svc.SessionValue(sessionAPICredentialToken)
+	if !ok {
+		return ""
+	}
+	token, _ := tokenRaw.(string)
+	_ = svc.ClearSessionValue(sessionAPICredentialToken)
+	_ = svc.ClearSessionValue(sessionAPICredentialTokenID)
+	return token
+}
 
 func (h *Handler) apiSection(w http.ResponseWriter, r *http.Request, path string) {
 	parts := pathParts("/api", path)
@@ -46,6 +88,8 @@ func (h *Handler) apiCredentials(w http.ResponseWriter, r *http.Request, parts [
 		h.apiCredentialRotate(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
 		h.apiCredentialToggle(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "delete":
+		h.apiCredentialDelete(w, r, parts[0])
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -104,7 +148,8 @@ func (h *Handler) apiCredentialForm(w http.ResponseWriter, r *http.Request, id u
 				h.renderAPICredentialForm(w, r, row, isNew, err.Error(), "")
 				return
 			}
-			h.renderAPICredentialForm(w, r, row, false, "", token)
+			stashAPICredentialToken(r, row.CredentialID, token)
+			http.Redirect(w, r, apiCredentialsBase+"/"+strconv.FormatUint(uint64(row.CredentialID), 10), http.StatusSeeOther)
 			return
 		}
 		row.Name = formString(r, "name")
@@ -124,7 +169,7 @@ func (h *Handler) apiCredentialForm(w http.ResponseWriter, r *http.Request, id u
 		redirectList(w, r, apiCredentialsBase)
 		return
 	}
-	h.renderAPICredentialForm(w, r, row, isNew, "", "")
+	h.renderAPICredentialForm(w, r, row, isNew, "", popAPICredentialToken(r, id))
 }
 
 func (h *Handler) apiCredentialRotate(w http.ResponseWriter, r *http.Request, idRaw string) {
@@ -145,11 +190,12 @@ func (h *Handler) apiCredentialRotate(w http.ResponseWriter, r *http.Request, id
 	db, _ := sites.DB(r.Context())
 	var row models.APICredential
 	_ = db.First(&row, id)
-	h.renderAPICredentialForm(w, r, row, false, "", token)
+	stashAPICredentialToken(r, row.CredentialID, token)
+	http.Redirect(w, r, apiCredentialsBase+"/"+strconv.FormatUint(uint64(row.CredentialID), 10), http.StatusSeeOther)
 }
 
 func (h *Handler) apiCredentialToggle(w http.ResponseWriter, r *http.Request, idRaw string) {
-	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+	if r.Method != http.MethodPost {
 		h.notFound(w, r)
 		return
 	}
@@ -173,25 +219,61 @@ func (h *Handler) apiCredentialToggle(w http.ResponseWriter, r *http.Request, id
 	redirectList(w, r, apiCredentialsBase)
 }
 
+func (h *Handler) apiCredentialDelete(w http.ResponseWriter, r *http.Request, idRaw string) {
+	if r.Method != http.MethodPost {
+		h.notFound(w, r)
+		return
+	}
+	id, ok := parseID(idRaw)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	if err := db.Delete(&models.APICredential{}, id).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	svc, err := user.FromContext(r.Context())
+	if err == nil {
+		idRaw, ok := svc.SessionValue(sessionAPICredentialTokenID)
+		if ok {
+			if idStr, _ := idRaw.(string); idStr == strconv.FormatUint(uint64(id), 10) {
+				_ = svc.ClearSessionValue(sessionAPICredentialToken)
+				_ = svc.ClearSessionValue(sessionAPICredentialTokenID)
+			}
+		}
+	}
+	redirectList(w, r, apiCredentialsBase)
+}
+
 func (h *Handler) renderAPICredentialForm(w http.ResponseWriter, r *http.Request, row models.APICredential, isNew bool, errMsg, newToken string) {
+	title := "New API Credential"
+	subtitle := "Create an API key for a headless frontend or integration."
+	if !isNew {
+		title = "Edit API Credential"
+		subtitle = "Update credential details or rotate the key from the list."
+	}
 	data := formData(map[string]any{
 		"ActiveNav": "api_credentials",
+		"Title":     title,
+		"Subtitle":  subtitle,
 		"Row":       row,
 		"IsNew":     isNew,
 		"BasePath":  apiCredentialsBase,
 		"Error":     errMsg,
 		"NewToken":  newToken,
 	})
-	h.render(w, r, "API Credential", "admin/api_credentials_form.html", data)
+	h.render(w, r, title, "admin/api_credentials_form.html", data)
 }
 
 func (h *Handler) apiSettings(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAPIWrite(r) {
-		h.forbidden(w, r)
-		return
-	}
 	ctx := r.Context()
 	if r.Method == http.MethodPost {
+		if !h.requireAPIWrite(r) {
+			h.forbidden(w, r)
+			return
+		}
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -203,6 +285,11 @@ func (h *Handler) apiSettings(w http.ResponseWriter, r *http.Request) {
 		if v := strings.TrimSpace(r.FormValue("jwt_ttl_seconds")); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
 				data["jwt_ttl_seconds"] = n
+			}
+		}
+		if v := strings.TrimSpace(r.FormValue("refresh_ttl_seconds")); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				data["refresh_ttl_seconds"] = n
 			}
 		}
 		if v := strings.TrimSpace(r.FormValue("cors_origins")); v != "" {
@@ -227,13 +314,29 @@ func (h *Handler) apiSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/api/settings?saved=1", http.StatusSeeOther)
 		return
 	}
-	data, _ := api.SettingsData(ctx)
-	h.render(w, r, "API Settings", "admin/api_settings.html", map[string]any{
+	h.render(w, r, "API Settings", "admin/api_settings.html", formData(map[string]any{
 		"ActiveNav": "api_settings",
-		"Settings":  data,
+		"Subtitle":  "Configure authentication, CORS, and rate limits for the headless Content API.",
+		"Settings":  apiSettingsDisplay(ctx),
 		"Saved":     r.URL.Query().Get("saved") == "1",
 		"DocsURL":   "/api/v1/docs",
-	})
+		"CanWrite":  h.requireAPIWrite(r),
+	}))
+}
+
+func apiSettingsDisplay(ctx context.Context) map[string]any {
+	jwtTTL, _ := settings.GlobalIntDefault(ctx, "api", "jwt_ttl_seconds", 3600)
+	refreshTTL, _ := settings.GlobalIntDefault(ctx, "api", "refresh_ttl_seconds", 604800)
+	rateLimit, _ := settings.GlobalIntDefault(ctx, "api", "rate_limit_per_minute", 120)
+	loginRate, _ := settings.GlobalIntDefault(ctx, "api", "login_rate_limit_per_minute", 20)
+	cors, _ := settings.GlobalString(ctx, "api", "cors_origins")
+	return map[string]any{
+		"jwt_ttl_seconds":             jwtTTL,
+		"refresh_ttl_seconds":         refreshTTL,
+		"rate_limit_per_minute":       rateLimit,
+		"login_rate_limit_per_minute": loginRate,
+		"cors_origins":                cors,
+	}
 }
 
 func (h *Handler) requireAPIWrite(r *http.Request) bool {

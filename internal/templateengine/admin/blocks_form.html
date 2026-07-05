@@ -21,7 +21,24 @@
         </div>
 
         <div class="admin-sidebar-panel is-active" data-sidebar-panel="content" role="tabpanel">
-          <p class="admin-form-panel-intro">Configure what this block displays. Options depend on the block type set under <strong>General</strong>.</p>
+          <p class="admin-form-panel-intro">Choose a block type first, then configure the fields shown below.</p>
+
+          <div class="admin-block-type-field row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="admin-form-label" for="block-type">Type</label>
+              <select class="admin-form-control" name="type" id="block-type">
+                <option value="html" {{if eq .Row.Type "html"}}selected{{end}}>HTML</option>
+                <option value="markdown" {{if eq .Row.Type "markdown"}}selected{{end}}>Markdown</option>
+                <option value="content" {{if eq .Row.Type "content"}}selected{{end}}>Content</option>
+                <option value="login" {{if eq .Row.Type "login"}}selected{{end}}>Login</option>
+                <option value="menu-vertical" {{if eq .Row.Type "menu-vertical"}}selected{{end}}>Menu Vertical</option>
+                <option value="menu-horizontal" {{if eq .Row.Type "menu-horizontal"}}selected{{end}}>Menu Horizontal</option>
+                <option value="search-horizontal" {{if eq .Row.Type "search-horizontal"}}selected{{end}}>Search Horizontal</option>
+                <option value="search-vertical" {{if eq .Row.Type "search-vertical"}}selected{{end}}>Search Vertical</option>
+                <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
+              </select>
+            </div>
+          </div>
 
           <div class="block-fields-native" id="block-fields-native">
             <label class="admin-form-label">Content</label>
@@ -63,7 +80,7 @@
                 <select class="admin-form-control" name="category_slug">
                   <option value="">Select category</option>
                   {{range .Categories}}
-                  <option value="{{.Slug}}" {{if eq $.Meta.CategorySlug .Slug}}selected{{end}}>{{.Name}}</option>
+                  <option value="{{.Slug}}" {{if eq $.Meta.CategorySlug .Slug}}selected{{end}}>{{.Label}}</option>
                   {{end}}
                 </select>
               </div>
@@ -297,20 +314,6 @@
               <label class="admin-form-label" for="block-space">Space</label>
               <input class="admin-form-control" id="block-space" name="space" value="{{.Row.Space}}" placeholder="sidebar" required>
               <p class="admin-form-help">Used in <code class="admin-code">{{"{{"}}space "…"{{"}}"}}</code> in templates.</p>
-            </div>
-            <div class="admin-sidebar-field">
-              <label class="admin-form-label" for="block-type">Type</label>
-              <select class="admin-form-control" name="type" id="block-type">
-                <option value="html" {{if eq .Row.Type "html"}}selected{{end}}>HTML</option>
-                <option value="markdown" {{if eq .Row.Type "markdown"}}selected{{end}}>Markdown</option>
-                <option value="content" {{if eq .Row.Type "content"}}selected{{end}}>Content</option>
-                <option value="login" {{if eq .Row.Type "login"}}selected{{end}}>Login</option>
-                <option value="menu-vertical" {{if eq .Row.Type "menu-vertical"}}selected{{end}}>Menu Vertical</option>
-                <option value="menu-horizontal" {{if eq .Row.Type "menu-horizontal"}}selected{{end}}>Menu Horizontal</option>
-                <option value="search-horizontal" {{if eq .Row.Type "search-horizontal"}}selected{{end}}>Search Horizontal</option>
-                <option value="search-vertical" {{if eq .Row.Type "search-vertical"}}selected{{end}}>Search Vertical</option>
-                <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
-              </select>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="block-sort">Sort Order</label>

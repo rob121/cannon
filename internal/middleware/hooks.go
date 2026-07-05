@@ -27,7 +27,7 @@ func (c *Chain) Hooks(next http.Handler) http.Handler {
 
 func hookUserContext(r *http.Request) map[string]any {
 	svc, err := user.FromContext(r.Context())
-	if err != nil {
+	if err != nil || svc == nil {
 		return map[string]any{"authenticated": false}
 	}
 	ctx, err := svc.Context(r.Context())

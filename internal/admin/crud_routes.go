@@ -384,7 +384,7 @@ func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row mo
 		"PageData":                    routemeta.MetadataStringMap(row.Metadata),
 		"TemplateOverride":            templateOverride,
 		"ControllerTemplateOptions":   controllerTemplateOptions,
-		"Categories":                  categories,
+		"Categories":                  content.FlattenCategoryOptions(categories),
 		"Tags":                        tags,
 		"Items":                       items,
 		"Users":                       users,

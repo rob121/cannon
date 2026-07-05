@@ -23,3 +23,8 @@ type RoleInheritance struct {
 	ChildRoleID  uint `gorm:"primaryKey"`
 	ParentRoleID uint `gorm:"primaryKey"`
 }
+
+// TableName keeps the singular table name used throughout Cannon migrations.
+func (RoleInheritance) TableName() string {
+	return "role_inheritance"
+}

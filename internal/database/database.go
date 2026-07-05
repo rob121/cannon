@@ -55,6 +55,9 @@ func Migrate(site *config.SiteConfig) error {
 	if err != nil {
 		return err
 	}
+	if err := RepairRoleInheritanceSchema(db); err != nil {
+		return err
+	}
 	if err := RepairMenuSchema(db); err != nil {
 		return err
 	}

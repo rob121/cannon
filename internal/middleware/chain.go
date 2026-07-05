@@ -269,8 +269,13 @@ func (c *Chain) ExtensionRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		site, _ := sites.FromContext(r.Context())
 		mgr := c.Extensions(site)
-		svc, _ := user.FromContext(r.Context())
-		userCtx, _ := svc.Context(r.Context())
+		var userCtx map[string]any
+		if svc, err := user.FromContext(r.Context()); err == nil && svc != nil {
+			userCtx, _ = svc.Context(r.Context())
+		}
+		if userCtx == nil {
+			userCtx = map[string]any{"authenticated": false}
+		}
 		updated, resp, stop, err := mgr.HandleRequest(r.Context(), r, userCtx)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

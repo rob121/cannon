@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rob121/cannon/internal/categoryselect"
 	"github.com/rob121/cannon/internal/models"
 )
 
@@ -21,13 +22,14 @@ func RenderCategorySelectHTML(scope string, categories []models.Category, select
 	b.WriteString(html.EscapeString(scope))
 	b.WriteString(`"><option value="">— None —</option>`)
 	seen := map[uint]bool{}
-	for _, cat := range categories {
+	for _, opt := range categoryselect.Flatten(categories) {
+		cat := opt.Category
 		seen[cat.CategoryID] = true
 		selected := ""
 		if cat.CategoryID == selectedID {
 			selected = " selected"
 		}
-		b.WriteString(fmt.Sprintf(`<option value="%d"%s>%s</option>`, cat.CategoryID, selected, html.EscapeString(cat.Name)))
+		b.WriteString(fmt.Sprintf(`<option value="%d"%s>%s</option>`, cat.CategoryID, selected, html.EscapeString(opt.Label)))
 	}
 	if selectedID > 0 && !seen[selectedID] {
 		b.WriteString(fmt.Sprintf(`<option value="%d" selected>Category #%d</option>`, selectedID, selectedID))

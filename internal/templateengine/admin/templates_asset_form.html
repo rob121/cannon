@@ -52,7 +52,7 @@
           <button type="submit" class="btn-admin-primary">Save</button>
           <a class="btn-admin-outline" href="{{.CancelURL}}">Cancel</a>
           {{if .CanDelete}}
-          <button type="submit" class="btn-admin-outline admin-form-actions-revert" formaction="{{.BasePath}}/delete" formmethod="post" onclick="return confirm('Delete this asset permanently?')">Delete Asset</button>
+          <button type="submit" class="btn-admin-outline btn-admin-danger admin-form-actions-revert" formaction="{{.BasePath}}/delete" formmethod="post" onclick="return confirm('Delete this asset permanently?')"><i class="bi bi-trash"></i> Delete Asset</button>
           {{end}}
         </div>
       </form>

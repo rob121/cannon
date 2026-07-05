@@ -441,7 +441,7 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 		"Items":          items,
 		"Total":          total,
 		"Page":           page,
-		"Categories":     categories,
+		"Categories":     cms.FlattenCategoryOptions(categories),
 		"Tags":           tags,
 		"Authors":        authors,
 		"CategoryID":     categoryID,

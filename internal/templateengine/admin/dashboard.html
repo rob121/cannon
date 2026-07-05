@@ -3,7 +3,8 @@
 {{template "error_alert" .}}
 
 <div class="admin-stats">
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/items" data-turbo-frame="_top">
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/items" data-turbo-frame="_top" aria-label="View items"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Items</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-journal-richtext"></i></span>
@@ -18,8 +19,9 @@
       {{end}}
       <span class="admin-stat-meta">Published content</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/categories" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/categories" data-turbo-frame="_top" aria-label="View categories"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Categories</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-folder2"></i></span>
@@ -28,8 +30,9 @@
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Content taxonomy</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/tags" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/tags" data-turbo-frame="_top" aria-label="View tags"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Tags</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-tags"></i></span>
@@ -38,18 +41,20 @@
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Labels</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/comments" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/comments" data-turbo-frame="_top" aria-label="View comments"></a>
     <div class="admin-stat-card-top">
-      <span class="admin-stat-label">Comments</span>
+      <span class="admin-stat-label">Pending Comments</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-chat-dots"></i></span>
     </div>
     <div class="admin-stat-value">{{if .PendingCommentCount}}{{.PendingCommentCount}}{{else}}0{{end}}</div>
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Awaiting moderation</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/users" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/users" data-turbo-frame="_top" aria-label="View users"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Users</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
@@ -58,8 +63,9 @@
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Registered accounts</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/routes" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/routes" data-turbo-frame="_top" aria-label="View routes"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Routes</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-signpost-split"></i></span>
@@ -71,8 +77,9 @@
       {{end}}
       <span class="admin-stat-meta">URL mappings</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/extensions" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/extensions" data-turbo-frame="_top" aria-label="View extensions"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Extensions</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-puzzle"></i></span>
@@ -81,8 +88,9 @@
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Installed processes</span>
     </div>
-  </a>
-  <a class="admin-stat-card admin-stat-card-link" href="/admin/sites" data-turbo-frame="_top">
+  </div>
+  <div class="admin-stat-card">
+    <a class="admin-stat-card-link-overlay" href="/admin/sites" data-turbo-frame="_top" aria-label="View sites"></a>
     <div class="admin-stat-card-top">
       <span class="admin-stat-label">Sites</span>
       <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-globe2"></i></span>
@@ -91,7 +99,7 @@
     <div class="admin-stat-foot">
       <span class="admin-stat-badge admin-stat-badge-neutral">Configured instances</span>
     </div>
-  </a>
+  </div>
 </div>
 
 <div class="admin-dashboard-grid">

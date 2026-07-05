@@ -1,37 +1,77 @@
 {{template "page_header" .}}
-{{if .Saved}}<div class="alert alert-success">API settings saved.</div>{{end}}
-<form method="post" class="admin-form-card" data-turbo-frame="_top">
-  {{.CSRF}}
-  <div class="row g-3">
-    <div class="col-md-4">
-      <label class="admin-form-label" for="jwt_ttl_seconds">JWT TTL (seconds)</label>
-      <input class="admin-form-control" type="number" min="300" max="86400" id="jwt_ttl_seconds" name="jwt_ttl_seconds" value="{{index .Settings "jwt_ttl_seconds"}}" placeholder="3600">
-    </div>
-    <div class="col-md-4">
-      <label class="admin-form-label" for="rate_limit_per_minute">Rate limit / minute</label>
-      <input class="admin-form-control" type="number" min="10" id="rate_limit_per_minute" name="rate_limit_per_minute" value="{{index .Settings "rate_limit_per_minute"}}" placeholder="120">
-    </div>
-    <div class="col-md-4">
-      <label class="admin-form-label" for="login_rate_limit_per_minute">Login rate limit / minute</label>
-      <input class="admin-form-control" type="number" min="5" id="login_rate_limit_per_minute" name="login_rate_limit_per_minute" value="{{index .Settings "login_rate_limit_per_minute"}}" placeholder="20">
-    </div>
-    <div class="col-12">
-      <label class="admin-form-label" for="cors_origins">CORS allowed origins</label>
-      <input class="admin-form-control" id="cors_origins" name="cors_origins" value="{{index .Settings "cors_origins"}}" placeholder="https://app.example.com, https://www.example.com">
-      <p class="admin-form-help">Comma-separated. Leave empty to disable cross-origin browser access.</p>
-    </div>
-    <div class="col-12">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="rotate_jwt_secret" value="1" id="rotate_jwt_secret">
-        <label class="form-check-label" for="rotate_jwt_secret">Rotate JWT signing secret (invalidates all user tokens)</label>
+<div class="admin-form-stack">
+  {{if .Saved}}<div class="admin-alert admin-alert-success">API settings saved.</div>{{end}}
+  {{if not .CanWrite}}<div class="admin-alert admin-alert-info">You have read-only access to API settings.</div>{{end}}
+  <form method="post" action="/admin/api/settings" class="admin-form-card">
+    {{csrfField}}
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Headless API configuration</h2>
+        <p class="admin-form-card-desc">Tune authentication, CORS, and rate limits for the public Content API.</p>
       </div>
     </div>
-    <div class="col-12">
-      <p class="admin-form-help mb-0">OpenAPI docs: <a href="{{.DocsURL}}" target="_blank" rel="noopener">{{.DocsURL}}</a></p>
+    <div class="admin-form-card-body">
+      <div class="admin-form-section-card">
+        {{template "form_section_header" (dict "Title" "Authentication" "Description" "Token lifetimes for user sessions issued by the API.")}}
+        <div class="admin-form-section-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="admin-form-label" for="jwt_ttl_seconds">JWT access TTL (seconds)</label>
+              <input class="admin-form-control" type="number" min="300" max="86400" id="jwt_ttl_seconds" name="jwt_ttl_seconds" value="{{index .Settings "jwt_ttl_seconds"}}" placeholder="3600" {{if not .CanWrite}}disabled{{end}}>
+              <p class="admin-form-help">How long user access tokens remain valid (300–86400).</p>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="refresh_ttl_seconds">Refresh token TTL (seconds)</label>
+              <input class="admin-form-control" type="number" min="3600" max="2592000" id="refresh_ttl_seconds" name="refresh_ttl_seconds" value="{{index .Settings "refresh_ttl_seconds"}}" placeholder="604800" {{if not .CanWrite}}disabled{{end}}>
+              <p class="admin-form-help">How long refresh tokens remain valid (3600–2592000).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="admin-form-section-card">
+        {{template "form_section_header" (dict "Title" "CORS & rate limits" "Description" "Browser access and request throttling for API clients.")}}
+        <div class="admin-form-section-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="admin-form-label" for="cors_origins">CORS allowed origins</label>
+              <input class="admin-form-control" id="cors_origins" name="cors_origins" value="{{index .Settings "cors_origins"}}" placeholder="https://app.example.com, https://www.example.com" {{if not .CanWrite}}disabled{{end}}>
+              <p class="admin-form-help">Comma-separated. Leave empty to disable cross-origin browser access.</p>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="rate_limit_per_minute">Default rate limit / minute</label>
+              <input class="admin-form-control" type="number" min="10" id="rate_limit_per_minute" name="rate_limit_per_minute" value="{{index .Settings "rate_limit_per_minute"}}" placeholder="120" {{if not .CanWrite}}disabled{{end}}>
+            </div>
+            <div class="col-md-6">
+              <label class="admin-form-label" for="login_rate_limit_per_minute">Login rate limit / minute</label>
+              <input class="admin-form-control" type="number" min="5" id="login_rate_limit_per_minute" name="login_rate_limit_per_minute" value="{{index .Settings "login_rate_limit_per_minute"}}" placeholder="20" {{if not .CanWrite}}disabled{{end}}>
+              <p class="admin-form-help">Per IP address for login endpoints.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{if .CanWrite}}
+      <div class="admin-form-section-card">
+        {{template "form_section_header" (dict "Title" "JWT signing secret" "Description" "Rotating the secret invalidates all outstanding user tokens.")}}
+        <div class="admin-form-section-body">
+          <label class="admin-form-check">
+            <input type="checkbox" name="rotate_jwt_secret" value="1" id="rotate_jwt_secret">
+            Rotate JWT signing secret on save
+          </label>
+        </div>
+      </div>
+      {{end}}
+      <div class="admin-form-section-card">
+        {{template "form_section_header" (dict "Title" "Documentation" "Description" "Interactive OpenAPI reference for all Content API endpoints.")}}
+        <div class="admin-form-section-body">
+          <a class="btn-admin-outline btn-admin-sm" href="{{.DocsURL}}" target="_blank" rel="noopener"><i class="bi bi-book"></i> Open API docs</a>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="admin-form-actions">
-    <a class="btn-admin-outline" href="/admin/api/credentials" data-turbo-frame="_top">Back to credentials</a>
-    <button type="submit" class="btn-admin-primary">Save settings</button>
-  </div>
-</form>
+    <div class="admin-form-actions">
+      <a class="btn-admin-outline" href="/admin/api/credentials" data-turbo-frame="_top">Back to credentials</a>
+      {{if .CanWrite}}
+      <button type="submit" class="btn-admin-primary">Save settings</button>
+      {{end}}
+    </div>
+  </form>
+</div>

@@ -94,6 +94,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveMedia(w, r, parts[1:])
 	case "authors":
 		h.serveAuthors(w, r, parts[1:])
+	case "menus":
+		h.serveMenus(w, r, parts[1:])
 	default:
 		writeError(w, http.StatusNotFound, "not_found", "Unknown endpoint")
 	}

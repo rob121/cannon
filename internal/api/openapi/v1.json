@@ -3,20 +3,163 @@
   "info": {
     "title": "Cannon Content API",
     "version": "1.0.0",
-    "description": "Headless read-only content and account self-service API for Cannon CMS."
+    "description": "Headless read-only content and account self-service API for Cannon CMS. All endpoints require the X-Cannon-API-Key header. User-specific visibility and account routes also accept Authorization: Bearer <JWT>."
   },
   "servers": [{ "url": "/api/v1" }],
+  "tags": [
+    { "name": "Auth", "description": "Login and session tokens" },
+    { "name": "Account", "description": "Signed-in user profile and settings" },
+    { "name": "Items", "description": "Published content items" },
+    { "name": "Categories", "description": "Content taxonomy" },
+    { "name": "Tags", "description": "Content tags" },
+    { "name": "Menus", "description": "Site navigation menus" },
+    { "name": "Search", "description": "Full-text search" },
+    { "name": "Media", "description": "Media metadata" },
+    { "name": "Authors", "description": "Public author profiles" }
+  ],
   "components": {
     "securitySchemes": {
       "ApiKeyAuth": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-Cannon-API-Key"
+        "name": "X-Cannon-API-Key",
+        "description": "Application credential issued in Admin → API → Credentials"
       },
       "UserBearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "JWT",
+        "description": "User access token from POST /auth/login"
+      }
+    },
+    "parameters": {
+      "Page": {
+        "name": "page",
+        "in": "query",
+        "description": "Page number (1-based).",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 }
+      },
+      "PageSize": {
+        "name": "page_size",
+        "in": "query",
+        "description": "Items per page (max 100).",
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      },
+      "SearchQuery": {
+        "name": "q",
+        "in": "query",
+        "description": "Search keywords.",
+        "schema": { "type": "string" }
+      },
+      "Locale": {
+        "name": "locale",
+        "in": "query",
+        "description": "Content locale when multilingual mode is enabled.",
+        "schema": { "type": "string", "example": "en-US" }
+      },
+      "CategoryIDQuery": {
+        "name": "category_id",
+        "in": "query",
+        "description": "Filter items assigned to this category ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "CategorySlugQuery": {
+        "name": "category_slug",
+        "in": "query",
+        "description": "Filter items in this category slug and its descendants.",
+        "schema": { "type": "string", "example": "news" }
+      },
+      "IncludeDescendants": {
+        "name": "include_descendants",
+        "in": "query",
+        "description": "When used with category_id, include items in child categories.",
+        "schema": { "type": "string", "enum": ["1"] }
+      },
+      "TagIDQuery": {
+        "name": "tag_id",
+        "in": "query",
+        "description": "Filter items with this tag ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "Featured": {
+        "name": "featured",
+        "in": "query",
+        "description": "Set to 1 to return featured items only.",
+        "schema": { "type": "string", "enum": ["1"] }
+      },
+      "CategoriesFlat": {
+        "name": "flat",
+        "in": "query",
+        "description": "Return a flat category list instead of a nested tree.",
+        "schema": { "type": "string", "enum": ["1"] }
+      },
+      "CategoriesRoots": {
+        "name": "roots",
+        "in": "query",
+        "description": "Return only top-level categories.",
+        "schema": { "type": "string", "enum": ["1"] }
+      },
+      "CategoriesParentID": {
+        "name": "parent_id",
+        "in": "query",
+        "description": "Return direct children of this parent category ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "CategoryIDPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Category ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "CategorySlugPath": {
+        "name": "slug",
+        "in": "path",
+        "required": true,
+        "description": "Category slug path (may include slashes, e.g. news/local).",
+        "schema": { "type": "string", "example": "news" }
+      },
+      "ItemIDPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Item ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "ItemSlugPath": {
+        "name": "slug",
+        "in": "path",
+        "required": true,
+        "description": "Item slug for the active locale.",
+        "schema": { "type": "string" }
+      },
+      "TagIDPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Tag ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "MediaIDPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Media asset ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "AuthorIDPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Author user ID.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "MenuNamePath": {
+        "name": "name",
+        "in": "path",
+        "required": true,
+        "description": "Active menu name (case-insensitive), as defined in Admin → Menus.",
+        "schema": { "type": "string", "example": "main" }
       }
     }
   },
@@ -24,6 +167,7 @@
   "paths": {
     "/auth/login": {
       "post": {
+        "operationId": "postAuthLogin",
         "tags": ["Auth"],
         "summary": "Login",
         "security": [{ "ApiKeyAuth": [] }],
@@ -32,6 +176,7 @@
     },
     "/auth/me": {
       "get": {
+        "operationId": "getAuthMe",
         "tags": ["Account"],
         "summary": "Current user profile",
         "security": [{ "ApiKeyAuth": [] }, { "UserBearerAuth": [] }],
@@ -40,9 +185,155 @@
     },
     "/items": {
       "get": {
+        "operationId": "listItems",
         "tags": ["Items"],
         "summary": "List visible published items",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PageSize" },
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/Locale" },
+          { "$ref": "#/components/parameters/CategoryIDQuery" },
+          { "$ref": "#/components/parameters/CategorySlugQuery" },
+          { "$ref": "#/components/parameters/IncludeDescendants" },
+          { "$ref": "#/components/parameters/TagIDQuery" },
+          { "$ref": "#/components/parameters/Featured" }
+        ],
         "responses": { "200": { "description": "Paginated items" } }
+      }
+    },
+    "/items/{id}": {
+      "get": {
+        "operationId": "getItemByID",
+        "tags": ["Items"],
+        "summary": "Item by ID",
+        "parameters": [{ "$ref": "#/components/parameters/ItemIDPath" }],
+        "responses": { "200": { "description": "Item detail" }, "404": { "description": "Not found or not visible" } }
+      }
+    },
+    "/items/by-slug/{slug}": {
+      "get": {
+        "operationId": "getItemBySlug",
+        "tags": ["Items"],
+        "summary": "Item by slug",
+        "parameters": [{ "$ref": "#/components/parameters/ItemSlugPath" }],
+        "responses": { "200": { "description": "Item detail" }, "404": { "description": "Not found or not visible" } }
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "listCategories",
+        "tags": ["Categories"],
+        "summary": "Category tree",
+        "description": "Returns a nested tree by default. Use query parameters to change shape.",
+        "parameters": [
+          { "$ref": "#/components/parameters/Locale" },
+          { "$ref": "#/components/parameters/CategoriesFlat" },
+          { "$ref": "#/components/parameters/CategoriesRoots" },
+          { "$ref": "#/components/parameters/CategoriesParentID" }
+        ],
+        "responses": { "200": { "description": "Category tree or list" } }
+      }
+    },
+    "/categories/{id}": {
+      "get": {
+        "operationId": "getCategoryByID",
+        "tags": ["Categories"],
+        "summary": "Category by ID",
+        "parameters": [{ "$ref": "#/components/parameters/CategoryIDPath" }],
+        "responses": { "200": { "description": "Category detail with direct children" }, "404": { "description": "Not found or not visible" } }
+      }
+    },
+    "/categories/by-slug/{slug}": {
+      "get": {
+        "operationId": "getCategoryBySlug",
+        "tags": ["Categories"],
+        "summary": "Category by slug",
+        "parameters": [{ "$ref": "#/components/parameters/CategorySlugPath" }],
+        "responses": { "200": { "description": "Category detail with direct children" }, "404": { "description": "Not found or not visible" } }
+      }
+    },
+    "/categories/{id}/items": {
+      "get": {
+        "operationId": "listCategoryItems",
+        "tags": ["Categories"],
+        "summary": "Items in a category (includes descendants)",
+        "parameters": [
+          { "$ref": "#/components/parameters/CategoryIDPath" },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PageSize" },
+          { "$ref": "#/components/parameters/SearchQuery" }
+        ],
+        "responses": { "200": { "description": "Paginated items" }, "404": { "description": "Category not found or not visible" } }
+      }
+    },
+    "/tags": {
+      "get": {
+        "operationId": "listTags",
+        "tags": ["Tags"],
+        "summary": "List tags",
+        "responses": { "200": { "description": "Tag list" } }
+      }
+    },
+    "/tags/{id}": {
+      "get": {
+        "operationId": "getTagByID",
+        "tags": ["Tags"],
+        "summary": "Tag by ID",
+        "parameters": [{ "$ref": "#/components/parameters/TagIDPath" }],
+        "responses": { "200": { "description": "Tag detail" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/menus": {
+      "get": {
+        "operationId": "listMenus",
+        "tags": ["Menus"],
+        "summary": "List active menus",
+        "responses": { "200": { "description": "Menu definitions (menu_id, name)" } }
+      }
+    },
+    "/menus/{name}": {
+      "get": {
+        "operationId": "getMenuByName",
+        "tags": ["Menus"],
+        "summary": "Menu tree by name",
+        "description": "Returns nested menu items visible to the current viewer (public group or JWT user groups).",
+        "parameters": [{ "$ref": "#/components/parameters/MenuNamePath" }],
+        "responses": {
+          "200": { "description": "Nested menu items (menu_item_id, name, href, class, target, children)" },
+          "404": { "description": "Menu not found or no visible items" }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "searchItems",
+        "tags": ["Search"],
+        "summary": "Search published items",
+        "parameters": [
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/PageSize" },
+          { "$ref": "#/components/parameters/SearchQuery" }
+        ],
+        "responses": { "200": { "description": "Paginated search results" } }
+      }
+    },
+    "/media/{id}": {
+      "get": {
+        "operationId": "getMediaByID",
+        "tags": ["Media"],
+        "summary": "Media metadata by ID",
+        "parameters": [{ "$ref": "#/components/parameters/MediaIDPath" }],
+        "responses": { "200": { "description": "Media metadata" }, "404": { "description": "Not found or not visible" } }
+      }
+    },
+    "/authors/{id}": {
+      "get": {
+        "operationId": "getAuthorByID",
+        "tags": ["Authors"],
+        "summary": "Public author profile",
+        "parameters": [{ "$ref": "#/components/parameters/AuthorIDPath" }],
+        "responses": { "200": { "description": "Author profile" }, "404": { "description": "Not found" } }
       }
     }
   }

@@ -65,16 +65,13 @@ func (h *Handler) items(w http.ResponseWriter, r *http.Request, path string) {
 	}
 }
 
-func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
-	db, _ := sites.DB(r.Context())
-	page := parsePage(r)
-	statusFilter := r.URL.Query().Get("status")
-	categoryFilter := r.URL.Query().Get("category")
-	featuredFilter := r.URL.Query().Get("featured")
-	query := r.URL.Query().Get("q")
+func itemListExcludeTrashed(q *gorm.DB) *gorm.DB {
+	return q.Where("status <> ?", models.ItemStatusTrashed)
+}
 
-	q := db.Model(&models.Item{})
-	if statusFilter != "" {
+func itemListFilters(db *gorm.DB, statusFilter, categoryFilter, featuredFilter, query string) *gorm.DB {
+	q := itemListExcludeTrashed(db.Model(&models.Item{}))
+	if statusFilter != "" && statusFilter != string(models.ItemStatusTrashed) {
 		q = q.Where("status = ?", statusFilter)
 	}
 	if categoryFilter != "" {
@@ -91,6 +88,21 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		like := "%" + query + "%"
 		q = q.Where("title LIKE ? OR slug LIKE ?", like, like)
 	}
+	return q
+}
+
+func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
+	db, _ := sites.DB(r.Context())
+	page := parsePage(r)
+	statusFilter := r.URL.Query().Get("status")
+	if statusFilter == string(models.ItemStatusTrashed) {
+		statusFilter = ""
+	}
+	categoryFilter := r.URL.Query().Get("category")
+	featuredFilter := r.URL.Query().Get("featured")
+	query := r.URL.Query().Get("q")
+
+	q := itemListFilters(db, statusFilter, categoryFilter, featuredFilter, query)
 	var total int64
 	q.Count(&total)
 
@@ -106,30 +118,13 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 		order = "featured_sort asc"
 	}
 
-	listQ := db.Model(&models.Item{})
-	if statusFilter != "" {
-		listQ = listQ.Where("status = ?", statusFilter)
-	}
-	if categoryFilter != "" {
-		if id, ok := parseID(categoryFilter); ok {
-			listQ = listQ.Where("category_id = ?", id)
-		}
-	}
-	if featuredFilter == "1" {
-		listQ = listQ.Where("featured = ?", true)
-	} else if featuredFilter == "0" {
-		listQ = listQ.Where("featured = ?", false)
-	}
-	if query != "" {
-		like := "%" + query + "%"
-		listQ = listQ.Where("title LIKE ? OR slug LIKE ?", like, like)
-	}
+	listQ := itemListFilters(db, statusFilter, categoryFilter, featuredFilter, query)
 	var rows []models.Item
 	listQ.Preload("Category").Preload("Author").
 		Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
 	var ordered []models.Item
-	db.Select("item_id", "category_id", "featured", "featured_sort", "sort").Order("sort asc, item_id asc").Find(&ordered)
+	itemListExcludeTrashed(db).Select("item_id", "category_id", "featured", "featured_sort", "sort").Order("sort asc, item_id asc").Find(&ordered)
 	sortPos := itemSortPositions(ordered)
 
 	var featuredOrdered []models.Item
@@ -173,7 +168,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	data["FeaturedFilter"] = featuredFilter
 	data["CategoryFilterID"] = categoryFilterID
 	data["SearchQuery"] = query
-	data["Categories"] = categories
+	data["Categories"] = content.FlattenCategoryOptions(categories)
 	data["AllTags"] = allTags
 	data["ListQuery"] = listQueryFromData(data)
 	h.render(w, r, "Items", "admin/items.html", data)
@@ -382,7 +377,7 @@ func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, db *gor
 		"SelectedIDs":   defaultGroupSelectedIDs(db, row.Groups, isNew),
 		"AllTags":       allTags,
 		"SelectedTagIDs": tagIDs,
-		"Categories":    categories,
+		"Categories":    content.FlattenCategoryOptions(categories),
 		"Users":         users,
 		"CustomFields":  customFields,
 		"FieldValues":   fieldValues,

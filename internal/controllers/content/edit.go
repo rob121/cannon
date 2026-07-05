@@ -253,7 +253,7 @@ func editFormData(item models.Item, categories []models.Category, tags []models.
 		"Item":               item,
 		"IsNew":              isNew,
 		"CanPublish":         canPublish,
-		"Categories":         categories,
+		"Categories":         cms.FlattenCategoryOptions(categories),
 		"Tags":               tags,
 		"SelectedTagIDs":     tagIDs,
 		"SelectedCategoryID": selectedCategoryID,

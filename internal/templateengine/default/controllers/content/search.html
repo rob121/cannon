@@ -13,7 +13,7 @@
           <select class="form-select" id="search-category" name="category">
             <option value="">{{lang "search.all_categories"}}</option>
             {{range .Categories}}
-            <option value="{{.CategoryID}}" {{if eq $.CategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+            <option value="{{.CategoryID}}" {{if eq $.CategoryID .CategoryID}}selected{{end}}>{{.Label}}</option>
             {{end}}
           </select>
         </div>

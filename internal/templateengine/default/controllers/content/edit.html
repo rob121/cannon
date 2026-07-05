@@ -35,7 +35,7 @@
         <select class="form-select" id="item-category" name="category_id">
           <option value="">None</option>
           {{range .Categories}}
-          <option value="{{.CategoryID}}" {{if eq $.SelectedCategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+          <option value="{{.CategoryID}}" {{if eq $.SelectedCategoryID .CategoryID}}selected{{end}}>{{.Label}}</option>
           {{end}}
         </select>
       </div>

@@ -1,7 +1,6 @@
 package router
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -147,21 +146,21 @@ func migrateLegacyAuthPaths(db *gorm.DB) error {
 		to   string
 	}
 	for _, m := range []move{{"/login", paths.AuthLogin}, {"/logout", paths.AuthLogout}} {
-		var row models.Route
-		err := db.Where("path = ? AND controller = ?", m.from, "auth").First(&row).Error
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		var rows []models.Route
+		if err := db.Where("path = ? AND controller = ?", m.from, "auth").Limit(1).Find(&rows).Error; err != nil {
+			return err
+		}
+		if len(rows) == 0 {
 			continue
 		}
+		row := rows[0]
+		var existingRows []models.Route
+		err := db.Where("path = ?", m.to).Limit(1).Find(&existingRows).Error
 		if err != nil {
 			return err
 		}
-		var existing models.Route
-		err = db.Where("path = ?", m.to).First(&existing).Error
-		if err == nil && existing.RouteID != row.RouteID {
+		if len(existingRows) > 0 && existingRows[0].RouteID != row.RouteID {
 			continue
-		}
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
 		}
 		row.Path = m.to
 		if err := db.Save(&row).Error; err != nil {

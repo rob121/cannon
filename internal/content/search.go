@@ -8,6 +8,7 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // SearchIndexAvailable reports whether the SQLite FTS index is available.
@@ -84,7 +85,7 @@ func ensureSearchIndex(db *gorm.DB) error {
 	if db == nil || db.Dialector.Name() != "sqlite" {
 		return nil
 	}
-	err := db.Exec(`CREATE VIRTUAL TABLE IF NOT EXISTS item_search_fts USING fts5(
+	err := sqliteSilentExec(db, `CREATE VIRTUAL TABLE IF NOT EXISTS item_search_fts USING fts5(
 		item_id UNINDEXED,
 		locale UNINDEXED,
 		title,
@@ -92,9 +93,9 @@ func ensureSearchIndex(db *gorm.DB) error {
 		body,
 		fields,
 		tokenize='porter unicode61'
-	)`).Error
+	)`)
 	if err != nil {
-		if ftsUnavailable(err) {
+		if sqliteFTSUnavailable(err) {
 			return nil
 		}
 		return err
@@ -102,12 +103,19 @@ func ensureSearchIndex(db *gorm.DB) error {
 	return nil
 }
 
-func ftsUnavailable(err error) bool {
+func sqliteFTSUnavailable(err error) bool {
 	if err == nil {
 		return false
 	}
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "no such module: fts5") || strings.Contains(msg, "unknown tokenizer")
+}
+
+func sqliteSilentExec(db *gorm.DB, sql string, args ...any) error {
+	if db == nil {
+		return nil
+	}
+	return db.Session(&gorm.Session{Logger: logger.Discard}).Exec(sql, args...).Error
 }
 
 func searchFieldsText(ctx context.Context, db *gorm.DB, itemID uint) (string, error) {

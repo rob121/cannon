@@ -237,7 +237,6 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 		data["NavContentOpen"] = contentNavOpen(nav)
 		data["NavSystemOpen"] = systemNavOpen(nav)
 		data["NavExtensionAppsOpen"] = extensionAppsNavOpen(nav)
-		data["NavAPIOpen"] = apiNavOpen(nav)
 	}
 	eng, err := h.engine(r, listExtra)
 	if err != nil {

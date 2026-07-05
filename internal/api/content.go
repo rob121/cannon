@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -67,10 +68,13 @@ func (h *Handler) listItems(w http.ResponseWriter, r *http.Request, viewerGroups
 	if v := strings.TrimSpace(r.URL.Query().Get("q")); v != "" {
 		opts.Query = v
 	}
-	if v := strings.TrimSpace(r.URL.Query().Get("category_id")); v != "" {
-		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
-			opts.CategoryID = uint(n)
+	if err := applyItemCategoryFilter(ctx, r, viewerGroups, &opts); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeJSON(w, http.StatusOK, ListResponse{Data: []itemJSON{}, Meta: PageMeta{Page: page, PageSize: pageSize, Total: 0}})
+			return
 		}
+		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		return
 	}
 	if v := strings.TrimSpace(r.URL.Query().Get("tag_id")); v != "" {
 		if n, err := strconv.ParseUint(v, 10, 64); err == nil {
@@ -247,7 +251,30 @@ func (h *Handler) serveCategories(w http.ResponseWriter, r *http.Request, parts 
 			return
 		}
 		filtered := filterVisibleCategories(rows, viewerGroups)
-		writeJSON(w, http.StatusOK, map[string]any{"data": categoryRowsJSON(filtered)})
+		q := r.URL.Query()
+		if q.Get("flat") == "1" {
+			writeJSON(w, http.StatusOK, map[string]any{"data": categoryRowsJSON(ctx, filtered, false)})
+			return
+		}
+		if parentRaw := strings.TrimSpace(q.Get("parent_id")); parentRaw != "" {
+			if n, err := strconv.ParseUint(parentRaw, 10, 64); err == nil {
+				parentID := uint(n)
+				var children []models.Category
+				for _, c := range filtered {
+					if c.ParentID != nil && *c.ParentID == parentID {
+						children = append(children, c)
+					}
+				}
+				writeJSON(w, http.StatusOK, map[string]any{"data": categoryRowsJSON(ctx, children, false)})
+				return
+			}
+		}
+		rootsOnly := q.Get("roots") == "1"
+		writeJSON(w, http.StatusOK, map[string]any{"data": buildCategoryTreeJSON(ctx, filtered, rootsOnly)})
+		return
+	}
+	if parts[0] == "by-slug" && len(parts) >= 2 {
+		h.getCategoryBySlug(w, r, parts[1], viewerGroups)
 		return
 	}
 	id, err := strconv.ParseUint(parts[0], 10, 64)
@@ -255,6 +282,33 @@ func (h *Handler) serveCategories(w http.ResponseWriter, r *http.Request, parts 
 		writeError(w, http.StatusNotFound, "not_found", "Category not found")
 		return
 	}
+	if len(parts) == 2 && parts[1] == "items" {
+		h.listCategoryItems(w, r, uint(id), viewerGroups)
+		return
+	}
+	if len(parts) != 1 {
+		writeError(w, http.StatusNotFound, "not_found", "Category not found")
+		return
+	}
+	h.getCategoryByID(w, r, uint(id), viewerGroups)
+}
+
+func (h *Handler) getCategoryBySlug(w http.ResponseWriter, r *http.Request, slug string, viewerGroups []uint) {
+	ctx := r.Context()
+	cat, err := cms.CategoryBySlug(ctx, slug, viewerGroups)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "Category not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, categoryDetailJSON(ctx, *cat, viewerGroups))
+}
+
+func (h *Handler) getCategoryByID(w http.ResponseWriter, r *http.Request, id uint, viewerGroups []uint) {
+	ctx := r.Context()
 	db, err := sites.DB(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
@@ -269,7 +323,136 @@ func (h *Handler) serveCategories(w http.ResponseWriter, r *http.Request, parts 
 		writeError(w, http.StatusNotFound, "not_found", "Category not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, categoryRowJSON(cat))
+	writeJSON(w, http.StatusOK, categoryDetailJSON(ctx, cat, viewerGroups))
+}
+
+func (h *Handler) listCategoryItems(w http.ResponseWriter, r *http.Request, categoryID uint, viewerGroups []uint) {
+	ctx := r.Context()
+	db, err := sites.DB(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+	var cat models.Category
+	if err := db.Preload("Groups").First(&cat, categoryID).Error; err != nil {
+		writeError(w, http.StatusNotFound, "not_found", "Category not found")
+		return
+	}
+	if !groups.CanViewContent(viewerGroups, cat.Groups) {
+		writeError(w, http.StatusNotFound, "not_found", "Category not found")
+		return
+	}
+	page, pageSize := parsePageQuery(r)
+	opts := cms.ListOptions{Page: page, Limit: pageSize}
+	if v := strings.TrimSpace(r.URL.Query().Get("q")); v != "" {
+		opts.Query = v
+	}
+	if err := setCategoryDescendantFilter(ctx, categoryID, &opts); err != nil {
+		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+	items, total, err := cms.ListItems(ctx, viewerGroups, opts)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
+		return
+	}
+	data := make([]itemJSON, 0, len(items))
+	for i := range items {
+		row, err := itemToJSON(ctx, &items[i])
+		if err != nil {
+			continue
+		}
+		data = append(data, row)
+	}
+	writeJSON(w, http.StatusOK, ListResponse{Data: data, Meta: PageMeta{Page: page, PageSize: pageSize, Total: total}})
+}
+
+func applyItemCategoryFilter(ctx context.Context, r *http.Request, viewerGroups []uint, opts *cms.ListOptions) error {
+	if slug := strings.TrimSpace(r.URL.Query().Get("category_slug")); slug != "" {
+		cat, err := cms.CategoryBySlug(ctx, slug, viewerGroups)
+		if err != nil {
+			return err
+		}
+		return setCategoryDescendantFilter(ctx, cat.CategoryID, opts)
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("category_id")); v != "" {
+		n, err := strconv.ParseUint(v, 10, 64)
+		if err != nil || n == 0 {
+			return nil
+		}
+		if r.URL.Query().Get("include_descendants") == "1" {
+			return setCategoryDescendantFilter(ctx, uint(n), opts)
+		}
+		opts.CategoryID = uint(n)
+	}
+	return nil
+}
+
+func setCategoryDescendantFilter(ctx context.Context, categoryID uint, opts *cms.ListOptions) error {
+	ids, err := cms.CategoryDescendantIDs(ctx, categoryID)
+	if err != nil {
+		return err
+	}
+	opts.CategoryIDs = ids
+	opts.CategoryID = 0
+	return nil
+}
+
+func buildCategoryTreeJSON(ctx context.Context, rows []models.Category, rootsOnly bool) []map[string]any {
+	byParent := make(map[uint][]models.Category)
+	roots := make([]models.Category, 0)
+	for _, c := range rows {
+		if c.ParentID == nil || *c.ParentID == 0 {
+			roots = append(roots, c)
+			continue
+		}
+		byParent[*c.ParentID] = append(byParent[*c.ParentID], c)
+	}
+	out := make([]map[string]any, 0, len(roots))
+	for _, root := range roots {
+		out = append(out, categoryNodeJSON(ctx, root, byParent, rootsOnly))
+	}
+	return out
+}
+
+func categoryNodeJSON(ctx context.Context, cat models.Category, byParent map[uint][]models.Category, rootsOnly bool) map[string]any {
+	row := categoryRowJSON(ctx, cat, true)
+	if rootsOnly {
+		return row
+	}
+	children := byParent[cat.CategoryID]
+	if len(children) == 0 {
+		return row
+	}
+	nested := make([]map[string]any, 0, len(children))
+	for _, child := range children {
+		nested = append(nested, categoryNodeJSON(ctx, child, byParent, false))
+	}
+	row["children"] = nested
+	return row
+}
+
+func categoryDetailJSON(ctx context.Context, cat models.Category, viewerGroups []uint) map[string]any {
+	row := categoryRowJSON(ctx, cat, true)
+	rows, err := cms.CategoryTree(ctx)
+	if err == nil {
+		filtered := filterVisibleCategories(rows, viewerGroups)
+		byParent := make(map[uint][]models.Category)
+		for _, c := range filtered {
+			if c.ParentID == nil || *c.ParentID == 0 {
+				continue
+			}
+			byParent[*c.ParentID] = append(byParent[*c.ParentID], c)
+		}
+		if children := byParent[cat.CategoryID]; len(children) > 0 {
+			childRows := make([]map[string]any, 0, len(children))
+			for _, child := range children {
+				childRows = append(childRows, categoryRowJSON(ctx, child, false))
+			}
+			row["children"] = childRows
+		}
+	}
+	return row
 }
 
 func filterVisibleCategories(rows []models.Category, viewerGroups []uint) []models.Category {
@@ -282,19 +465,29 @@ func filterVisibleCategories(rows []models.Category, viewerGroups []uint) []mode
 	return out
 }
 
-func categoryRowsJSON(rows []models.Category) []map[string]any {
+func categoryRowsJSON(ctx context.Context, rows []models.Category, withURL bool) []map[string]any {
 	out := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, categoryRowJSON(c))
+		out = append(out, categoryRowJSON(ctx, c, withURL))
 	}
 	return out
 }
 
-func categoryRowJSON(c models.Category) map[string]any {
-	return map[string]any{
-		"category_id": c.CategoryID, "name": c.Name, "slug": c.Slug,
-		"parent_id": c.ParentID, "locale": c.Locale,
+func categoryRowJSON(ctx context.Context, c models.Category, withURL bool) map[string]any {
+	row := map[string]any{
+		"category_id": c.CategoryID,
+		"name":        c.Name,
+		"slug":        c.Slug,
+		"parent_id":   c.ParentID,
+		"locale":      c.Locale,
 	}
+	if strings.TrimSpace(c.Description) != "" {
+		row["description"] = c.Description
+	}
+	if withURL {
+		row["url"] = cms.CategoryURLForContext(ctx, c.Slug)
+	}
+	return row
 }
 
 func (h *Handler) serveTags(w http.ResponseWriter, r *http.Request, parts []string) {

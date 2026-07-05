@@ -26,7 +26,16 @@ type MenuItemParentOption struct {
 // MenuData loads a hierarchical menu for template rendering.
 // Top-level items include a "Children" slice of nested item maps when present.
 func MenuData(ctx context.Context, menuName string) ([]map[string]any, error) {
-	items, err := loadActiveMenuItems(ctx, menuName)
+	viewerGroups, err := groups.ViewerGroupIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return MenuDataForViewer(ctx, menuName, viewerGroups)
+}
+
+// MenuDataForViewer loads a menu tree using explicit viewer group ids.
+func MenuDataForViewer(ctx context.Context, menuName string, viewerGroups []uint) ([]map[string]any, error) {
+	items, err := loadActiveMenuItemsForViewer(ctx, menuName, viewerGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +89,15 @@ func limitMenuItem(item map[string]any, maxDepth, depth int) map[string]any {
 }
 
 func loadActiveMenuItems(ctx context.Context, menuName string) ([]models.MenuItem, error) {
-	db, err := sites.DB(ctx)
+	viewerGroups, err := groups.ViewerGroupIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	viewerGroups, err := groups.ViewerGroupIDs(ctx)
+	return loadActiveMenuItemsForViewer(ctx, menuName, viewerGroups)
+}
+
+func loadActiveMenuItemsForViewer(ctx context.Context, menuName string, viewerGroups []uint) ([]models.MenuItem, error) {
+	db, err := sites.DB(ctx)
 	if err != nil {
 		return nil, err
 	}

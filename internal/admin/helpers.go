@@ -195,11 +195,16 @@ func layoutContext(r *http.Request) map[string]any {
 	}
 	if svc, err := user.FromContext(r.Context()); err == nil {
 		if u, err := svc.Current(r.Context()); err == nil {
+			displayName := strings.TrimSpace(strings.TrimSpace(u.GivenName + " " + u.FamilyName))
+			if displayName == "" {
+				displayName = u.Username
+			}
 			data["CurrentUser"] = map[string]any{
-				"ID":         u.UserID,
-				"Username":   u.Username,
-				"GivenName":  u.GivenName,
-				"FamilyName": u.FamilyName,
+				"ID":          u.UserID,
+				"Username":    u.Username,
+				"GivenName":   u.GivenName,
+				"FamilyName":  u.FamilyName,
+				"DisplayName": displayName,
 			}
 		}
 	}
@@ -316,15 +321,6 @@ func menusNavOpen(nav string) bool {
 func contentNavOpen(nav string) bool {
 	switch nav {
 	case "items", "categories", "tags", "field_groups", "comments", "media", "trash", "review":
-		return true
-	default:
-		return false
-	}
-}
-
-func apiNavOpen(nav string) bool {
-	switch nav {
-	case "api_credentials", "api_settings":
 		return true
 	default:
 		return false

@@ -11,7 +11,6 @@
           <option value="pending" {{if eq .StatusFilter "pending"}}selected{{end}}>Pending Review</option>
           <option value="published" {{if eq .StatusFilter "published"}}selected{{end}}>Published</option>
           <option value="archived" {{if eq .StatusFilter "archived"}}selected{{end}}>Archived</option>
-          <option value="trashed" {{if eq .StatusFilter "trashed"}}selected{{end}}>Trashed</option>
         </select>
       </div>
       <div class="admin-filter-field">
@@ -19,7 +18,7 @@
         <select class="admin-form-control admin-form-control-sm" id="items-category-filter" name="category" onchange="this.form.submit()">
           <option value="">All Categories</option>
           {{range .Categories}}
-          <option value="{{.CategoryID}}" {{if eq $.CategoryFilterID .CategoryID}}selected{{end}}>{{.Name}}</option>
+          <option value="{{.CategoryID}}" {{if eq $.CategoryFilterID .CategoryID}}selected{{end}}>{{.Label}}</option>
           {{end}}
         </select>
       </div>
@@ -60,15 +59,13 @@
           <option value="reject">Return Pending to Draft</option>
           <option value="archive">Archive</option>
           <option value="trash">Move To Trash</option>
-          <option value="restore">Restore From Trash</option>
           <option value="assign_category">Assign Category</option>
           <option value="assign_tags">Assign Tags</option>
-          <option value="delete">Delete Permanently</option>
         </select>
         <select class="admin-form-control admin-form-control-sm admin-bulk-extra" name="bulk_category_id" id="bulk-category" aria-label="Bulk category" disabled hidden>
           <option value="">Category…</option>
           {{range .Categories}}
-          <option value="{{.CategoryID}}">{{.Name}}</option>
+          <option value="{{.CategoryID}}">{{.Label}}</option>
           {{end}}
         </select>
         <select class="admin-form-control admin-form-control-sm admin-bulk-extra admin-bulk-tags-select" name="bulk_tag_ids" id="bulk-tags" aria-label="Bulk tags" multiple disabled hidden>

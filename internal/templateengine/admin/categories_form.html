@@ -37,9 +37,7 @@
               <select class="admin-form-control" name="parent_id">
                 <option value="">None</option>
                 {{range .AllCategories}}
-                {{if ne .CategoryID $.Row.CategoryID}}
-                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.ParentID .CategoryID}}selected{{end}}>{{.Name}}</option>
-                {{end}}
+                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.ParentID .CategoryID}}selected{{end}}>{{.Label}}</option>
                 {{end}}
               </select>
             </div>

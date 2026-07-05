@@ -33,13 +33,14 @@ func migrateLegacyRoleNames(db *gorm.DB, roleByName map[string]models.Role) erro
 		if !ok {
 			continue
 		}
-		var oldRole models.Role
-		if err := db.Where("name = ?", oldName).First(&oldRole).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				continue
-			}
+		var oldRoles []models.Role
+		if err := db.Where("name = ?", oldName).Limit(1).Find(&oldRoles).Error; err != nil {
 			return err
 		}
+		if len(oldRoles) == 0 {
+			continue
+		}
+		oldRole := oldRoles[0]
 		if oldRole.RoleID == newRole.RoleID {
 			continue
 		}
@@ -86,17 +87,17 @@ func reassignRoleReferences(db *gorm.DB, oldID, newID uint) error {
 	if err := db.Where("role_id = ?", oldID).Delete(&models.RolePermission{}).Error; err != nil {
 		return err
 	}
-	if err := db.Exec(
-		"UPDATE role_inheritance SET parent_role_id = ? WHERE parent_role_id = ?",
-		newID, oldID,
-	).Error; err != nil {
-		return err
-	}
-	if err := db.Exec(
-		"UPDATE role_inheritance SET child_role_id = ? WHERE child_role_id = ?",
-		newID, oldID,
-	).Error; err != nil {
-		return err
+	if db.Migrator().HasTable(&models.RoleInheritance{}) {
+		if err := db.Model(&models.RoleInheritance{}).
+			Where("parent_role_id = ?", oldID).
+			Update("parent_role_id", newID).Error; err != nil {
+			return err
+		}
+		if err := db.Model(&models.RoleInheritance{}).
+			Where("child_role_id = ?", oldID).
+			Update("child_role_id", newID).Error; err != nil {
+			return err
+		}
 	}
 	return nil
 }

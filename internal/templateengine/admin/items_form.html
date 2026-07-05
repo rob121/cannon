@@ -184,20 +184,25 @@
           <div class="admin-sidebar-fields">
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="item-status">Status</label>
+              {{if eq .Row.Status "trashed"}}
+              <input class="admin-form-control" id="item-status" value="Trashed" disabled>
+              <input type="hidden" name="status" value="trashed">
+              <p class="admin-form-help mb-0">Restore this item from the <a href="/admin/trash" data-turbo-frame="_top">Trash</a> page.</p>
+              {{else}}
               <select class="admin-form-control" id="item-status" name="status">
                 <option value="draft" {{if eq .Row.Status "draft"}}selected{{end}}>Draft</option>
                 <option value="pending" {{if eq .Row.Status "pending"}}selected{{end}}>Pending Review</option>
                 <option value="published" {{if eq .Row.Status "published"}}selected{{end}}>Published</option>
                 <option value="archived" {{if eq .Row.Status "archived"}}selected{{end}}>Archived</option>
-                <option value="trashed" {{if eq .Row.Status "trashed"}}selected{{end}}>Trashed</option>
               </select>
+              {{end}}
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="item-category">Category</label>
               <select class="admin-form-control" id="item-category" name="category_id">
                 <option value="">None</option>
                 {{range .Categories}}
-                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.CategoryID .CategoryID}}selected{{end}}>{{.Name}}</option>
+                <option value="{{.CategoryID}}" {{if uintPtrEq $.Row.CategoryID .CategoryID}}selected{{end}}>{{.Label}}</option>
                 {{end}}
               </select>
             </div>

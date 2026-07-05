@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/models"
@@ -14,6 +15,7 @@ const categoriesBase = "/admin/categories"
 
 type categoryListRow struct {
 	models.Category
+	Depth       int
 	CanMoveUp   bool
 	CanMoveDown bool
 }
@@ -46,24 +48,60 @@ func (h *Handler) categories(w http.ResponseWriter, r *http.Request, path string
 func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
-	var total int64
-	db.Model(&models.Category{}).Count(&total)
-	data := listPage(r, page, total, categoriesBase,
+	sortParam := strings.TrimSpace(r.URL.Query().Get("sort"))
+	useTreeOrder := sortParam == "" || sortParam == "sort"
+
+	data := listPage(r, page, 0, categoriesBase,
 		"Organize items into nested categories.",
 		"Add Category", map[string]any{"ActiveNav": "categories"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "slug": "slug", "sort": "sort", "status": "status",
 	}, "sort")
-	var rows []models.Category
-	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
 	var ordered []models.Category
-	db.Order("sort asc, category_id asc").Find(&ordered)
+	if err := db.Order("sort asc, category_id asc").Find(&ordered).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	sortPos := categorySortPositions(ordered)
+
+	depthByID := make(map[uint]int, len(ordered))
+	flat := content.FlattenCategoryOptions(ordered)
+	for _, opt := range flat {
+		depthByID[opt.CategoryID] = opt.Depth
+	}
+
+	var rows []models.Category
+	if useTreeOrder {
+		rows = make([]models.Category, 0, len(flat))
+		for _, opt := range flat {
+			rows = append(rows, opt.Category)
+		}
+		data["Total"] = int64(len(rows))
+		data["Page"] = 1
+	} else {
+		var total int64
+		if err := db.Model(&models.Category{}).Count(&total).Error; err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data["Total"] = total
+		if err := db.Model(&models.Category{}).
+			Offset((page - 1) * pageSizeFor(r)).
+			Limit(pageSizeFor(r)).
+			Order(order + ", category_id asc").
+			Find(&rows).Error; err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	listRows := make([]categoryListRow, 0, len(rows))
 	for _, row := range rows {
-		item := categoryListRow{Category: row}
+		item := categoryListRow{
+			Category: row,
+			Depth:    depthByID[row.CategoryID],
+		}
 		if pos, ok := sortPos[row.CategoryID]; ok {
 			item.CanMoveUp = pos.canMoveUp
 			item.CanMoveDown = pos.canMoveDown
@@ -174,7 +212,7 @@ func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row
 		"AllGroups":       allGroups,
 		"SelectedIDs":     defaultGroupSelectedIDs(db, row.Groups, isNew),
 		"FieldGroups":     fieldGroups,
-		"AllCategories":   allCats,
+		"AllCategories":   content.CategoryParentOptions(allCats, row.CategoryID),
 		"ContentLocales": adminContentLocales(r),
 	})
 	if errMsg != "" {

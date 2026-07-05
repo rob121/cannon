@@ -9,11 +9,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="/admin/assets/admin.css?v=43" rel="stylesheet">
+  <link href="/admin/assets/admin.css?v=48" rel="stylesheet">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-esm.js"></script>
-  <script src="/admin/assets/admin.js?v=27" defer></script>
+  <script src="/admin/assets/admin.js?v=31" defer></script>
 </head>
 <body class="admin-body">
+  <div class="turbo-progress-bar" id="admin-turbo-progress"></div>
   <div class="admin-app">
     <aside class="admin-sidebar">
       <button type="button" class="admin-sidebar-collapse" id="admin-sidebar-toggle" aria-pressed="false" title="Collapse Sidebar">
@@ -31,7 +32,6 @@
         </a>
         {{end}}
         {{if .NavContentVisible}}
-        <div class="admin-nav-label">Content</div>
         <div class="admin-nav-group{{if .NavContentOpen}} open{{end}}" id="nav-content-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavContentOpen}} active{{end}}" aria-expanded="{{if .NavContentOpen}}true{{else}}false{{end}}">
             <i class="bi bi-journal-richtext"></i>
@@ -132,30 +132,21 @@
         {{end}}
         {{if .NavAPIVisible}}
         <div class="admin-nav-label">API</div>
-        <div class="admin-nav-group{{if .NavAPIOpen}} open{{end}}" id="nav-api-group">
-          <button type="button" class="admin-nav-group-toggle{{if .NavAPIOpen}} active{{end}}" aria-expanded="{{if .NavAPIOpen}}true{{else}}false{{end}}">
-            <i class="bi bi-braces"></i>
-            <span>Headless API</span>
-            <i class="bi bi-chevron-down admin-nav-chevron"></i>
-          </button>
-          <div class="admin-nav-sub">
-            {{if index .NavCan "api_credentials"}}
-            <a class="admin-nav-sublink{{if eq .ActiveNav "api_credentials"}} active{{end}}" href="/admin/api/credentials" data-turbo-frame="_top">
-              <span>Credentials</span>
-            </a>
-            {{end}}
-            {{if index .NavCan "api_settings"}}
-            <a class="admin-nav-sublink{{if eq .ActiveNav "api_settings"}} active{{end}}" href="/admin/api/settings" data-turbo-frame="_top">
-              <span>Settings</span>
-            </a>
-            {{end}}
-            {{if index .NavCan "api_credentials"}}
-            <a class="admin-nav-sublink" href="/api/v1/docs" target="_blank" rel="noopener">
-              <span>Documentation</span>
-            </a>
-            {{end}}
-          </div>
-        </div>
+        {{if index .NavCan "api_credentials"}}
+        <a class="admin-nav-link{{if eq .ActiveNav "api_credentials"}} active{{end}}" href="/admin/api/credentials" data-turbo-frame="_top">
+          <i class="bi bi-key"></i><span>Credentials</span>
+        </a>
+        {{end}}
+        {{if index .NavCan "api_settings"}}
+        <a class="admin-nav-link{{if eq .ActiveNav "api_settings"}} active{{end}}" href="/admin/api/settings" data-turbo-frame="_top">
+          <i class="bi bi-sliders"></i><span>Settings</span>
+        </a>
+        {{end}}
+        {{if index .NavCan "api_credentials"}}
+        <a class="admin-nav-link" href="/api/v1/docs" target="_blank" rel="noopener">
+          <i class="bi bi-book"></i><span>Documentation</span>
+        </a>
+        {{end}}
         {{end}}
         {{if or .NavUsersVisible .NavSystemVisible}}
         <div class="admin-nav-label">System</div>
@@ -205,7 +196,7 @@
         <div class="admin-nav-group{{if .NavSystemOpen}} open{{end}}" id="nav-system-group">
           <button type="button" class="admin-nav-group-toggle{{if .NavSystemOpen}} active{{end}}" aria-expanded="{{if .NavSystemOpen}}true{{else}}false{{end}}">
             <i class="bi bi-gear"></i>
-            <span>System</span>
+            <span>Administration</span>
             <i class="bi bi-chevron-down admin-nav-chevron"></i>
           </button>
           <div class="admin-nav-sub">
@@ -262,11 +253,11 @@
           <button type="button" class="admin-topbar-icon-btn admin-topbar-mobile-menu" id="admin-mobile-menu" aria-label="Open Menu">
             <i class="bi bi-list"></i>
           </button>
-          <div class="admin-topbar-search" role="search">
+          <button type="button" class="admin-topbar-search" id="admin-command-open" aria-label="Open quick navigation" aria-haspopup="dialog" aria-controls="admin-command-dialog">
             <i class="bi bi-search"></i>
-            <span class="admin-topbar-search-text">Search anything...</span>
+            <span class="admin-topbar-search-text">Search admin...</span>
             <kbd class="admin-topbar-kbd">⌘K</kbd>
-          </div>
+          </button>
         </div>
         <div class="admin-topbar-end">
           {{if .SiteURL}}
@@ -278,11 +269,29 @@
           {{end}}
           {{if .CurrentUser}}
           <span class="admin-topbar-divider" aria-hidden="true"></span>
-          {{with .CurrentUser}}
-          <a class="admin-topbar-avatar" href="/admin/users/{{.ID}}" data-turbo-frame="_top" title="{{.Username}}">
-            {{initials .GivenName .FamilyName .Username}}
-          </a>
-          {{end}}
+          <div class="admin-topbar-user" id="admin-user-menu">
+            <button type="button" class="admin-topbar-user-btn" id="admin-user-menu-toggle" aria-expanded="false" aria-haspopup="true">
+              <span class="admin-topbar-avatar" title="{{with .CurrentUser}}{{.DisplayName}}{{end}}">
+                {{with .CurrentUser}}{{initials .GivenName .FamilyName .Username}}{{end}}
+              </span>
+              <span class="admin-topbar-user-name">{{with .CurrentUser}}{{.DisplayName}}{{end}}</span>
+              <i class="bi bi-chevron-down admin-topbar-user-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="admin-topbar-user-dropdown" id="admin-user-menu-dropdown" hidden>
+              {{with .CurrentUser}}
+              <div class="admin-topbar-user-meta">
+                <span class="admin-topbar-user-display">{{.DisplayName}}</span>
+                <span class="admin-topbar-user-email">{{.Username}}</span>
+              </div>
+              <a class="admin-topbar-user-link" href="/admin/users/{{.ID}}" data-turbo-frame="_top">
+                <i class="bi bi-person"></i> Your Account
+              </a>
+              {{end}}
+              <a class="admin-topbar-user-link" href="/auth/logout" data-turbo-frame="_top">
+                <i class="bi bi-box-arrow-right"></i> Sign Out
+              </a>
+            </div>
+          </div>
           {{end}}
         </div>
       </header>
@@ -295,6 +304,17 @@
   </div>
   <dialog class="admin-media-picker-dialog" id="media-picker-dialog">
     <turbo-frame id="media-picker-frame"></turbo-frame>
+  </dialog>
+  <dialog class="admin-command-dialog" id="admin-command-dialog" aria-label="Quick navigation">
+    <div class="admin-command-panel">
+      <div class="admin-command-input-wrap">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        <input type="search" class="admin-command-input" id="admin-command-input" placeholder="Jump to a page..." autocomplete="off" spellcheck="false">
+        <kbd class="admin-command-kbd">Esc</kbd>
+      </div>
+      <div class="admin-command-results" id="admin-command-results" role="listbox"></div>
+      <p class="admin-command-hint">Type to filter · <kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>Enter</kbd> open</p>
+    </div>
   </dialog>
 </body>
 </html>

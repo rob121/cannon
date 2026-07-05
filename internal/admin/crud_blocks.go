@@ -274,7 +274,7 @@ func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta bloc
 		"CancelURL":        blocksBase + listQueryFromData(map[string]any{"SpaceFilter": spaceFilter}),
 		"AllGroups":        allGroups,
 		"SelectedIDs":      defaultGroupSelectedIDs(db, row.Groups, isNew),
-		"Categories":       categories,
+		"Categories":       content.FlattenCategoryOptions(categories),
 		"Tags":             tags,
 		"AllMenus":         allMenus,
 		"WrapperTemplates": wrapperTemplates,

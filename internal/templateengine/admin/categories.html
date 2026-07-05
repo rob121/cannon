@@ -14,7 +14,7 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery "Label" .Name)}}</td>
+          <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Name "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery "Current" false)}}</td>
           <td><code class="admin-code">{{.Slug}}</code></td>
           <td>{{template "sort_controls" (dict "Root" $ "ID" .CategoryID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .CategoryID "Status" .Status "ListQuery" $.ListQuery)}}</td>

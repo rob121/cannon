@@ -46,6 +46,17 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			av := asInt(a)
 			return (av + bv - 1) / bv
 		},
+		"intRange": func(n any) []int {
+			count := asInt(n)
+			if count <= 0 {
+				return nil
+			}
+			out := make([]int, count)
+			for i := range out {
+				out[i] = i
+			}
+			return out
+		},
 		"min": func(a, b any) int {
 			av, bv := asInt(a), asInt(b)
 			if av < bv {
