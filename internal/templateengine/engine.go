@@ -26,7 +26,7 @@ import (
 	"github.com/rob121/cannon/internal/user"
 )
 
-//go:embed default/*.html default/error/*.html default/mail/*.html default/partials/auth/*.html default/partials/blocks/*.html default/partials/content/*.html default/partials/error-page.html default/partials/meta-tags.html default/partials/offline-notice.html default/partials/page-header.html default/partials/menu-nav.html default/partials/route-iframe.html default/controllers/*/*.html default/*.css default/*.svg admin/*.html admin/error/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
+//go:embed default/*.html default/error/*.html default/mail/*.html default/partials/auth/*.html default/partials/blocks/*.html default/partials/content/*.html default/partials/error-page.html default/partials/meta-tags.html default/partials/offline-notice.html default/partials/page-header.html default/partials/menu-nav.html default/partials/route-iframe.html default/controllers/*/*.html default/*.css default/*.js default/*.svg admin/*.html admin/error/*.html admin/admin.css admin/admin.js admin/cannon-icon.svg
 var coreFS embed.FS
 
 // BlockRenderer renders named template spaces via extensions.

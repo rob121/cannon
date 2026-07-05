@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/rob121/cannon/internal/cache"
 )
 
 const (
-	SectionGeneral = "general"
-	SectionMail    = "mail"
-	SectionMedia   = "media"
-	SectionSEO     = "seo"
+	SectionGeneral   = "general"
+	SectionMail      = "mail"
+	SectionMedia     = "media"
+	SectionSEO       = "seo"
+	SectionAnalytics = "analytics"
 )
 
 // GlobalBool reads a boolean value from a global configuration section.
@@ -269,6 +272,21 @@ func RobotsTXT(ctx context.Context) (string, error) {
 // AllowAICrawlers reports whether AI crawlers are allowed in robots.txt.
 func AllowAICrawlers(ctx context.Context) (bool, error) {
 	return GlobalBoolDefault(ctx, SectionSEO, "allow_ai_crawlers", true)
+}
+
+// AnalyticsEnabled reports whether live visitor analytics is active.
+func AnalyticsEnabled(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionAnalytics, "enabled", false)
+}
+
+// AnalyticsAuthenticatedOnly reports whether only signed-in users are tracked.
+func AnalyticsAuthenticatedOnly(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionAnalytics, "track_authenticated_only", false)
+}
+
+// MemoryCacheEnabled reports whether domain-level in-memory caches are active.
+func MemoryCacheEnabled(ctx context.Context) (bool, error) {
+	return cache.Enabled(ctx), nil
 }
 
 // Bool coerces a configuration map value to bool.

@@ -100,7 +100,73 @@
       <span class="admin-stat-badge admin-stat-badge-neutral">Configured instances</span>
     </div>
   </div>
+  {{if .RealtimeEnabled}}
+  <div class="admin-stat-card" id="analytics-online-card">
+    <div class="admin-stat-card-top">
+      <span class="admin-stat-label">Visitors Online</span>
+      <span class="admin-stat-icon" aria-hidden="true"><i class="bi bi-activity"></i></span>
+    </div>
+    <div class="admin-stat-value" id="analytics-online-count">{{if .VisitorsOnline}}{{.VisitorsOnline}}{{else}}0{{end}}</div>
+    <div class="admin-stat-foot">
+      <span class="admin-stat-badge admin-stat-badge-success">Live</span>
+      <span class="admin-stat-meta">Real-time presence</span>
+    </div>
+  </div>
+  {{end}}
 </div>
+
+{{if .RealtimeEnabled}}
+<div class="admin-form-card mb-4" id="analytics-realtime-panel">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Live Analytics</h2>
+      <p class="admin-form-card-desc">Visitors currently on the public site, updated over WebSockets.</p>
+    </div>
+  </div>
+  <div class="admin-form-card-body">
+    <script type="application/json" id="cannon-admin-realtime-config">{{.RealtimeConfigJSON}}</script>
+    <div class="row g-3 mb-3">
+      <div class="col-sm-4">
+        <div class="admin-stat-card admin-stat-card-compact">
+          <div class="admin-stat-label">Online Now</div>
+          <div class="admin-stat-value" id="analytics-panel-online">{{if .VisitorsOnline}}{{.VisitorsOnline}}{{else}}0{{end}}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="admin-stat-card admin-stat-card-compact">
+          <div class="admin-stat-label">Signed In</div>
+          <div class="admin-stat-value" id="analytics-panel-auth">{{if .VisitorsAuthenticated}}{{.VisitorsAuthenticated}}{{else}}0{{end}}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="admin-stat-card admin-stat-card-compact">
+          <div class="admin-stat-label">Top Pages</div>
+          <div class="admin-stat-value" id="analytics-panel-pages">{{if .AnalyticsPages}}{{len .AnalyticsPages}}{{else}}0{{end}}</div>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th scope="col">Page</th>
+            <th scope="col" class="text-end">Visitors</th>
+          </tr>
+        </thead>
+        <tbody id="analytics-pages-body">
+          {{if .AnalyticsPages}}
+          {{range .AnalyticsPages}}
+          <tr><td><code class="admin-code">{{.Path}}</code></td><td class="text-end">{{.Count}}</td></tr>
+          {{end}}
+          {{else}}
+          <tr><td colspan="2" class="text-muted">No active visitors</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}
 
 <div class="admin-dashboard-grid">
   <div class="admin-form-card">

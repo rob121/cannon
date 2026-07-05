@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -53,7 +54,7 @@ func toggleModelStatus(db *gorm.DB, id uint, dest any) error {
 	return db.Save(dest).Error
 }
 
-func (h *Handler) postToggleModel(w http.ResponseWriter, r *http.Request, idStr string, dest any, redirectBase string) {
+func (h *Handler) postToggleModel(w http.ResponseWriter, r *http.Request, idStr string, dest any, redirectBase string, after func(context.Context)) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -76,23 +77,28 @@ func (h *Handler) postToggleModel(w http.ResponseWriter, r *http.Request, idStr 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if after != nil {
+		after(r.Context())
+	}
 	redirectList(w, r, redirectBase+listRedirectQuery(r))
 }
 
 func (h *Handler) blockToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Block{}, blocksBase)
+	h.postToggleModel(w, r, idStr, &models.Block{}, blocksBase, invalidateBlocksDataCache)
 }
 
 func (h *Handler) routeToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Route{}, routesBase)
+	h.postToggleModel(w, r, idStr, &models.Route{}, routesBase, invalidateRoutesDataCache)
 }
 
 func (h *Handler) userToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.User{}, usersBase)
+	h.postToggleModel(w, r, idStr, &models.User{}, usersBase, func(ctx context.Context) {
+		invalidateSecurityUserFromRequest(ctx, idStr)
+	})
 }
 
 func (h *Handler) groupToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Group{}, groupsBase)
+	h.postToggleModel(w, r, idStr, &models.Group{}, groupsBase, invalidateGroupsDataCache)
 }
 
 func (h *Handler) roleToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -123,15 +129,15 @@ func (h *Handler) roleToggleStatus(w http.ResponseWriter, r *http.Request, idStr
 		http.Error(w, "system roles cannot be deactivated", http.StatusBadRequest)
 		return
 	}
-	h.postToggleModel(w, r, idStr, &models.Role{}, rolesBase)
+	h.postToggleModel(w, r, idStr, &models.Role{}, rolesBase, invalidateSecuritySiteContext)
 }
 
 func (h *Handler) menuToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Menu{}, menusBase)
+	h.postToggleModel(w, r, idStr, &models.Menu{}, menusBase, nil)
 }
 
 func (h *Handler) authenticatorToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Authenticator{}, authenticatorsBase)
+	h.postToggleModel(w, r, idStr, &models.Authenticator{}, authenticatorsBase, nil)
 }
 
 func (h *Handler) profileFieldToggleStatus(w http.ResponseWriter, r *http.Request, profileIDStr, fieldIDStr string) {

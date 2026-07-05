@@ -2,6 +2,8 @@ package security
 
 import (
 	"sync"
+
+	"github.com/rob121/cannon/internal/cache"
 )
 
 type siteCache struct {
@@ -64,6 +66,7 @@ func InvalidateUser(siteID string, userID uint) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.users, userID)
+	cache.InvalidateViewerGroups(siteID, userID)
 }
 
 // InvalidateSite drops all cached permissions for a site.
@@ -71,11 +74,13 @@ func InvalidateSite(siteID string) {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	delete(siteCaches, siteID)
+	cache.InvalidateGroups(siteID)
 }
 
-// InvalidateAll drops every cached permission set.
+// InvalidateAll drops every cached permission set and domain group lookups.
 func InvalidateAll() {
 	cacheMu.Lock()
 	defer cacheMu.Unlock()
 	siteCaches = map[string]*siteCache{}
+	cache.InvalidateAll()
 }

@@ -1,8 +1,11 @@
 package accesslog
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -300,8 +303,26 @@ func Tail(path string, maxBytes int64) (string, error) {
 // ResponseWriter wraps http.ResponseWriter to capture status and size.
 type ResponseWriter struct {
 	http.ResponseWriter
-	Status int
-	Bytes  int
+	Status   int
+	Bytes    int
+	Hijacked bool
+}
+
+// Hijack delegates to the underlying ResponseWriter when supported.
+func (w *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("accesslog: underlying ResponseWriter does not implement http.Hijacker")
+	}
+	w.Hijacked = true
+	return h.Hijack()
+}
+
+// Flush delegates to the underlying ResponseWriter when supported.
+func (w *ResponseWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 func (w *ResponseWriter) WriteHeader(code int) {

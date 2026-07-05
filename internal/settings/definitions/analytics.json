@@ -1,0 +1,27 @@
+{
+  "title": "Analytics",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "title": "Enable Real-Time Analytics",
+        "default": false,
+        "description": "Track live visitors on the public site using WebSockets (Centrifuge). Shows online users and top pages on the admin dashboard."
+      },
+      "track_authenticated_only": {
+        "type": "boolean",
+        "title": "Track Signed-In Users Only",
+        "default": false,
+        "description": "When enabled, anonymous visitors are not counted and the public tracker does not connect."
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/enabled"},
+      {"type": "Control", "scope": "#/properties/track_authenticated_only"}
+    ]
+  }
+}

@@ -324,6 +324,7 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 		if menuAdded {
 			redirectURL += "&menu_added=1"
 		}
+		invalidateRoutesDataCache(r.Context())
 		redirectList(w, r, redirectURL)
 		return
 	}
@@ -572,6 +573,7 @@ func (h *Handler) routeDelete(w http.ResponseWriter, r *http.Request, idStr stri
 			return
 		}
 	}
+	invalidateRoutesDataCache(r.Context())
 	redirectList(w, r, routesBase)
 }
 
@@ -610,6 +612,7 @@ func (h *Handler) routeMoveSort(w http.ResponseWriter, r *http.Request, idStr st
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateRoutesDataCache(r.Context())
 	redirectList(w, r, routesBase+listRedirectQuery(r))
 }
 

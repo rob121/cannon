@@ -270,7 +270,7 @@ func (h *Handler) categoryDelete(w http.ResponseWriter, r *http.Request, idStr s
 }
 
 func (h *Handler) categoryToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Category{}, categoriesBase)
+	h.postToggleModel(w, r, idStr, &models.Category{}, categoriesBase, nil)
 }
 
 type categorySortPosition struct {

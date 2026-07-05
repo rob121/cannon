@@ -139,7 +139,7 @@ func (h *Handler) contentFieldAction(w http.ResponseWriter, r *http.Request, par
 		return
 	}
 	if len(parts) == 4 && parts[3] == "toggle-status" {
-		h.postToggleModel(w, r, parts[2], &models.ContentField{}, fieldGroupsBase+"/"+strconv.FormatUint(uint64(groupID), 10))
+		h.postToggleModel(w, r, parts[2], &models.ContentField{}, fieldGroupsBase+"/"+strconv.FormatUint(uint64(groupID), 10), nil)
 		return
 	}
 	h.contentFieldForm(w, r, groupID, fieldID)

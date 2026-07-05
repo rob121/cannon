@@ -117,7 +117,6 @@ func (c *Chain) InvalidateLang(site *config.SiteConfig) {
 func (c *Chain) Site(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		rw := &accesslog.ResponseWriter{ResponseWriter: w, Status: http.StatusOK}
 
 		site, err := c.Sites.Resolve(r)
 		if err != nil {
@@ -128,9 +127,24 @@ func (c *Chain) Site(next http.Handler) http.Handler {
 		if level, err := settings.LogLevel(ctx); err == nil {
 			applog.SetLevel(applog.ParseLevel(level))
 		}
+
+		// WebSocket upgrades must reach the origin ResponseWriter (Hijacker).
+		if isWebSocketUpgrade(r) {
+			next.ServeHTTP(w, r.WithContext(ctx))
+			return
+		}
+
+		rw := &accesslog.ResponseWriter{ResponseWriter: w, Status: http.StatusOK}
 		next.ServeHTTP(rw, r.WithContext(ctx))
-		accesslog.Write(site, r, rw.Status, rw.Bytes, time.Since(start))
+		if !rw.Hijacked {
+			accesslog.Write(site, r, rw.Status, rw.Bytes, time.Since(start))
+		}
 	})
+}
+
+func isWebSocketUpgrade(r *http.Request) bool {
+	return strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
+		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
 func (c *Chain) Session(next http.Handler) http.Handler {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/groups"
@@ -60,10 +61,7 @@ func ListForSpace(ctx context.Context, db *gorm.DB, space string) ([]models.Bloc
 		return nil, err
 	}
 
-	var rows []models.Block
-	err = db.Preload("Groups").Where("space = ? AND status = ?", space, models.StatusActive).
-		Order("sort asc, block_id asc").
-		Find(&rows).Error
+	rows, err := cache.BlocksForSpace(ctx, db, space)
 	if err != nil {
 		return nil, err
 	}

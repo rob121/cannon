@@ -987,6 +987,14 @@ body.admin-sidebar-collapsed .admin-main { margin-left: var(--admin-sidebar-coll
   padding-top: 0.125rem;
 }
 
+.admin-stat-card-compact {
+  padding: 0.875rem 1rem;
+}
+
+.admin-stat-card-compact .admin-stat-value {
+  font-size: 1.5rem;
+}
+
 .admin-stat-meta {
   font-size: 0.75rem;
   color: var(--admin-muted-fg);

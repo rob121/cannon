@@ -161,5 +161,5 @@ func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idS
 }
 
 func (h *Handler) notificationToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Notification{}, notificationsBase)
+	h.postToggleModel(w, r, idStr, &models.Notification{}, notificationsBase, nil)
 }

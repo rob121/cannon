@@ -75,6 +75,12 @@
         "enum": ["debug", "info", "warning", "error", "none"],
         "description": "Minimum severity written to the Cannon process log."
       },
+      "memory_cache_enabled": {
+        "type": "boolean",
+        "title": "Enable In-Memory Data Cache",
+        "default": true,
+        "description": "Cache frequently read site data (settings, routes, blocks, groups) in process memory. Disable for debugging or when running multiple Cannon processes against one database."
+      },
       "debug_template_spaces": {
         "type": "boolean",
         "title": "Debug Template Spaces",
@@ -136,6 +142,7 @@
       {"type": "Control", "scope": "#/properties/site_offline"},
       {"type": "Control", "scope": "#/properties/default_list_limit"},
       {"type": "Control", "scope": "#/properties/log_level"},
+      {"type": "Control", "scope": "#/properties/memory_cache_enabled"},
       {"type": "Control", "scope": "#/properties/debug_template_spaces"},
       {"type": "Control", "scope": "#/properties/frontend_theme"},
       {"type": "Control", "scope": "#/properties/admin_theme"},

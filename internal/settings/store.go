@@ -29,11 +29,6 @@ type Store interface {
 
 type dbStore struct{}
 
-// NewStore returns the default database-backed settings store.
-func NewStore() Store {
-	return dbStore{}
-}
-
 func (dbStore) Load(ctx context.Context, scope, section string) (map[string]any, error) {
 	db, err := sites.DB(ctx)
 	if err != nil {

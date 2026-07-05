@@ -185,6 +185,7 @@ func (h *Handler) blockForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, err.Error())
 			return
 		}
+		invalidateBlocksDataCache(r.Context())
 		redirectList(w, r, blocksBase+listRedirectQuery(r))
 		return
 	}
@@ -216,6 +217,7 @@ func (h *Handler) blockDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateBlocksDataCache(r.Context())
 	redirectList(w, r, blocksBase+listRedirectQuery(r))
 }
 
@@ -389,6 +391,7 @@ func (h *Handler) blockMoveSort(w http.ResponseWriter, r *http.Request, idStr st
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateBlocksDataCache(r.Context())
 	redirectList(w, r, blocksBase+listRedirectQuery(r))
 }
 

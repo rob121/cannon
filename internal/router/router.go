@@ -17,6 +17,7 @@ import (
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/hooks"
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/paths"
 	"github.com/rob121/cannon/internal/routemeta"
@@ -258,8 +259,8 @@ func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path string) (model
 		return models.Route{}, false, err
 	}
 
-	var routes []models.Route
-	if err := db.Preload("Groups").Where("status = ?", models.StatusActive).Find(&routes).Error; err != nil {
+	routes, err := cache.ActiveRoutes(ctx, db)
+	if err != nil {
 		return models.Route{}, false, err
 	}
 
@@ -288,8 +289,8 @@ func (d *Dispatcher) noViewableRoutes(ctx context.Context, db *gorm.DB) bool {
 	if err != nil {
 		return false
 	}
-	var routes []models.Route
-	if err := db.Preload("Groups").Where("status = ?", models.StatusActive).Find(&routes).Error; err != nil {
+	routes, err := cache.ActiveRoutes(ctx, db)
+	if err != nil {
 		return false
 	}
 	for _, route := range routes {

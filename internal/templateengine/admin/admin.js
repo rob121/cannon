@@ -1176,6 +1176,7 @@
     initMediaPicker();
     initTemplateBrowser();
     initAccessLogTail();
+    initRealtimeAnalytics();
     initPermissionPicker();
     initTurboProgress();
     initUserMenu();
@@ -1307,6 +1308,129 @@
     }
     refresh();
     resetTimer();
+  }
+
+  function loadExternalScript(src) {
+    return new Promise(function (resolve, reject) {
+      if (document.querySelector('script[data-src="' + src + '"]')) {
+        resolve();
+        return;
+      }
+      var script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.dataset.src = src;
+      script.onload = function () { resolve(); };
+      script.onerror = function () { reject(new Error('script load failed')); };
+      document.head.appendChild(script);
+    });
+  }
+
+  function parseAnalyticsStats(raw) {
+    if (!raw) {
+      return null;
+    }
+    if (typeof raw === 'object' && !(raw instanceof ArrayBuffer) && !(raw instanceof Uint8Array)) {
+      return raw;
+    }
+    var text = raw;
+    if (raw instanceof Uint8Array) {
+      text = new TextDecoder().decode(raw);
+    }
+    if (typeof text !== 'string') {
+      return null;
+    }
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function initRealtimeAnalytics() {
+    var panel = document.getElementById('analytics-realtime-panel');
+    if (!panel || panel.dataset.bound) {
+      return;
+    }
+    var configEl = document.getElementById('cannon-admin-realtime-config');
+    if (!configEl) {
+      return;
+    }
+    var config;
+    try {
+      config = JSON.parse(configEl.textContent || '{}');
+    } catch (err) {
+      return;
+    }
+    if (!config.endpoint || !config.analytics) {
+      return;
+    }
+    panel.dataset.bound = '1';
+
+    function setText(id, value) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.textContent = String(value);
+      }
+    }
+
+    function renderStats(stats) {
+      stats = parseAnalyticsStats(stats);
+      if (!stats) {
+        return;
+      }
+      setText('analytics-online-count', stats.online || 0);
+      setText('analytics-panel-online', stats.online || 0);
+      setText('analytics-panel-auth', stats.authenticated || 0);
+      var pages = Array.isArray(stats.pages) ? stats.pages : [];
+      setText('analytics-panel-pages', pages.length);
+      var body = document.getElementById('analytics-pages-body');
+      if (!body) {
+        return;
+      }
+      if (!pages.length) {
+        body.innerHTML = '<tr><td colspan="2" class="text-muted">No active visitors</td></tr>';
+        return;
+      }
+      body.innerHTML = pages.map(function (row) {
+        var path = row.path || '/';
+        var count = row.count || 0;
+        return '<tr><td><code class="admin-code">' + path.replace(/</g, '&lt;') + '</code></td><td class="text-end">' + count + '</td></tr>';
+      }).join('');
+    }
+
+    function fetchLiveStats() {
+      return fetch('/admin/analytics/live', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (resp) {
+          if (!resp.ok) {
+            throw new Error('analytics fetch failed');
+          }
+          return resp.json();
+        })
+        .then(renderStats)
+        .catch(function () {});
+    }
+
+    fetchLiveStats();
+
+    loadExternalScript('https://cdn.jsdelivr.net/npm/centrifuge@5.2.2/dist/centrifuge.js')
+      .then(function () {
+        if (typeof Centrifuge === 'undefined') {
+          return;
+        }
+        var centrifuge = new Centrifuge(config.endpoint, {});
+        var sub = centrifuge.newSubscription(config.analytics);
+        sub.on('publication', function (ctx) {
+          renderStats(ctx.data);
+        });
+        sub.on('subscribed', fetchLiveStats);
+        centrifuge.connect();
+        sub.subscribe();
+        window.setInterval(fetchLiveStats, 15000);
+      })
+      .catch(function () {
+        window.setInterval(fetchLiveStats, 5000);
+      });
   }
 
   function initTemplateBrowser() {

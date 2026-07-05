@@ -23,6 +23,7 @@ import (
 	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/realtime"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 	"github.com/rob121/cannon/internal/themes"
@@ -33,10 +34,11 @@ type Handler struct {
 	chain    *middleware.Chain
 	activate ActivateFunc
 	reload   ReloadFunc
+	realtime *realtime.Hub
 }
 
-func NewHandler(chain *middleware.Chain, activate ActivateFunc, reload ReloadFunc) *Handler {
-	return &Handler{chain: chain, activate: activate, reload: reload}
+func NewHandler(chain *middleware.Chain, activate ActivateFunc, reload ReloadFunc, hub *realtime.Hub) *Handler {
+	return &Handler{chain: chain, activate: activate, reload: reload, realtime: hub}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +54,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case path == "" || path == "/":
 		h.dashboard(w, r)
+	case strings.HasPrefix(path, "/analytics"):
+		h.analytics(w, r, path)
 	case strings.HasPrefix(path, "/users"):
 		h.users(w, r, path)
 	case strings.HasPrefix(path, "/groups"):

@@ -2,6 +2,8 @@ package user
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,6 +20,7 @@ import (
 )
 
 const sessionUserKey = "user_id"
+const analyticsVisitorKey = "analytics_visitor_id"
 
 var ErrNotAuthenticated = errors.New("not authenticated")
 
@@ -92,6 +95,23 @@ func (s *Service) Current(ctx context.Context) (*models.User, error) {
 func (s *Service) Login(userID uint) error {
 	s.data[sessionUserKey] = userID
 	return s.store.Save(s.id, s.data)
+}
+
+// AnalyticsVisitorID returns a stable anonymous visitor id stored in the session.
+func (s *Service) AnalyticsVisitorID() (string, error) {
+	if v, ok := s.data[analyticsVisitorKey].(string); ok && strings.TrimSpace(v) != "" {
+		return v, nil
+	}
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	id := hex.EncodeToString(buf)
+	s.data[analyticsVisitorKey] = id
+	if err := s.store.Save(s.id, s.data); err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // SessionCSRFToken returns the CSRF token stored in the session, if any.

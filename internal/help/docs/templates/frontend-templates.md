@@ -37,14 +37,34 @@ Most public pages use:
 
 Cannon still requests logical paths like `default/layout.html`; when your theme is active, files are loaded from `{theme}/layout.html` instead of the embed.
 
-Built-in layout excerpt:
+Built-in layout excerpt (include these hook placeholders in custom `layout.html` overrides):
 
 ```html
-<link href="/theme/site.css" rel="stylesheet">
-<main class="container">
-  {{.Main}}
-</main>
+<head>
+  ...
+  <link href="/theme/site.css" rel="stylesheet">
+  {{if .HeadExtra}}{{.HeadExtra}}{{end}}
+</head>
+<body>
+  ...
+  <main>{{.Main}}</main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {{if .BodyEndExtra}}{{.BodyEndExtra}}{{end}}
+</body>
 ```
+
+### Document hooks in layouts
+
+Cannon merges extension and built-in markup into two layout fields:
+
+| Field | Hook | Typical content |
+|-------|------|-----------------|
+| `{{.HeadExtra}}` | `onPrepareDocumentHead` | Extra meta, link, or script tags in `<head>` |
+| `{{.BodyEndExtra}}` | `onPrepareDocumentBody` | Deferred scripts before `</body>` |
+
+**Include both placeholders once** in `layout.html`. You do not add analytics, captcha, or extension scripts manually — Cannon injects them when enabled (for example **Configuration → Analytics → Enable Real-Time Analytics** loads `/theme/site-analytics.js` via `BodyEndExtra`).
+
+SEO **Additional Head Markup** from Configuration → SEO uses the `{{siteHeadExtra}}` partial inside `meta-tags.html`, separate from `HeadExtra`.
 
 ---
 
@@ -58,7 +78,7 @@ mysite/assets/js/app.js     →  /theme/js/app.js
 mysite/assets/logo.png      →  /theme/logo.png
 ```
 
-When **Frontend Theme** is `default` (built-in), `/theme/site.css` serves the embedded default stylesheet. Custom themes override with on-disk files first.
+When **Frontend Theme** is `default` (built-in), `/theme/site.css`, `/theme/site-mfa.js`, and `/theme/site-analytics.js` serve embedded default files. Custom themes override with on-disk files first (under `assets/` or the theme root for built-in parity).
 
 Site media uploads remain under **`/assets/`** from `assets_dir` — separate from theme assets.
 

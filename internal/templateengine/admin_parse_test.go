@@ -33,6 +33,7 @@ func testAdminFuncs() map[string]any {
 		"showRouteTitle":  func() bool { return true },
 		"fieldOptions": func(string) []map[string]string { return nil },
 		"fieldValueContains": func(string, string) bool { return false },
+		"formatBytes":       func(int64) string { return "0 B" },
 	}
 	for k, v := range lang.TestFuncMap() {
 		funcs[k] = v

@@ -15,6 +15,7 @@ import (
 	"github.com/rob121/cannon/internal/admin"
 	"github.com/rob121/cannon/internal/api"
 	"github.com/rob121/cannon/internal/blocks"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/config"
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/groups"
@@ -27,6 +28,7 @@ import (
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/realtime"
 	"github.com/rob121/cannon/internal/roles"
 	"github.com/rob121/cannon/internal/router"
 	"github.com/rob121/cannon/internal/routepath"
@@ -39,11 +41,12 @@ import (
 
 // Server is the main HTTP server.
 type Server struct {
-	cfg   *config.App
-	sites *sites.Manager
-	chain *middleware.Chain
-	mux   *http.ServeMux
-	mu    sync.RWMutex
+	cfg      *config.App
+	sites    *sites.Manager
+	chain    *middleware.Chain
+	mux      *http.ServeMux
+	realtime *realtime.Hub
+	mu       sync.RWMutex
 }
 
 type muxDelegate struct {
@@ -73,9 +76,15 @@ func (s *Server) Activate(cfg *config.App) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cfg = cfg
+	if s.realtime != nil {
+		_ = s.realtime.Shutdown(context.Background())
+		s.realtime = nil
+		realtime.SetHub(nil)
+	}
 	s.sites = nil
 	s.chain = nil
 	s.mux = http.NewServeMux()
+	security.InvalidateAll()
 	return s.activate()
 }
 
@@ -135,17 +144,29 @@ func (s *Server) activate() error {
 		}
 	}
 
+	hub, err := realtime.NewHub()
+	if err != nil {
+		log.Printf("realtime hub: %v", err)
+	} else {
+		s.realtime = hub
+		realtime.SetHub(hub)
+	}
+
 	s.registerRoutes()
 	return nil
 }
 
 func (s *Server) registerRoutes() {
 	loginHandler := s.chain.Site(s.chain.Session(s.chain.CSRF(s.chain.Hooks(s.chain.ExtensionRequest(&admin.LoginHandler{Chain: s.chain})))))
-	adminHandler := s.wrap(admin.NewHandler(s.chain, s.Activate, s.Reload))
+	adminHandler := s.wrap(admin.NewHandler(s.chain, s.Activate, s.Reload, s.realtime))
 
 	s.mux.Handle("/admin/login", loginHandler)
 	s.mux.Handle("/admin", adminHandler)
 	s.mux.Handle("/admin/", adminHandler)
+	if s.realtime != nil {
+		wsStack := s.chain.Site(s.chain.Session(realtime.CredentialsMiddleware(s.realtime.WebSocketHandler())))
+		s.mux.Handle(realtime.WebSocketPath, wsStack)
+	}
 	s.mux.Handle("/assets/", s.wrap(http.StripPrefix("/assets/", s.assetsHandler())))
 	s.mux.Handle("/robots.txt", s.wrap(http.HandlerFunc(s.serveRobotsTXT)))
 	s.mux.Handle("/sitemap.xml", s.wrap(http.HandlerFunc(s.serveSitemapXML)))
@@ -505,6 +526,13 @@ func (s *Server) assetsHandler() http.Handler {
 		}
 		http.FileServer(http.Dir(site.AssetsDir)).ServeHTTP(w, r)
 	})
+}
+
+func requestScheme(r *http.Request) string {
+	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		return "https"
+	}
+	return "http"
 }
 
 // ListenAndServe starts the HTTP server.

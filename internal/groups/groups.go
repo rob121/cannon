@@ -3,6 +3,7 @@ package groups
 import (
 	"context"
 
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
@@ -26,24 +27,14 @@ func UserGroupIDs(ctx context.Context, userID uint) ([]uint, error) {
 	if err != nil {
 		return nil, err
 	}
-	publicID, err := PublicGroupID(db)
+	publicID, err := cache.PublicGroupID(ctx, db)
 	if err != nil {
 		return nil, err
 	}
 	if userID == 0 {
 		return []uint{publicID}, nil
 	}
-	var ids []uint
-	err = db.Model(&models.User{}).
-		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
-		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
-		Where("users.user_id = ? AND users.status = ? AND groups.status = ?",
-			userID, models.StatusActive, models.StatusActive).
-		Pluck("groups.group_id", &ids).Error
-	if err != nil {
-		return nil, err
-	}
-	return ensureContains(ids, publicID), nil
+	return cache.ViewerGroupIDs(ctx, db, userID, viewerGroupIDsForUser)
 }
 
 // UserInAnyGroup reports whether userID belongs to at least one active group in allowed.
@@ -68,22 +59,29 @@ func ViewerGroupIDs(ctx context.Context) ([]uint, error) {
 	if err != nil {
 		return nil, err
 	}
-	publicID, err := PublicGroupID(db)
-	if err != nil {
-		return nil, err
-	}
 
 	svc, err := user.FromContext(ctx)
 	if err != nil {
+		publicID, err := cache.PublicGroupID(ctx, db)
+		if err != nil {
+			return nil, err
+		}
 		return []uint{publicID}, nil
 	}
 	userID, ok := svc.CurrentID()
 	if !ok {
+		publicID, err := cache.PublicGroupID(ctx, db)
+		if err != nil {
+			return nil, err
+		}
 		return []uint{publicID}, nil
 	}
+	return cache.ViewerGroupIDs(ctx, db, userID, viewerGroupIDsForUser)
+}
 
+func viewerGroupIDsForUser(db *gorm.DB, userID uint) ([]uint, error) {
 	var ids []uint
-	err = db.Model(&models.User{}).
+	err := db.Model(&models.User{}).
 		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
 		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
 		Where("users.user_id = ? AND users.status = ? AND groups.status = ?",
@@ -92,7 +90,7 @@ func ViewerGroupIDs(ctx context.Context) ([]uint, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ensureContains(ids, publicID), nil
+	return ids, nil
 }
 
 // CanView reports whether content assigned to contentGroups is visible to viewerGroupIDs.
@@ -129,11 +127,12 @@ func viewerMatchesGroups(viewerGroupIDs, contentIDs []uint) bool {
 
 // PublicGroupID returns the id of the hardcoded public group.
 func PublicGroupID(db *gorm.DB) (uint, error) {
-	var group models.Group
-	if err := db.Where("name = ?", PublicGroupName).First(&group).Error; err != nil {
-		return 0, err
-	}
-	return group.GroupID, nil
+	return PublicGroupIDCtx(context.Background(), db)
+}
+
+// PublicGroupIDCtx returns the public group id, using the site cache when enabled.
+func PublicGroupIDCtx(ctx context.Context, db *gorm.DB) (uint, error) {
+	return cache.PublicGroupID(ctx, db)
 }
 
 // EnsurePublicGroup seeds the hardcoded public group used for content visibility.

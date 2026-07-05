@@ -152,6 +152,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, data m
 	data["PendingItemCount"] = pendingItemCount
 	data["TrashedItemCount"] = trashedCount
 	data["SiteCount"] = len(cfg.Sites)
+	dashboardAnalyticsData(h, r, data)
 	if _, ok := data["Subtitle"]; !ok {
 		data["Subtitle"] = dashboardWelcomeSubtitle(r)
 	}

@@ -220,7 +220,7 @@ Detailed checklist: `.info/TODO_AUTH.md`
 - [~] Basic item search — SQL `LIKE` on title/intro/body
 - [ ] Full-text search — index, relevance ranking, optional Elasticsearch/Solr
 - [ ] Custom field filtering in search (spec: `content.md` §13)
-- [ ] View/analytics-based popularity — today “popular” uses comment count only
+- [~] View/analytics-based popularity — live visitor presence via Centrifuge; page-view history still pending
 
 ---
 
