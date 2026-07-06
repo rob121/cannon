@@ -1,2 +1,30 @@
+# Local site configuration (paths, database DSNs)
 sites.json
-cannon
+
+# Built binary
+/cannon
+
+# Runtime data (when data_root points inside the repo)
+/data/
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Sessions and temp files
+tmp/
+**/sessions/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
