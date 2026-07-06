@@ -1,0 +1,78 @@
+{{template "page_header" .}}
+{{if .Error}}
+<div class="admin-alert admin-alert-error">{{.Error}}</div>
+{{end}}
+<div class="admin-extension-install-grid">
+  <section class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div>
+        <h2 class="admin-form-card-title">Upload From Computer</h2>
+        <p class="admin-form-card-desc">Choose a compiled Cannon extension binary from this machine.</p>
+      </div>
+      <span class="admin-form-card-icon"><i class="bi bi-cloud-arrow-up"></i></span>
+    </div>
+    <form method="post" action="{{.BasePath}}/new" enctype="multipart/form-data" data-turbo="false" class="admin-extension-install-form">
+      {{csrfField}}
+      <input type="hidden" name="source" value="upload">
+      <div class="admin-form-group">
+        <label class="admin-form-label" id="extension-upload-file-label">Extension binary</label>
+        <div class="admin-media-dropzone admin-extension-file-dropzone" id="extension-upload-dropzone">
+          <input class="admin-media-file-input" type="file" name="extension_file" id="extension-upload-file" required aria-labelledby="extension-upload-file-label">
+          <div class="admin-media-dropzone-empty" id="extension-dropzone-empty">
+            <i class="bi bi-puzzle" aria-hidden="true"></i>
+            <p class="admin-media-dropzone-title">Drop binary here</p>
+            <span class="btn-admin-outline btn-admin-sm admin-extension-browse-button"><i class="bi bi-folder2-open"></i> Browse Files</span>
+            <p class="admin-media-dropzone-desc">Compiled Cannon extension executable from this machine</p>
+          </div>
+          <div class="admin-media-dropzone-selected hidden" id="extension-dropzone-selected">
+            <div class="admin-media-selected-icon" id="extension-selected-icon">
+              <i class="bi bi-file-earmark-binary" aria-hidden="true"></i>
+            </div>
+            <div class="admin-media-selected-meta">
+              <div class="admin-media-selected-name" id="extension-selected-name"></div>
+              <div class="admin-media-selected-size" id="extension-selected-size"></div>
+            </div>
+            <button type="button" class="btn-admin-ghost btn-admin-sm" id="extension-clear-file">Change file</button>
+          </div>
+        </div>
+        <p class="admin-form-help">The file name becomes the extension binary name unless you provide one below.</p>
+      </div>
+      <div class="admin-form-group">
+        <label class="admin-form-label" for="extension-upload-name">Binary name</label>
+        <input class="admin-form-control" name="name" id="extension-upload-name" placeholder="cannon-ext-example">
+      </div>
+      <div class="admin-form-actions">
+        <button type="submit" class="btn-admin-primary"><i class="bi bi-cloud-arrow-up"></i> Upload Extension</button>
+        <a class="btn-admin-outline" href="{{.CancelURL}}">Cancel</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div>
+        <h2 class="admin-form-card-title">Install From URL</h2>
+        <p class="admin-form-card-desc">Paste a GitHub repository, release page, manifest URL, release asset, or direct binary endpoint.</p>
+      </div>
+      <span class="admin-form-card-icon"><i class="bi bi-link-45deg"></i></span>
+    </div>
+    <form method="post" action="{{.BasePath}}/new" class="admin-extension-install-form">
+      {{csrfField}}
+      <input type="hidden" name="source" value="url">
+      <div class="admin-form-group">
+        <label class="admin-form-label" for="extension-install-url">Extension URL</label>
+        <input class="admin-form-control" type="url" name="extension_url" id="extension-install-url" placeholder="https://github.com/owner/cannon-ext-demo/releases/tag/v0.1.0" required>
+        <p class="admin-form-help">GitHub release URLs use <code>cannon-extension.json</code> when available; direct URLs are saved as binaries.</p>
+      </div>
+      <div class="admin-form-group">
+        <label class="admin-form-label" for="extension-url-name">Binary name</label>
+        <input class="admin-form-control" name="name" id="extension-url-name" placeholder="Leave empty to use manifest or repository name">
+        <p class="admin-form-help">Only needed for direct binary URLs. Do not paste the release page URL here.</p>
+      </div>
+      <div class="admin-form-actions">
+        <button type="submit" class="btn-admin-primary"><i class="bi bi-download"></i> Install From URL</button>
+        <a class="btn-admin-outline" href="{{.CancelURL}}">Cancel</a>
+      </div>
+    </form>
+  </section>
+</div>

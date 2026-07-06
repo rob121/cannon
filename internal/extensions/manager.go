@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -98,6 +99,9 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 	if err := m.syncDirectory(db); err != nil {
 		return err
 	}
+	if err := m.deactivateMissingBinaries(db); err != nil {
+		return err
+	}
 	var rows []models.Extension
 	if err := db.Where("status = ?", models.StatusActive).Order("sort asc").Find(&rows).Error; err != nil {
 		return err
@@ -107,7 +111,8 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 			continue
 		}
 		if err := m.start(ctx, row); err != nil {
-			return err
+			m.disableFailedExtension(ctx, row.Name, err)
+			continue
 		}
 	}
 	m.startUpdateChecker()
@@ -156,6 +161,49 @@ func (m *Manager) syncDirectory(db *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) deactivateMissingBinaries(db *gorm.DB) error {
+	var rows []models.Extension
+	if err := db.Where("status = ?", models.StatusActive).Find(&rows).Error; err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if _, err := os.Stat(m.binaryPath(row.Name)); err == nil || !os.IsNotExist(err) {
+			continue
+		}
+		m.mu.Lock()
+		m.suppressed[row.Name] = true
+		m.mu.Unlock()
+		if err := db.Model(&models.Extension{}).Where("extension_id = ?", row.ExtensionID).Update("status", models.StatusInactive).Error; err != nil {
+			return err
+		}
+		log.Printf("extension %s auto-disabled: binary not found", row.Name)
+	}
+	return nil
+}
+
+func (m *Manager) disableFailedExtension(ctx context.Context, name string, startErr error) {
+	m.cleanupRuntime(name)
+	m.mu.Lock()
+	m.suppressed[name] = true
+	m.mu.Unlock()
+	if db, err := sites.DB(ctx); err == nil {
+		_ = db.Model(&models.Extension{}).Where("name = ?", name).Update("status", models.StatusInactive).Error
+	}
+	log.Printf("extension %s auto-disabled: %v", name, startErr)
+}
+
+func (m *Manager) cleanupRuntime(name string) {
+	m.mu.Lock()
+	rt, ok := m.runtimes[name]
+	if ok {
+		delete(m.runtimes, name)
+	}
+	m.mu.Unlock()
+	if ok && rt.cmd != nil && rt.cmd.Process != nil && rt.cmd.ProcessState == nil {
+		_ = rt.cmd.Process.Kill()
+	}
 }
 
 func (m *Manager) socketPath(name string) string {
@@ -556,7 +604,11 @@ func (m *Manager) Start(ctx context.Context, row models.Extension) error {
 	m.mu.Lock()
 	delete(m.suppressed, row.Name)
 	m.mu.Unlock()
-	return m.start(ctx, row)
+	if err := m.start(ctx, row); err != nil {
+		m.disableFailedExtension(ctx, row.Name, err)
+		return err
+	}
+	return nil
 }
 
 // Install runs POST /install for an extension that has not been marked installed yet.

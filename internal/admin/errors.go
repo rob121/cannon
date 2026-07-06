@@ -32,11 +32,13 @@ func (h *Handler) renderError(w http.ResponseWriter, r *http.Request, status int
 		"ErrorIcon":    errorIconForStatus(status),
 		"BackURL":      backURL,
 	}
+	h.enrichLayoutData(r, data)
 	eng, err := h.engine(r, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	eng.SetHookContext(r.Context())
 	defer eng.SetHookContext(nil)
 	if err := eng.RenderAdminError(w, status, data); err != nil {

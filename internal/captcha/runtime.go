@@ -48,6 +48,13 @@ func ExpandHTML(ctx context.Context, body string) (string, error) {
 	if !ok || mgr == nil {
 		return stripPlaceholders(body), nil
 	}
+	active, err := settings.CaptchaActiveExtension(ctx)
+	if err != nil {
+		return body, err
+	}
+	if name := strings.TrimSpace(active); name != "" && !mgr.CaptchaExtensionAvailable(name) {
+		return stripPlaceholders(body), nil
+	}
 	r, ok := httpreq.FromContext(ctx)
 	if !ok || r == nil {
 		return body, fmt.Errorf("captcha expand: request missing from context")
@@ -66,7 +73,7 @@ func ExpandHTML(ctx context.Context, body string) (string, error) {
 		}
 		extName, err := mgr.ResolveCaptchaExtension(ctx, provider)
 		if err != nil {
-			return `<p class="text-danger small mb-0">Captcha is unavailable.</p>`
+			return ""
 		}
 		render, err := mgr.InvokeCaptchaRender(ctx, extName, contextName, attrs["action"], r, userCtx)
 		if err != nil {
@@ -218,7 +225,15 @@ func Required(ctx context.Context, formContext string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return strings.TrimSpace(name) != "", nil
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false, nil
+	}
+	mgr, ok := extensions.FromContext(ctx)
+	if !ok || mgr == nil {
+		return false, nil
+	}
+	return mgr.CaptchaExtensionAvailable(name), nil
 }
 
 // VerifySubmit validates captcha for a protected form submission.

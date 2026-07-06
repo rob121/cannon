@@ -2,12 +2,17 @@ package admin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
+	pathpkg "path"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/models"
@@ -61,6 +66,8 @@ func (h *Handler) extensions(w http.ResponseWriter, r *http.Request, path string
 	switch {
 	case len(parts) == 0:
 		h.extensionList(w, r)
+	case len(parts) == 1 && parts[0] == "new":
+		h.extensionNew(w, r)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.extensionDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "restart":
@@ -83,6 +90,10 @@ func (h *Handler) extensions(w http.ResponseWriter, r *http.Request, path string
 	case len(parts) == 2 && parts[1] == "update":
 		h.extensionAction(w, r, parts[0], func(ctx context.Context, extMgr *extensions.Manager, row models.Extension) error {
 			return extMgr.Update(ctx, row)
+		})
+	case len(parts) == 2 && parts[1] == "check-update":
+		h.extensionAction(w, r, parts[0], func(ctx context.Context, extMgr *extensions.Manager, row models.Extension) error {
+			return extMgr.CheckExtensionUpdate(ctx, row)
 		})
 	case len(parts) == 2 && parts[1] == "move-up":
 		h.extensionMoveSort(w, r, parts[0], -1)
@@ -114,7 +125,7 @@ func (h *Handler) extensionList(w http.ResponseWriter, r *http.Request) {
 	db.Model(&models.Extension{}).Count(&total)
 	data := listPage(r, page, total, extensionsBase,
 		"Installed extension processes and their status.",
-		"", map[string]any{"ActiveNav": "extension_registry"})
+		"Add Extension", map[string]any{"ActiveNav": "extension_registry"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status", "installed": "installed", "sort": "sort",
 	}, "sort")
@@ -143,6 +154,322 @@ func (h *Handler) extensionList(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Rows"] = listRows
 	h.render(w, r, "Extensions", "admin/extensions.html", data)
+}
+
+func (h *Handler) extensionNew(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		row, err := h.saveNewExtension(r)
+		if err != nil {
+			h.renderExtensionNew(w, r, err.Error())
+			return
+		}
+		redirectList(w, r, extensionEditURL(row.ExtensionID))
+		return
+	}
+	h.renderExtensionNew(w, r, "")
+}
+
+func (h *Handler) renderExtensionNew(w http.ResponseWriter, r *http.Request, errMsg string) {
+	data := formData(map[string]any{
+		"ActiveNav": "extension_registry",
+		"Title":     "Add Extension",
+		"Subtitle":  "Upload a local extension binary or install one from a release URL.",
+		"BasePath":  extensionsBase,
+		"ListURL":   extensionsBase,
+		"CancelURL": extensionsBase,
+	})
+	if errMsg != "" {
+		data["Error"] = errMsg
+	}
+	h.render(w, r, "Add Extension", "admin/extensions_new.html", data)
+}
+
+func (h *Handler) saveNewExtension(r *http.Request) (models.Extension, error) {
+	site, _ := sites.FromContext(r.Context())
+	extMgr := h.chain.Extensions(site)
+	if strings.HasPrefix(strings.ToLower(r.Header.Get("Content-Type")), "multipart/") {
+		if err := r.ParseMultipartForm(extensions.MaxExtensionBinaryBytes + (1 << 20)); err != nil {
+			return models.Extension{}, err
+		}
+	} else if err := r.ParseForm(); err != nil {
+		return models.Extension{}, err
+	}
+	if formString(r, "source") == "url" {
+		return h.saveExtensionFromURL(r.Context(), extMgr, formString(r, "extension_url"), formString(r, "name"))
+	}
+	file, header, err := r.FormFile("extension_file")
+	if err != nil {
+		return models.Extension{}, fmt.Errorf("choose an extension binary to upload")
+	}
+	defer file.Close()
+	name := formString(r, "name")
+	if name == "" && header != nil {
+		name = header.Filename
+	}
+	return extMgr.SaveBinary(r.Context(), extensions.SaveBinaryOptions{
+		Name:   name,
+		Source: file,
+	})
+}
+
+type extensionDownloadManifest struct {
+	Name          string                            `json:"name"`
+	Version       string                            `json:"version"`
+	LatestVersion string                            `json:"latest_version"`
+	TagName       string                            `json:"tag_name"`
+	AssetURL      string                            `json:"asset_url"`
+	SHA256        string                            `json:"sha256"`
+	Assets        map[string]extensionManifestAsset `json:"assets"`
+}
+
+type extensionManifestAsset struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+}
+
+func (h *Handler) saveExtensionFromURL(ctx context.Context, extMgr *extensions.Manager, rawURL, nameOverride string) (models.Extension, error) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return models.Extension{}, fmt.Errorf("extension URL is required")
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return models.Extension{}, fmt.Errorf("enter a valid http or https URL")
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return models.Extension{}, fmt.Errorf("extension URL must use http or https")
+	}
+
+	manifestURL, updateBase, ok := extensionManifestURL(rawURL)
+	if ok {
+		manifest, err := fetchExtensionManifest(manifestURL)
+		if err != nil {
+			return models.Extension{}, err
+		}
+		asset := selectExtensionManifestAsset(manifest)
+		if strings.TrimSpace(asset.URL) == "" {
+			return models.Extension{}, fmt.Errorf("release manifest does not include a binary for %s_%s", runtime.GOOS, runtime.GOARCH)
+		}
+		name, err := resolveExtensionInstallName(nameOverride, rawURL, manifest.Name, asset.URL)
+		if err != nil {
+			return models.Extension{}, err
+		}
+		version := firstNonEmpty(manifest.Version, manifest.LatestVersion, manifest.TagName)
+		return downloadAndSaveExtension(ctx, extMgr, asset.URL, name, asset.SHA256, updateBase, version)
+	}
+	updateBase = githubUpdateBase(rawURL)
+	name, err := resolveExtensionInstallName(nameOverride, rawURL, "", rawURL)
+	if err != nil {
+		return models.Extension{}, err
+	}
+	return downloadAndSaveExtension(ctx, extMgr, rawURL, name, "", updateBase, "")
+}
+
+func fetchExtensionManifest(manifestURL string) (extensionDownloadManifest, error) {
+	resp, err := extensionHTTPClient.Get(manifestURL)
+	if err != nil {
+		return extensionDownloadManifest{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return extensionDownloadManifest{}, fmt.Errorf("download manifest: status %d", resp.StatusCode)
+	}
+	var manifest extensionDownloadManifest
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&manifest); err != nil {
+		return extensionDownloadManifest{}, err
+	}
+	return manifest, nil
+}
+
+func downloadAndSaveExtension(ctx context.Context, extMgr *extensions.Manager, downloadURL, name, sha256, updateBase, latestVersion string) (models.Extension, error) {
+	resp, err := extensionHTTPClient.Get(downloadURL)
+	if err != nil {
+		return models.Extension{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		return models.Extension{}, fmt.Errorf("download extension: status %d", resp.StatusCode)
+	}
+	return extMgr.SaveBinary(ctx, extensions.SaveBinaryOptions{
+		Name:          name,
+		Source:        resp.Body,
+		SHA256:        sha256,
+		UpdateURLBase: updateBase,
+		LatestVersion: latestVersion,
+	})
+}
+
+var extensionHTTPClient = &http.Client{Timeout: 2 * time.Minute}
+
+func extensionManifestURL(rawURL string) (manifestURL, updateBase string, ok bool) {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(u.Host, "github.com") {
+		if strings.HasSuffix(pathpkg.Base(u.Path), "cannon-extension.json") {
+			return rawURL, "", true
+		}
+		return "", "", false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return "", "", false
+	}
+	owner, repo := parts[0], parts[1]
+	updateBase = "https://github.com/" + pathpkg.Join(owner, repo, "releases", "download")
+	if len(parts) >= 5 && parts[2] == "releases" && parts[3] == "tag" {
+		return updateBase + "/" + parts[4] + "/cannon-extension.json", updateBase, true
+	}
+	if len(parts) >= 4 && parts[2] == "releases" && parts[3] == "latest" {
+		return githubLatestManifestURL(owner, repo), updateBase, true
+	}
+	if len(parts) >= 6 && parts[2] == "releases" && parts[3] == "download" && pathpkg.Base(u.Path) == "cannon-extension.json" {
+		return rawURL, updateBase, true
+	}
+	if len(parts) == 2 {
+		return githubLatestManifestURL(owner, repo), updateBase, true
+	}
+	return "", "", false
+}
+
+func githubLatestManifestURL(owner, repo string) string {
+	return "https://github.com/" + pathpkg.Join(owner, repo, "releases", "latest", "download", "cannon-extension.json")
+}
+
+func githubUpdateBase(rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(u.Host, "github.com") {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) >= 4 && parts[2] == "releases" && parts[3] == "download" {
+		return "https://github.com/" + pathpkg.Join(parts[0], parts[1], "releases", "download")
+	}
+	return ""
+}
+
+func selectExtensionManifestAsset(manifest extensionDownloadManifest) extensionManifestAsset {
+	for _, key := range []string{
+		runtime.GOOS + "_" + runtime.GOARCH,
+		runtime.GOOS + "-" + runtime.GOARCH,
+		manifest.Name + "_" + runtime.GOOS + "_" + runtime.GOARCH,
+		manifest.Name + "-" + runtime.GOOS + "-" + runtime.GOARCH,
+		manifest.Name,
+	} {
+		if asset, ok := manifest.Assets[key]; ok && strings.TrimSpace(asset.URL) != "" {
+			return asset
+		}
+	}
+	if strings.TrimSpace(manifest.AssetURL) != "" {
+		return extensionManifestAsset{URL: manifest.AssetURL, SHA256: manifest.SHA256}
+	}
+	return extensionManifestAsset{}
+}
+
+func extensionNameFromURL(rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	return pathpkg.Base(u.Path)
+}
+
+func resolveExtensionInstallName(nameOverride, sourceURL, manifestName, assetURL string) (string, error) {
+	var rejected string
+	for _, candidate := range extensionInstallNameCandidates(nameOverride, sourceURL, manifestName, assetURL) {
+		name, err := extensions.NormalizeBinaryName(candidate)
+		if err == nil {
+			return name, nil
+		}
+		if rejected == "" && strings.TrimSpace(candidate) != "" {
+			rejected = strings.TrimSpace(candidate)
+		}
+	}
+	if rejected != "" {
+		return "", fmt.Errorf("binary name %q is invalid; use only letters, numbers, dots, underscores, and hyphens, or leave Binary name empty for GitHub releases", rejected)
+	}
+	return "", fmt.Errorf("could not determine extension binary name; leave Binary name empty for GitHub releases")
+}
+
+func extensionInstallNameCandidates(nameOverride, sourceURL, manifestName, assetURL string) []string {
+	seen := make(map[string]struct{}, 6)
+	add := func(values *[]string, raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		if _, ok := seen[raw]; ok {
+			return
+		}
+		seen[raw] = struct{}{}
+		*values = append(*values, raw)
+	}
+	var out []string
+	add(&out, sanitizedNameOverride(nameOverride))
+	add(&out, manifestName)
+	add(&out, githubRepoName(sourceURL))
+	if asset := extensionNameFromURL(assetURL); asset != "" {
+		add(&out, stripPlatformSuffix(asset))
+		add(&out, asset)
+	}
+	if direct := extensionNameFromURL(sourceURL); direct != "" && !looksLikeReleaseTag(direct) {
+		add(&out, stripPlatformSuffix(direct))
+		add(&out, direct)
+	}
+	return out
+}
+
+func githubRepoName(rawURL string) string {
+	u, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !strings.EqualFold(u.Host, "github.com") {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return ""
+	}
+	return parts[1]
+}
+
+func sanitizedNameOverride(override string) string {
+	override = strings.TrimSpace(override)
+	if override == "" {
+		return ""
+	}
+	if strings.Contains(override, "://") {
+		if repo := githubRepoName(override); repo != "" {
+			return repo
+		}
+		return ""
+	}
+	if strings.Contains(override, "/") {
+		return ""
+	}
+	return override
+}
+
+func looksLikeReleaseTag(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	if strings.EqualFold(name, "latest") || strings.EqualFold(name, "download") {
+		return true
+	}
+	return strings.HasPrefix(name, "v") && strings.ContainsAny(name, "0123456789")
+}
+
+func stripPlatformSuffix(name string) string {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	for _, suffix := range []string{
+		"-darwin_arm64", "-darwin_amd64", "-linux_arm64", "-linux_amd64",
+		"-windows_arm64", "-windows_amd64", "-freebsd_amd64", "-openbsd_amd64",
+		"_darwin_arm64", "_darwin_amd64", "_linux_arm64", "_linux_amd64",
+		"_windows_arm64", "_windows_amd64",
+	} {
+		if strings.HasSuffix(lower, suffix) {
+			return name[:len(name)-len(suffix)]
+		}
+	}
+	return name
 }
 
 func (h *Handler) extensionForm(w http.ResponseWriter, r *http.Request, id uint) {

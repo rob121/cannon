@@ -220,18 +220,13 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 	})), nil
 }
 
-func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page string, data map[string]any) {
+func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
 	if data == nil {
-		data = map[string]any{}
-	}
-	data["Title"] = title
-	if _, ok := data["ActiveNav"]; !ok {
-		data["ActiveNav"] = strings.ToLower(title)
+		return
 	}
 	for k, v := range layoutContext(r) {
 		data[k] = v
 	}
-	listExtra := listExtraFromData(data)
 	extNav := h.adminExtensionNav(r)
 	data["AdminExtensions"] = extNav
 	data["NavExtensionAppsVisible"] = len(extNav) > 0
@@ -242,6 +237,18 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page str
 		data["NavSystemOpen"] = systemNavOpen(nav)
 		data["NavExtensionAppsOpen"] = extensionAppsNavOpen(nav)
 	}
+}
+
+func (h *Handler) render(w http.ResponseWriter, r *http.Request, title, page string, data map[string]any) {
+	if data == nil {
+		data = map[string]any{}
+	}
+	data["Title"] = title
+	if _, ok := data["ActiveNav"]; !ok {
+		data["ActiveNav"] = strings.ToLower(title)
+	}
+	h.enrichLayoutData(r, data)
+	listExtra := listExtraFromData(data)
 	eng, err := h.engine(r, listExtra)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

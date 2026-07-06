@@ -189,7 +189,7 @@ func (m *Manager) latestUpdateInfo(row models.Extension) (UpdateInfo, error) {
 }
 
 func (m *Manager) fetchUpdateManifest(row models.Extension, base string) (UpdateInfo, error) {
-	manifestURL := base + "/latest/download/" + updateManifestName
+	manifestURL := updateManifestURL(base)
 	resp, err := m.updateClient.Get(manifestURL)
 	if err != nil {
 		return UpdateInfo{}, err
@@ -305,6 +305,18 @@ func githubLatestAPIURL(rawBase string) string {
 		return ""
 	}
 	return "https://api.github.com/repos/" + path.Join(parts[0], parts[1], "releases", "latest")
+}
+
+func updateManifestURL(rawBase string) string {
+	base := strings.TrimRight(strings.TrimSpace(rawBase), "/")
+	u, err := url.Parse(base)
+	if err == nil && strings.EqualFold(u.Host, "github.com") {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) >= 4 && parts[2] == "releases" && parts[3] == "download" {
+			return "https://github.com/" + path.Join(parts[0], parts[1], "releases", "latest", "download", updateManifestName)
+		}
+	}
+	return base + "/latest/download/" + updateManifestName
 }
 
 func newerVersion(latest, current string) bool {

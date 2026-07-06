@@ -30,6 +30,14 @@ func TestGitHubLatestAPIURL(t *testing.T) {
 	}
 }
 
+func TestUpdateManifestURLForGitHubReleaseBase(t *testing.T) {
+	got := updateManifestURL("https://github.com/rob121/cannon-ext-gzip/releases/download")
+	want := "https://github.com/rob121/cannon-ext-gzip/releases/latest/download/cannon-extension.json"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
 func TestFetchUpdateManifest(t *testing.T) {
 	platform := runtime.GOOS + "_" + runtime.GOARCH
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -162,10 +162,18 @@
     {{end}}
   </div>
   <div class="admin-extension-toolbar-actions">
+    {{if .Row.UpdateURLBase}}
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/check-update?redirect=edit" class="admin-inline-form">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline btn-admin-sm admin-extension-check-button">
+        <i class="bi bi-search"></i> Check Now
+      </button>
+    </form>
+    {{end}}
     {{if .Row.UpdateAvailable}}
     <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/update?redirect=edit" class="admin-inline-form" onsubmit="return confirm('Update this extension binary from its configured update source?')">
       {{csrfField}}
-      <button type="submit" class="btn-admin-primary btn-admin-sm">
+      <button type="submit" class="btn-admin-primary btn-admin-sm admin-extension-update-button">
         <i class="bi bi-cloud-arrow-down"></i> Update
       </button>
     </form>
@@ -242,12 +250,22 @@
 {{end}}
 
 {{define "extension_update_cell"}}
-{{if .Row.UpdateAvailable}}
+{{if .Row.UpdateURLBase}}
 <div class="admin-extension-update-cell">
+  {{if .Row.UpdateAvailable}}
   <span class="admin-badge admin-badge-warning"><span class="admin-badge-dot"></span>New Version{{if .Row.LatestVersion}} {{.Row.LatestVersion}}{{end}}</span>
   <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/update{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content" onsubmit="return confirm('Update this extension binary from its configured update source?')">
     {{csrfField}}
-    <button type="submit" class="btn-admin-ghost btn-admin-sm">Update</button>
+    <button type="submit" class="btn-admin-primary btn-admin-sm admin-extension-update-button">Update</button>
+  </form>
+  {{else if .Row.UpdateError}}
+  <span class="admin-badge admin-badge-inactive" title="{{.Row.UpdateError}}"><span class="admin-badge-dot"></span>Check Failed</span>
+  {{else if .Row.LatestVersion}}
+  <span class="admin-capability-none">Latest {{.Row.LatestVersion}}</span>
+  {{end}}
+  <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/check-update{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content">
+    {{csrfField}}
+    <button type="submit" class="btn-admin-outline btn-admin-sm admin-extension-check-button">Check Now</button>
   </form>
 </div>
 {{else if .Row.UpdateError}}

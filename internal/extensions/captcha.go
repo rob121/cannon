@@ -125,15 +125,18 @@ func (m *Manager) ResolveCaptchaExtension(ctx context.Context, provider string) 
 		if name == "" {
 			return "", fmt.Errorf("no active captcha extension configured")
 		}
-		if rt, ok := m.runtime(name); !ok || strings.TrimSpace(rt.Capabilities.Captcha) == "" {
+		if !m.captchaExtensionAvailable(name) {
 			return "", fmt.Errorf("active captcha extension %q is unavailable", name)
 		}
 		return name, nil
 	}
-	if rt, ok := m.runtime(provider); ok && strings.TrimSpace(rt.Capabilities.Captcha) != "" {
+	if m.captchaExtensionAvailable(provider) {
 		return provider, nil
 	}
 	for name, rt := range m.allCaptchaRuntimes() {
+		if !m.IsRunning(name) {
+			continue
+		}
 		if strings.EqualFold(name, provider) {
 			return name, nil
 		}
@@ -162,12 +165,31 @@ func (m *Manager) allCaptchaRuntimes() map[string]*Runtime {
 	return out
 }
 
+// CaptchaExtensionAvailable reports whether a captcha extension is loaded and running.
+func (m *Manager) CaptchaExtensionAvailable(name string) bool {
+	return m.captchaExtensionAvailable(name)
+}
+
+func (m *Manager) captchaExtensionAvailable(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	rt, ok := m.runtime(name)
+	if !ok || strings.TrimSpace(rt.Capabilities.Captcha) == "" {
+		return false
+	}
+	return m.IsRunning(name)
+}
+
 // CaptchaExtensionNames returns sorted extension names that expose the captcha capability.
 func (m *Manager) CaptchaExtensionNames() []string {
 	runtimes := m.allCaptchaRuntimes()
 	names := make([]string, 0, len(runtimes))
 	for name := range runtimes {
-		names = append(names, name)
+		if m.IsRunning(name) {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	return names
