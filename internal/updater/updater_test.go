@@ -59,11 +59,15 @@ func TestClientFetchManifest(t *testing.T) {
 
 func TestClientFetchGitHubLatest(t *testing.T) {
 	assetName := "cannon-" + runtime.GOOS + "_" + runtime.GOARCH
+	decoyName := "cannon-darwin_arm64"
+	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" {
+		decoyName = "cannon-linux_amd64"
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{
 			"tag_name": "v0.3.0",
 			"assets": [
-				{"name": "cannon-linux_amd64", "browser_download_url": "http://example.test/linux"},
+				{"name": "` + decoyName + `", "browser_download_url": "http://example.test/decoy"},
 				{"name": "` + assetName + `", "browser_download_url": "http://example.test/platform", "digest": "sha256:def456"}
 			]
 		}`))
