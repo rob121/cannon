@@ -11,6 +11,8 @@ import (
 
 const ConfigName = "sites"
 
+const configEnv = "CANNON_CONFIG"
+
 // UpdateConfig holds Cannon application update settings.
 type UpdateConfig struct {
 	URLBase string `json:"url_base"`
@@ -67,22 +69,18 @@ func Load() (*App, string, error) {
 	cfg := defaultApp()
 	loadedFrom := ""
 
-	for _, path := range searchPaths() {
-		abs, err := filepath.Abs(path)
-		if err != nil {
+	for _, path := range configSearchPaths() {
+		if _, err := os.Stat(path); err != nil {
 			continue
 		}
-		if _, err := os.Stat(abs); err != nil {
-			continue
-		}
-		raw, err := os.ReadFile(abs)
+		raw, err := os.ReadFile(path)
 		if err != nil {
-			return nil, "", fmt.Errorf("read config %s: %w", abs, err)
+			return nil, "", fmt.Errorf("read config %s: %w", path, err)
 		}
 		if err := json.Unmarshal(raw, cfg); err != nil {
-			return nil, "", fmt.Errorf("parse config %s: %w", abs, err)
+			return nil, "", fmt.Errorf("parse config %s: %w", path, err)
 		}
-		loadedFrom = abs
+		loadedFrom = path
 		break
 	}
 
@@ -165,6 +163,44 @@ func searchPaths() []string {
 	return paths
 }
 
+func configSearchPaths() []string {
+	candidates := []string{}
+	if env := strings.TrimSpace(os.Getenv(configEnv)); env != "" {
+		candidates = append(candidates, env)
+	}
+	candidates = append(candidates, searchPaths()...)
+
+	seen := make(map[string]struct{}, len(candidates))
+	out := make([]string, 0, len(candidates))
+	for _, path := range candidates {
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			continue
+		}
+		if _, ok := seen[abs]; ok {
+			continue
+		}
+		seen[abs] = struct{}{}
+		out = append(out, abs)
+	}
+	return out
+}
+
+func resolveSavePath() (string, error) {
+	if path := ConfigPath(); path != "" {
+		return path, nil
+	}
+	if env := strings.TrimSpace(os.Getenv(configEnv)); env != "" {
+		return filepath.Abs(env)
+	}
+	for _, path := range configSearchPaths() {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+	return filepath.Abs(filepath.Join(".", ConfigName+".json"))
+}
+
 // Get returns the loaded configuration.
 func Get() *App {
 	mu.RLock()
@@ -172,19 +208,29 @@ func Get() *App {
 	return appCfg
 }
 
-// Save writes the configuration to sites.json in the working directory.
+// Save writes the configuration back to the loaded path, or the first existing
+// config file discovered in the search path order.
 func Save(cfg *App) error {
 	applyDefaults(cfg)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	path := filepath.Join(".", ConfigName+".json")
+	path, err := resolveSavePath()
+	if err != nil {
+		return err
+	}
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("create config dir: %w", err)
+		}
+	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("write config: %w", err)
+		return fmt.Errorf("write config %s: %w", path, err)
 	}
 	mu.Lock()
 	appCfg = cfg
+	loadedPath = path
 	mu.Unlock()
 	return nil
 }
