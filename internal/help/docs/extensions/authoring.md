@@ -23,9 +23,10 @@ import "github.com/rob121/cannon/extension"
 
 func main() {
     s := extension.New(extension.Info{
-        Name:    "my-extension",
-        Version: "1.0.0",
-        Title:   "My Extension",
+        Name:          "my-extension",
+        Version:       "1.0.0",
+        Title:         "My Extension",
+        UpdateURLBase: "https://github.com/you/my-extension/releases/download",
     })
     // Register capabilities here…
     s.ListenAndServe()
@@ -50,6 +51,31 @@ The `extension` package registers these automatically:
 | `/help/{slug}` | GET | Markdown help article |
 
 Register only the capabilities your extension implements. Cannon ignores missing handlers.
+
+## Updates
+
+When `UpdateURLBase` is set, Cannon stores it from `/meta`, checks for newer releases on a background ticker, and shows **New Version** plus an Update button in **System → Extensions** when a newer version is available.
+
+For GitHub-hosted extensions, publish a `cannon-extension.json` asset on each release:
+
+```json
+{
+  "name": "my-extension",
+  "version": "1.1.0",
+  "assets": {
+    "darwin_arm64": {
+      "url": "https://github.com/you/my-extension/releases/download/v1.1.0/my-extension-darwin-arm64",
+      "sha256": "..."
+    },
+    "linux_amd64": {
+      "url": "https://github.com/you/my-extension/releases/download/v1.1.0/my-extension-linux-amd64",
+      "sha256": "..."
+    }
+  }
+}
+```
+
+Cannon fetches `{update_url_base}/latest/download/cannon-extension.json`. If that manifest is absent and the base URL is a GitHub releases URL, Cannon falls back to GitHub's latest release API and picks an asset matching the binary name and current platform.
 
 ## Capabilities
 
@@ -338,7 +364,7 @@ List paths from `GET /help`; fetch markdown from `GET /help/{slug}`.
 Run one-time setup with `OnInstall` — create tables, seed configuration, copy assets:
 
 ```go
-info := extension.Info{Name: "cannon-extension-contact"}
+info := extension.Info{Name: "cannon-ext-contact"}
 
 s.OnInstall(func(req extension.WireRequest) error {
     db, _, err := extension.OpenDB()
@@ -369,13 +395,13 @@ SQLite connections use WAL mode, busy timeout, foreign keys, and `MaxOpenConns(1
 Extensions share the site database with Cannon. **Prefix every extension-owned table** so names stay unique. Do not write to Cannon core tables (`users`, `routes`, `extensions`, etc.) unless you are deliberately integrating with core data.
 
 ```go
-info := extension.Info{Name: "cannon-extension-contact"}
+info := extension.Info{Name: "cannon-ext-contact"}
 
 formsTable := extension.TableName(info.TablePrefix(), "forms")
 // => "contact_forms"
 ```
 
-The helpers strip a `cannon-extension-` prefix from the binary name automatically. Create tables in `OnInstall`, keep transactions short (especially on SQLite), and prefer Cannon-owned wire contracts for write-heavy or core CMS workflows.
+The helpers strip a `cannon-ext-` prefix from the binary name automatically. Create tables in `OnInstall`, keep transactions short (especially on SQLite), and prefer Cannon-owned wire contracts for write-heavy or core CMS workflows.
 
 ## Testing locally
 

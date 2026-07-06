@@ -3,6 +3,7 @@ module github.com/rob121/cannon
 go 1.26.4
 
 require (
+	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/TobiEiss/go-jsonforms v1.1.8
 	github.com/centrifugal/centrifuge v0.38.0
@@ -28,7 +29,6 @@ require (
 	github.com/FZambia/eagle v0.2.0 // indirect
 	github.com/Jeffail/gabs/v2 v2.7.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

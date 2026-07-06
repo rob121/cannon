@@ -12,7 +12,7 @@ import (
 
 func TestPublicDataURLAndHandleData(t *testing.T) {
 	const (
-		extName = "cannon-extension-contact"
+		extName = "cannon-ext-contact"
 		siteID  = "example"
 	)
 	hash := extension.RouteHash(extName, siteID)

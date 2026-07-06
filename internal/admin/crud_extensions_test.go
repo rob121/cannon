@@ -23,12 +23,13 @@ func TestExtensionDisplayTitle(t *testing.T) {
 
 func TestMergeExtensionMetaUsesCachedRow(t *testing.T) {
 	meta := mergeExtensionMeta(extensions.MetaSummary{Available: false}, models.Extension{
-		Name:        "demo",
-		Title:       "Demo",
-		Description: "Cached description",
-		Version:     "1.0.0",
+		Name:          "demo",
+		Title:         "Demo",
+		Description:   "Cached description",
+		Version:       "1.0.0",
+		UpdateURLBase: "https://github.com/rob121/demo/releases/download",
 	})
-	if !meta.Available || meta.Description != "Cached description" || meta.Title != "Demo" {
+	if !meta.Available || meta.Description != "Cached description" || meta.Title != "Demo" || meta.UpdateURLBase == "" {
 		t.Fatalf("meta = %+v", meta)
 	}
 }

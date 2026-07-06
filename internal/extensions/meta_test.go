@@ -8,10 +8,10 @@ import (
 func TestMetaUpdateURL(t *testing.T) {
 	meta := Meta{
 		Version:       "0.1.0",
-		UpdateURLBase: "https://github.com/rob121/cannon-extension-contact/releases/download",
+		UpdateURLBase: "https://github.com/rob121/cannon-ext-contact/releases/download",
 	}
 	got := meta.UpdateURL()
-	want := "https://github.com/rob121/cannon-extension-contact/releases/download/0.1.0"
+	want := "https://github.com/rob121/cannon-ext-contact/releases/download/0.1.0"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
 	}

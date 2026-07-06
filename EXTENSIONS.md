@@ -12,6 +12,7 @@ The `github.com/rob121/cannon/extension` package handles socket setup, built-in 
 4. On first start, if the extension is not marked installed, Cannon sends `POST /install` with a wire request payload.
 5. Cannon calls `GET /meta` to populate version and update information in the admin UI.
 6. During requests, Cannon POSTs JSON wire requests to capability handlers (for example `/page`, `/admin`, `/request`).
+7. Cannon periodically checks each cached `update_url_base` for newer extension releases and stores update state in the extension registry.
 
 ## Required and built-in endpoints
 
@@ -25,6 +26,47 @@ The `github.com/rob121/cannon/extension` package handles socket setup, built-in 
 | `/help/{slug}` | GET | Markdown help article |
 
 The `extension` package registers all of these automatically. You only register the capabilities your extension implements.
+
+## Extension Updates
+
+`GET /meta` should include `version` and `update_url_base` when the extension can be updated from a release source:
+
+```json
+{
+  "name": "cannon-ext-gcalendar",
+  "version": "0.1.0",
+  "update_url_base": "https://github.com/rob121/cannon-ext-gcalendar/releases/download"
+}
+```
+
+Cannon stores the base URL, checks for updates on a background ticker, and marks the extension row with a **New Version** flag when the latest release is newer than the installed version. The admin extension list and detail view then show an Update button.
+
+For portable releases, publish a `cannon-extension.json` asset on the latest release. Cannon fetches:
+
+```text
+{update_url_base}/latest/download/cannon-extension.json
+```
+
+Recommended manifest:
+
+```json
+{
+  "name": "cannon-ext-gcalendar",
+  "version": "0.2.0",
+  "assets": {
+    "darwin_arm64": {
+      "url": "https://github.com/rob121/cannon-ext-gcalendar/releases/download/v0.2.0/cannon-ext-gcalendar-darwin-arm64",
+      "sha256": "..."
+    },
+    "linux_amd64": {
+      "url": "https://github.com/rob121/cannon-ext-gcalendar/releases/download/v0.2.0/cannon-ext-gcalendar-linux-amd64",
+      "sha256": "..."
+    }
+  }
+}
+```
+
+If the manifest is not available and `update_url_base` is a GitHub releases URL, Cannon falls back to the GitHub latest release API and picks an asset matching the binary name and current `GOOS`/`GOARCH`. If no asset can be matched, Cannon falls back to `{update_url_base}/{latest_version}/{binary_name}`. When a checksum is present, Cannon verifies it before replacing the local binary.
 
 ## Capabilities
 
@@ -211,8 +253,8 @@ s.HandleData("contact/submit", func(req extension.WireRequest) extension.WireRes
 Helpers:
 
 ```go
-hash := extension.RouteHash("cannon-extension-contact", "example")
-url := extension.PublicDataURL("cannon-extension-contact", "example", "contact/submit")
+hash := extension.RouteHash("cannon-ext-contact", "example")
+url := extension.PublicDataURL("cannon-ext-contact", "example", "contact/submit")
 path := extension.DataPath(req) // "contact/submit"
 ```
 
@@ -276,8 +318,8 @@ Optional **Admin → Routes** entries for friendly URLs:
 
 | Path | Type | Extension | Handler |
 |------|------|-----------|---------|
-| `/contact` | Extension | `cannon-extension-contact` | Page `contact` |
-| `/contact/submit` | Extension Endpoint | `cannon-extension-contact` | Endpoint `submit` |
+| `/contact` | Extension | `cannon-ext-contact` | Page `contact` |
+| `/contact/submit` | Extension Endpoint | `cannon-ext-contact` | Endpoint `submit` |
 
 For most extensions, prefer **`HandleData` + `/ext/{route_hash}/…`** so submit URLs work without creating admin routes. Use **Extension Endpoint** routes when you need a custom public path.
 
@@ -392,7 +434,7 @@ After expansion, `onAfterRender` still runs on the final HTML for optional custo
 
 ```json
 {
-  "id": "cannon-extension-turnstile",
+  "id": "cannon-ext-captcha-cfturnstile",
   "title": "Cloudflare Turnstile",
   "contexts": ["login", "register", "comment", "form"],
   "client": {
@@ -466,7 +508,7 @@ Register on the extension server:
 s.RegisterCaptcha(extension.CaptchaRegistration{
     ProviderInfo: func(req extension.WireRequest) (extension.CaptchaProviderInfo, error) {
         return extension.CaptchaProviderInfo{
-            ID:    "cannon-extension-turnstile",
+            ID:    "cannon-ext-captcha-cfturnstile",
             Title: "Cloudflare Turnstile",
             Contexts: []string{
                 extension.CaptchaContextLogin,
@@ -771,7 +813,7 @@ Extensions can expose settings through `GET` and `POST /configuration` using [JS
 Register a configuration provider on the server:
 
 ```go
-info := extension.Info{Name: "cannon-extension-contact"}
+info := extension.Info{Name: "cannon-ext-contact"}
 settingsTable := extension.TableName(info.TablePrefix(), "settings")
 
 s.OnConfiguration(extension.MapConfiguration([]extension.ConfigurationDefinition{
@@ -887,10 +929,10 @@ SQLite connections use WAL mode, busy timeout, foreign keys, and `MaxOpenConns(1
 
 Extensions share the site database with Cannon. **Prefix every extension-owned table** so names stay unique and clearly owned. Do not write to Cannon core tables (`users`, `routes`, `extensions`, etc.) unless you are deliberately integrating with core data through a documented contract.
 
-Use a short slug derived from the extension name. The helpers strip a `cannon-extension-` prefix automatically:
+Use a short slug derived from the extension name. The helpers strip a `cannon-ext-` prefix automatically:
 
 ```go
-info := extension.Info{Name: "cannon-extension-contact"}
+info := extension.Info{Name: "cannon-ext-contact"}
 
 formsTable := extension.TableName(info.TablePrefix(), "forms")
 // => "contact_forms"
@@ -909,7 +951,7 @@ Guidelines:
 Example install hook:
 
 ```go
-info := extension.Info{Name: "cannon-extension-contact"}
+info := extension.Info{Name: "cannon-ext-contact"}
 
 s.OnInstall(func(req extension.WireRequest) error {
     db, _, err := extension.OpenDB()
@@ -995,7 +1037,7 @@ path, _ := extension.TemplateOverridePath("contact/form.html")
    replace github.com/rob121/cannon => ../cannon
    ```
 
-3. Build a binary named to match the extension (for example `cannon-extension-contact`).
+3. Build a binary named to match the extension (for example `cannon-ext-contact`).
 4. Place the binary in Cannon's extensions directory (configured in `sites.json`).
 5. Register the extension in the admin UI or let Cannon sync it from the directory.
 6. Set status to active; Cannon starts the process and runs `/install` if needed.
@@ -1012,11 +1054,11 @@ rec := httptest.NewRecorder()
 s.Handler().ServeHTTP(rec, req)
 ```
 
-See `extension/server_test.go` and `cannon-extension-contact` for examples.
+See `extension/server_test.go` and `cannon-ext-contact` for examples.
 
 ## Example: contact extension
 
-The [cannon-extension-contact](https://github.com/rob121/cannon-extension-contact) repository demonstrates a page + admin + help extension using this package.
+The [cannon-ext-contact](https://github.com/rob121/cannon-ext-contact) repository demonstrates a page + admin + help extension using this package.
 
 ## Admin integration
 

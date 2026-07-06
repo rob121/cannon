@@ -157,8 +157,19 @@
     {{else}}
     <span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>
     {{end}}
+    {{if .Row.UpdateAvailable}}
+    <span class="admin-badge admin-badge-warning"><span class="admin-badge-dot"></span>New Version{{if .Row.LatestVersion}} {{.Row.LatestVersion}}{{end}}</span>
+    {{end}}
   </div>
   <div class="admin-extension-toolbar-actions">
+    {{if .Row.UpdateAvailable}}
+    <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/update?redirect=edit" class="admin-inline-form" onsubmit="return confirm('Update this extension binary from its configured update source?')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-primary btn-admin-sm">
+        <i class="bi bi-cloud-arrow-down"></i> Update
+      </button>
+    </form>
+    {{end}}
     {{if .HasConfiguration}}
     <a class="btn-admin-primary btn-admin-sm" href="{{.ConfigurationURL}}" data-turbo-frame="_top">
       <i class="bi bi-sliders"></i> Configure
@@ -228,6 +239,22 @@
 
 {{define "extension_sort_controls"}}
 {{template "sort_controls" (dict "Root" .Root "ID" .Row.ExtensionID "CanMoveUp" .Row.CanMoveUp "CanMoveDown" .Row.CanMoveDown)}}
+{{end}}
+
+{{define "extension_update_cell"}}
+{{if .Row.UpdateAvailable}}
+<div class="admin-extension-update-cell">
+  <span class="admin-badge admin-badge-warning"><span class="admin-badge-dot"></span>New Version{{if .Row.LatestVersion}} {{.Row.LatestVersion}}{{end}}</span>
+  <form method="post" action="{{.BasePath}}/{{.Row.ExtensionID}}/update{{listQueryFromData .Root}}" class="admin-inline-form" data-turbo-frame="main-content" onsubmit="return confirm('Update this extension binary from its configured update source?')">
+    {{csrfField}}
+    <button type="submit" class="btn-admin-ghost btn-admin-sm">Update</button>
+  </form>
+</div>
+{{else if .Row.UpdateError}}
+<span class="admin-badge admin-badge-inactive" title="{{.Row.UpdateError}}"><span class="admin-badge-dot"></span>Check Failed</span>
+{{else}}
+<span class="admin-capability-none">—</span>
+{{end}}
 {{end}}
 
 {{define "extension_list_process_cell"}}

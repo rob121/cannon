@@ -80,6 +80,10 @@ func (h *Handler) extensions(w http.ResponseWriter, r *http.Request, path string
 		h.extensionAction(w, r, parts[0], func(ctx context.Context, extMgr *extensions.Manager, row models.Extension) error {
 			return extMgr.Install(ctx, row)
 		})
+	case len(parts) == 2 && parts[1] == "update":
+		h.extensionAction(w, r, parts[0], func(ctx context.Context, extMgr *extensions.Manager, row models.Extension) error {
+			return extMgr.Update(ctx, row)
+		})
 	case len(parts) == 2 && parts[1] == "move-up":
 		h.extensionMoveSort(w, r, parts[0], -1)
 	case len(parts) == 2 && parts[1] == "move-down":
@@ -265,11 +269,13 @@ func mergeExtensionMeta(live extensions.MetaSummary, row models.Extension) exten
 		return live
 	}
 	return extensions.MetaSummary{
-		Available:   row.Title != "" || row.Description != "" || row.Version != "",
-		Title:       row.Title,
-		Description: row.Description,
-		Version:     row.Version,
-		Name:        row.Name,
+		Available:     row.Title != "" || row.Description != "" || row.Version != "" || row.UpdateURLBase != "",
+		Title:         row.Title,
+		Description:   row.Description,
+		Version:       row.Version,
+		Name:          row.Name,
+		UpdateURLBase: row.UpdateURLBase,
+		UpdateURL:     (extensions.Meta{Version: row.Version, UpdateURLBase: row.UpdateURLBase}).UpdateURL(),
 	}
 }
 

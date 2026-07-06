@@ -7,6 +7,7 @@
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Extension")}}
           <th>Description</th>
           <th>Version</th>
+          <th>Update</th>
           {{template "sort_th" (dict "Root" $ "Key" "installed" "Label" "Installed")}}
           <th>Order</th>
           <th>Process</th>
@@ -23,6 +24,7 @@
           </td>
           <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
           <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+          <td>{{template "extension_update_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
           <td>{{template "installed_badge" .Installed}}</td>
           <td>{{template "extension_sort_controls" (dict "Root" $ "Row" .)}}</td>
           <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
@@ -30,7 +32,7 @@
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
         </tr>
         {{else}}
-        <tr><td colspan="8" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-puzzle" "Title" "No extensions yet" "Message" "Install extension processes to add features and integrations.")}}</td></tr>
+        <tr><td colspan="9" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-puzzle" "Title" "No extensions yet" "Message" "Install extension processes to add features and integrations.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

@@ -22,8 +22,8 @@ import (
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/models"
-	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/security"
+	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
@@ -71,19 +71,22 @@ type Runtime struct {
 }
 
 type Manager struct {
-	app        *config.App
-	site       *config.SiteConfig
-	runtimes   map[string]*Runtime
-	suppressed map[string]bool
-	mu         sync.RWMutex
+	app          *config.App
+	site         *config.SiteConfig
+	runtimes     map[string]*Runtime
+	suppressed   map[string]bool
+	updateClient *http.Client
+	updateOnce   sync.Once
+	mu           sync.RWMutex
 }
 
 func NewManager(app *config.App, site *config.SiteConfig) *Manager {
 	return &Manager{
-		app:        app,
-		site:       site,
-		runtimes:   make(map[string]*Runtime),
-		suppressed: make(map[string]bool),
+		app:          app,
+		site:         site,
+		runtimes:     make(map[string]*Runtime),
+		suppressed:   make(map[string]bool),
+		updateClient: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -107,6 +110,7 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 			return err
 		}
 	}
+	m.startUpdateChecker()
 	return nil
 }
 
@@ -273,6 +277,22 @@ func (m *Manager) applyCachedMeta(ctx context.Context, row *models.Extension, me
 	if v := strings.TrimSpace(meta.Version); v != "" && v != strings.TrimSpace(row.Version) {
 		updates["version"] = v
 		row.Version = v
+		if row.LatestVersion != "" && !newerVersion(row.LatestVersion, v) {
+			updates["update_available"] = false
+			updates["update_asset_url"] = ""
+			updates["update_asset_sha256"] = ""
+		}
+	}
+	if v := strings.TrimSpace(meta.UpdateURLBase); v != strings.TrimSpace(row.UpdateURLBase) {
+		updates["update_url_base"] = v
+		row.UpdateURLBase = v
+		if v == "" {
+			updates["update_available"] = false
+			updates["latest_version"] = ""
+			updates["update_asset_url"] = ""
+			updates["update_asset_sha256"] = ""
+			updates["update_error"] = ""
+		}
 	}
 	if len(updates) == 0 {
 		return nil

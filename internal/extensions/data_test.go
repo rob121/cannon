@@ -18,7 +18,7 @@ func TestParseExtensionDataPath(t *testing.T) {
 }
 
 func TestRouteHashMatchesSocketBasename(t *testing.T) {
-	name := "cannon-extension-contact"
+	name := "cannon-ext-contact"
 	siteID := "example"
 	hash := RouteHash(name, siteID)
 	socket := "/tmp/sockets/" + hash + ".sock"

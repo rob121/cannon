@@ -6,9 +6,10 @@ import (
 )
 
 // TablePrefixFromName derives a database table prefix from an extension binary name.
-// For example "cannon-extension-contact" becomes "contact".
+// For example "cannon-ext-contact" becomes "contact".
 func TablePrefixFromName(name string) string {
 	name = strings.TrimSpace(name)
+	name = strings.TrimPrefix(name, "cannon-ext-")
 	name = strings.TrimPrefix(name, "cannon-extension-")
 	return sanitizeTableIdent(name)
 }

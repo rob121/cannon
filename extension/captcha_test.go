@@ -9,7 +9,7 @@ import (
 )
 
 func TestRegisterCaptchaCapability(t *testing.T) {
-	s := New(Info{Name: "cannon-extension-turnstile", Title: "Turnstile", Version: "1"})
+	s := New(Info{Name: "cannon-ext-captcha-cfturnstile", Title: "Turnstile", Version: "1"})
 	s.RegisterCaptcha(CaptchaRegistration{
 		Render: func(req WireRequest) (CaptchaRenderResult, error) {
 			if CaptchaContext(req) != CaptchaContextLogin {
@@ -46,7 +46,7 @@ func TestRegisterCaptchaCapability(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&info); err != nil {
 		t.Fatal(err)
 	}
-	if info.ID != "cannon-extension-turnstile" || info.Title != "Turnstile" {
+	if info.ID != "cannon-ext-captcha-cfturnstile" || info.Title != "Turnstile" {
 		t.Fatalf("info = %#v", info)
 	}
 

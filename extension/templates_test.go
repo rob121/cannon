@@ -13,13 +13,13 @@ import (
 )
 
 func TestTablePrefixFromName(t *testing.T) {
-	if got := extension.TablePrefixFromName("cannon-extension-contact"); got != "contact" {
+	if got := extension.TablePrefixFromName("cannon-ext-contact"); got != "contact" {
 		t.Fatalf("prefix: got %q", got)
 	}
 	if got := extension.TableName("contact", "forms"); got != "contact_forms" {
 		t.Fatalf("table name: got %q", got)
 	}
-	info := extension.Info{Name: "cannon-extension-contact"}
+	info := extension.Info{Name: "cannon-ext-contact"}
 	if got := info.TablePrefix(); got != "contact" {
 		t.Fatalf("info prefix: got %q", got)
 	}

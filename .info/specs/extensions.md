@@ -220,7 +220,7 @@ Register on the extension server with `RegisterCaptcha`. Default socket paths:
 
 ```json
 {
-  "id": "cannon-extension-turnstile",
+  "id": "cannon-ext-captcha-cfturnstile",
   "title": "Cloudflare Turnstile",
   "contexts": ["login", "register", "comment", "form"],
   "client": {
@@ -302,10 +302,33 @@ Each entry when requested should respond as markdown to be rendered and included
 /meta requests should return meta info to be shown in teh admin extensions area ie
 
 {
-  "name": "cannon-extension-contact",
+  "name": "cannon-ext-contact",
   "version": "0.1.0",
-  "update_url_base": "https://github.com/rob121/cannon-extension-contact/releases/download"
+  "update_url_base": "https://github.com/rob121/cannon-ext-contact/releases/download"
 }
+
+Cannon stores `update_url_base` and checks it on a background ticker. If a newer version is found, the extension row is marked with a New Version flag and the admin UI shows an Update button.
+
+Preferred release manifest:
+
+```json
+{
+  "name": "cannon-ext-contact",
+  "version": "0.2.0",
+  "assets": {
+    "darwin_arm64": {
+      "url": "https://github.com/rob121/cannon-ext-contact/releases/download/v0.2.0/cannon-ext-contact-darwin-arm64",
+      "sha256": "..."
+    },
+    "linux_amd64": {
+      "url": "https://github.com/rob121/cannon-ext-contact/releases/download/v0.2.0/cannon-ext-contact-linux-amd64",
+      "sha256": "..."
+    }
+  }
+}
+```
+
+Cannon fetches the manifest from `{update_url_base}/latest/download/cannon-extension.json`. If no manifest exists and the base URL is a GitHub releases URL, Cannon falls back to the GitHub latest release API and picks an asset matching the extension binary name and current `GOOS`/`GOARCH`.
 
 
 

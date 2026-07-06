@@ -71,68 +71,75 @@ type ProfileUserFieldValue struct {
 }
 
 type Extension struct {
-	ExtensionID uint   `gorm:"primaryKey"`
-	Name        string `gorm:"size:128;uniqueIndex;not null"`
-	Title       string `gorm:"size:256"`
-	Description string `gorm:"type:text"`
-	Version     string `gorm:"size:64"`
-	MenuName    string `gorm:"size:128"`
-	Socket      string `gorm:"size:512;not null"`
-	Sort        int    `gorm:"not null;default:0"`
-	Status      Status `gorm:"size:16;not null;default:inactive"`
-	Installed   bool   `gorm:"not null;default:false"`
+	ExtensionID       uint       `gorm:"primaryKey"`
+	Name              string     `gorm:"size:128;uniqueIndex;not null"`
+	Title             string     `gorm:"size:256"`
+	Description       string     `gorm:"type:text"`
+	Version           string     `gorm:"size:64"`
+	UpdateURLBase     string     `gorm:"size:1024"`
+	LatestVersion     string     `gorm:"size:64"`
+	UpdateAvailable   bool       `gorm:"not null;default:false;index"`
+	UpdateAssetURL    string     `gorm:"size:2048"`
+	UpdateAssetSHA256 string     `gorm:"size:128"`
+	UpdateCheckedAt   *time.Time `gorm:"index"`
+	UpdateError       string     `gorm:"type:text"`
+	MenuName          string     `gorm:"size:128"`
+	Socket            string     `gorm:"size:512;not null"`
+	Sort              int        `gorm:"not null;default:0"`
+	Status            Status     `gorm:"size:16;not null;default:inactive"`
+	Installed         bool       `gorm:"not null;default:false"`
 }
 
 type RouteType string
 
 const (
-	RouteTypeURL                RouteType = "Url"
-	RouteTypeExtension          RouteType = "Extension"
-	RouteTypeExtensionEndpoint  RouteType = "Extension Endpoint"
-	RouteTypeLocalFile          RouteType = "Local File"
-	RouteTypeController         RouteType = "Controller"
-	RouteTypeIframe             RouteType = "Iframe"
+	RouteTypeURL               RouteType = "Url"
+	RouteTypeExtension         RouteType = "Extension"
+	RouteTypeExtensionEndpoint RouteType = "Extension Endpoint"
+	RouteTypeLocalFile         RouteType = "Local File"
+	RouteTypeController        RouteType = "Controller"
+	RouteTypeIframe            RouteType = "Iframe"
 )
 
 type Route struct {
-	RouteID       uint      `gorm:"primaryKey"`
-	Name          string    `gorm:"size:128;not null"`
-	Path          string    `gorm:"size:512;uniqueIndex;not null"`
-	Type          RouteType `gorm:"size:32;not null"`
-	Status        Status    `gorm:"size:16;not null;default:active"`
-	Target        string    `gorm:"size:1024"`
-	ExtensionName         string    `gorm:"size:128"`
-	ExtensionPageID       string    `gorm:"size:128"`
-	ExtensionEndpointID   string    `gorm:"size:128"`
-	Metadata              string    `gorm:"type:text"`
-	Controller            string    `gorm:"size:128"`
-	ControllerAction      string    `gorm:"size:128"`
-	IsDefault             bool      `gorm:"not null;default:false;index"`
-	ShowTitle             bool      `gorm:"not null;default:true"`
-	Sort                  int       `gorm:"not null;default:0;index"`
-	Groups                []Group   `gorm:"many2many:route_groups;"`
+	RouteID             uint      `gorm:"primaryKey"`
+	Name                string    `gorm:"size:128;not null"`
+	Path                string    `gorm:"size:512;uniqueIndex;not null"`
+	Type                RouteType `gorm:"size:32;not null"`
+	Status              Status    `gorm:"size:16;not null;default:active"`
+	Target              string    `gorm:"size:1024"`
+	ExtensionName       string    `gorm:"size:128"`
+	ExtensionPageID     string    `gorm:"size:128"`
+	ExtensionEndpointID string    `gorm:"size:128"`
+	Metadata            string    `gorm:"type:text"`
+	Controller          string    `gorm:"size:128"`
+	ControllerAction    string    `gorm:"size:128"`
+	IsDefault           bool      `gorm:"not null;default:false;index"`
+	ShowTitle           bool      `gorm:"not null;default:true"`
+	Sort                int       `gorm:"not null;default:0;index"`
+	Groups              []Group   `gorm:"many2many:route_groups;"`
 }
 
 type Menu struct {
-	MenuID   uint   `gorm:"primaryKey"`
-	MenuName string `gorm:"size:128;uniqueIndex;not null"`
-	Status   Status `gorm:"size:16;not null;default:active"`
+	MenuID   uint       `gorm:"primaryKey"`
+	MenuName string     `gorm:"size:128;uniqueIndex;not null"`
+	Status   Status     `gorm:"size:16;not null;default:active"`
 	Items    []MenuItem `gorm:"foreignKey:MenuID;constraint:-"`
 }
 
 type MenuItem struct {
-	MenuItemID uint   `gorm:"primaryKey"`
-	MenuID     uint   `gorm:"index;not null"`
-	ParentID   *uint  `gorm:"index"`
-	Parent     *MenuItem `gorm:"foreignKey:ParentID;references:MenuItemID;constraint:-"`
+	MenuItemID uint       `gorm:"primaryKey"`
+	MenuID     uint       `gorm:"index;not null"`
+	ParentID   *uint      `gorm:"index"`
+	Parent     *MenuItem  `gorm:"foreignKey:ParentID;references:MenuItemID;constraint:-"`
 	Children   []MenuItem `gorm:"foreignKey:ParentID;constraint:-"`
-	Name       string `gorm:"size:128;not null"`
-	RouteID    *uint  `gorm:"index"`
-	Route      *Route `gorm:"foreignKey:RouteID;references:RouteID;constraint:-"`
-	Class      string `gorm:"size:256"`
-	Target     string `gorm:"size:64"`
-	Sort       int    `gorm:"not null;default:0"`
-	Groups     []Group `gorm:"many2many:menu_item_groups;"`
+	Name       string     `gorm:"size:128;not null"`
+	RouteID    *uint      `gorm:"index"`
+	Route      *Route     `gorm:"foreignKey:RouteID;references:RouteID;constraint:-"`
+	Class      string     `gorm:"size:256"`
+	Target     string     `gorm:"size:64"`
+	Sort       int        `gorm:"not null;default:0"`
+	Groups     []Group    `gorm:"many2many:menu_item_groups;"`
 }
 
 type GroupKind string
@@ -177,15 +184,15 @@ type Setting struct {
 type BlockType string
 
 const (
-	BlockTypeHTML      BlockType = "html"
-	BlockTypeMarkdown  BlockType = "markdown"
-	BlockTypeExtension BlockType = "extension"
-	BlockTypeContent        BlockType = "content"
-	BlockTypeLogin          BlockType = "login"
-	BlockTypeMenuVertical      BlockType = "menu-vertical"
-	BlockTypeMenuHorizontal    BlockType = "menu-horizontal"
-	BlockTypeSearchHorizontal  BlockType = "search-horizontal"
-	BlockTypeSearchVertical    BlockType = "search-vertical"
+	BlockTypeHTML             BlockType = "html"
+	BlockTypeMarkdown         BlockType = "markdown"
+	BlockTypeExtension        BlockType = "extension"
+	BlockTypeContent          BlockType = "content"
+	BlockTypeLogin            BlockType = "login"
+	BlockTypeMenuVertical     BlockType = "menu-vertical"
+	BlockTypeMenuHorizontal   BlockType = "menu-horizontal"
+	BlockTypeSearchHorizontal BlockType = "search-horizontal"
+	BlockTypeSearchVertical   BlockType = "search-vertical"
 )
 
 // Block assigns content to a template space for {{space "space"}} rendering.

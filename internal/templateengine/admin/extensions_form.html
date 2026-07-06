@@ -87,6 +87,27 @@
             <dd><a class="admin-help-article-link" href="{{.Meta.UpdateURL}}" target="_blank" rel="noopener noreferrer">{{.Meta.UpdateURL}}</a></dd>
           </div>
           {{end}}
+          {{if .Row.LatestVersion}}
+          <div class="admin-capability-defaults-item">
+            <dt>Latest Version</dt>
+            <dd>
+              {{.Row.LatestVersion}}
+              {{if .Row.UpdateAvailable}}<span class="admin-badge admin-badge-warning"><span class="admin-badge-dot"></span>New Version</span>{{end}}
+            </dd>
+          </div>
+          {{end}}
+          {{if .Row.UpdateCheckedAt}}
+          <div class="admin-capability-defaults-item">
+            <dt>Last Update Check</dt>
+            <dd>{{.Row.UpdateCheckedAt.Format "Jan 2, 2006 3:04 PM"}}</dd>
+          </div>
+          {{end}}
+          {{if .Row.UpdateError}}
+          <div class="admin-capability-defaults-item">
+            <dt>Update Check Error</dt>
+            <dd>{{.Row.UpdateError}}</dd>
+          </div>
+          {{end}}
         </dl>
         {{else}}
         <div class="admin-empty admin-empty-compact">Extension info is unavailable until the process has started at least once.</div>
