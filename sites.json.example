@@ -1,5 +1,5 @@
 {
-  "install_enabled": true,
+  "install_enabled": false,
   "data_root": "./data",
   "update": {
     "url_base": "https://github.com/rob121/cannon/releases/download"
@@ -12,5 +12,19 @@
     "cookie_name": "cannon_session",
     "max_age": 86400
   },
-  "sites": []
+  "sites": [
+    {
+      "id": "example",
+      "name": "Example",
+      "host": "http://localhost:8001",
+      "database": {
+        "type": "sqlite",
+        "dsn": "./data/example/example.sqlite"
+      },
+      "template_dir": "./data/example/templates",
+      "assets_dir": "./data/example/assets",
+      "tmp_dir": "./data/example/tmp",
+      "language_dir": "./data/example/language"
+    }
+  ]
 }

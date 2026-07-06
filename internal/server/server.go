@@ -455,22 +455,33 @@ func (s *Server) serveThemeAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) serveAdminThemeAsset(w http.ResponseWriter, r *http.Request) {
-	if s.sites == nil {
-		http.NotFound(w, r)
-		return
-	}
-	site, err := s.sites.Resolve(r)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	r = r.WithContext(sites.WithContext(r.Context(), site))
 	name := strings.TrimPrefix(r.URL.Path, "/admin/assets/")
 	name = strings.TrimPrefix(name, "/")
 	if name == "" || strings.Contains(name, "..") {
 		http.NotFound(w, r)
 		return
 	}
+	name = filepath.Base(name)
+
+	// Install mode runs before sites exist; serve embedded admin assets.
+	if s.sites == nil {
+		raw, err := templateengine.AdminAsset(name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", detectContentType(name))
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		_, _ = w.Write(raw)
+		return
+	}
+
+	site, err := s.sites.Resolve(r)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	r = r.WithContext(sites.WithContext(r.Context(), site))
 	theme, err := settings.AdminTheme(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -484,7 +495,7 @@ func (s *Server) serveAdminThemeAsset(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	raw, _, err := templateengine.AdminThemeAsset(site.TemplateDir, theme, filepath.Base(name))
+	raw, _, err := templateengine.AdminThemeAsset(site.TemplateDir, theme, name)
 	if err != nil {
 		http.NotFound(w, r)
 		return
