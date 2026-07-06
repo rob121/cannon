@@ -231,6 +231,11 @@
               <span>Access Log</span>
             </a>
             {{end}}
+            {{if index .NavCan "system_update"}}
+            <a class="admin-nav-sublink{{if eq .ActiveNav "system_update"}} active{{end}}" href="/admin/system/update" data-turbo-frame="_top">
+              <span>Cannon Update</span>
+            </a>
+            {{end}}
           </div>
         </div>
         {{end}}

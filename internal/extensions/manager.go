@@ -25,6 +25,7 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/updater"
 	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
@@ -325,7 +326,7 @@ func (m *Manager) applyCachedMeta(ctx context.Context, row *models.Extension, me
 	if v := strings.TrimSpace(meta.Version); v != "" && v != strings.TrimSpace(row.Version) {
 		updates["version"] = v
 		row.Version = v
-		if row.LatestVersion != "" && !newerVersion(row.LatestVersion, v) {
+		if row.LatestVersion != "" && !updater.NewerVersion(row.LatestVersion, v) {
 			updates["update_available"] = false
 			updates["update_asset_url"] = ""
 			updates["update_asset_sha256"] = ""

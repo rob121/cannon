@@ -10,6 +10,7 @@ import (
 
 	"github.com/rob121/cannon/internal/accesslog"
 	"github.com/rob121/cannon/internal/applog"
+	"github.com/rob121/cannon/internal/appupdate"
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/csrf"
@@ -30,6 +31,7 @@ type localeKey struct{}
 type Chain struct {
 	Sites      *sites.Manager
 	extBySite  map[string]*extensions.Manager
+	appUpdates *appupdate.Manager
 	sessionMap map[string]*session.Store
 	langMap    map[string]*lang.Manager
 	mu         sync.RWMutex
@@ -60,6 +62,16 @@ func (c *Chain) Extensions(site *config.SiteConfig) *extensions.Manager {
 	mgr := extensions.NewManager(c.Sites.Config(), site)
 	c.extBySite[site.ID] = mgr
 	return mgr
+}
+
+func (c *Chain) AppUpdates() *appupdate.Manager {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.appUpdates == nil {
+		c.appUpdates = appupdate.New(c.Sites.Config())
+		c.appUpdates.StartChecker()
+	}
+	return c.appUpdates
 }
 
 func (c *Chain) SessionStore(site *config.SiteConfig) (*session.Store, error) {

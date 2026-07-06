@@ -35,6 +35,7 @@ var navPermissionKeys = map[string]string{
 	"configuration":      "core.admin.configuration.read",
 	"notifications":      "core.admin.notifications.read",
 	"access_log":         "core.admin.system.read",
+	"system_update":      "core.admin.system.read",
 	"help":               "core.admin.help.read",
 	"languages":          "core.admin.languages.read",
 	"api_credentials":    "core.admin.api.read",

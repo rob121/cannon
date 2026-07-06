@@ -13,6 +13,7 @@ import (
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/updater"
 )
 
 const MaxExtensionBinaryBytes int64 = 200 << 20
@@ -62,7 +63,7 @@ func (m *Manager) SaveBinary(ctx context.Context, opts SaveBinaryOptions) (model
 	if n > MaxExtensionBinaryBytes {
 		return models.Extension{}, fmt.Errorf("extension binary exceeds the %d MB limit", MaxExtensionBinaryBytes/(1024*1024))
 	}
-	if expected := normalizeDigest(opts.SHA256); expected != "" {
+	if expected := updater.NormalizeDigest(opts.SHA256); expected != "" {
 		got := hex.EncodeToString(h.Sum(nil))
 		if !strings.EqualFold(got, expected) {
 			return models.Extension{}, fmt.Errorf("sha256 mismatch: got %s, want %s", got, expected)

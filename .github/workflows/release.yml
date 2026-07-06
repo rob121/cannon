@@ -1,0 +1,123 @@
+name: Release Cannon
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version/tag, for example v0.2.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: cannon
+  VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Test
+        run: go test -count=1 ./...
+
+      - name: Build binary
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          platform="$(go env GOOS)_$(go env GOARCH)"
+          asset="${APP_NAME}-${platform}"
+          go build -trimpath \
+            -ldflags="-s -w -X github.com/rob121/cannon/internal/version.Version=${VERSION} -X github.com/rob121/cannon/internal/version.Commit=${GITHUB_SHA}" \
+            -o "dist/${asset}" ./cmd/cannon
+          cd dist
+          shasum -a 256 "${asset}" | awk '{print $1}' > "${asset}.sha256"
+          echo "platform=${platform}" >> "$GITHUB_OUTPUT"
+          echo "asset=${asset}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cannon-${{ steps.build.outputs.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release manifest
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upload
+          find dist -maxdepth 3 -type f -print -exec cp {} upload/ \;
+
+      - name: Author cannon.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const appName = process.env.APP_NAME;
+          const version = process.env.VERSION;
+          const repo = process.env.GITHUB_REPOSITORY;
+          const uploadDir = 'upload';
+          const assets = {};
+
+          for (const file of fs.readdirSync(uploadDir).sort()) {
+            if (file.endsWith('.sha256')) continue;
+            if (!file.startsWith(`${appName}-`)) continue;
+            const platform = file.slice(appName.length + 1);
+            const shaPath = path.join(uploadDir, `${file}.sha256`);
+            const sha256 = fs.existsSync(shaPath) ? fs.readFileSync(shaPath, 'utf8').trim() : '';
+            assets[platform] = {
+              url: `https://github.com/${repo}/releases/download/${version}/${file}`,
+              sha256
+            };
+          }
+
+          const manifest = {
+            name: appName,
+            version,
+            assets
+          };
+          fs.writeFileSync(path.join(uploadDir, 'cannon.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+          cat upload/cannon.json
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          files: upload/*

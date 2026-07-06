@@ -214,7 +214,7 @@ func layoutContext(r *http.Request) map[string]any {
 	data["NavMenusVisible"] = navGroupVisible(navCan, "menus", "menu_items")
 	data["NavUsersVisible"] = navGroupVisible(navCan, "accounts", "authenticators", "profiles", "groups", "roles", "permissions")
 	data["NavAPIVisible"] = navGroupVisible(navCan, "api_credentials", "api_settings")
-	data["NavSystemVisible"] = navGroupVisible(navCan, "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log")
+	data["NavSystemVisible"] = navGroupVisible(navCan, "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log", "system_update")
 	return data
 }
 
@@ -329,7 +329,7 @@ func contentNavOpen(nav string) bool {
 
 func systemNavOpen(nav string) bool {
 	switch nav {
-	case "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log":
+	case "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log", "system_update":
 		return true
 	default:
 		return false

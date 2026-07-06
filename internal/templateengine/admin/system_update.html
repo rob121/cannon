@@ -1,0 +1,64 @@
+{{template "page_header" .}}
+{{template "success_alert" .}}
+{{template "error_alert" .}}
+
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div>
+      <h2 class="admin-form-card-title">Installed Version</h2>
+      <p class="admin-form-card-desc">The running Cannon binary and its configured update source.</p>
+    </div>
+    <span class="admin-form-card-icon"><i class="bi bi-box-seam"></i></span>
+  </div>
+  <div class="admin-form-card-body">
+    <dl class="admin-dl-grid">
+      <dt>Current version</dt>
+      <dd><code class="admin-code">{{.CurrentVersion}}</code></dd>
+      {{if .Commit}}
+      <dt>Build commit</dt>
+      <dd><code class="admin-code">{{.Commit}}</code></dd>
+      {{end}}
+      <dt>Binary path</dt>
+      <dd><code class="admin-code">{{.BinaryPath}}</code></dd>
+      <dt>Update URL base</dt>
+      <dd><a href="{{.UpdateURLBase}}" target="_blank" rel="noopener noreferrer">{{.UpdateURLBase}}</a></dd>
+      {{if .State.LatestVersion}}
+      <dt>Latest version</dt>
+      <dd>
+        {{if .State.UpdateAvailable}}
+        <span class="admin-badge admin-badge-warning">New version {{.State.LatestVersion}}</span>
+        {{else}}
+        <span class="admin-badge admin-badge-success">Up to date ({{.State.LatestVersion}})</span>
+        {{end}}
+      </dd>
+      {{end}}
+      {{if .State.UpdateCheckedAt}}
+      <dt>Last checked</dt>
+      <dd>{{.State.UpdateCheckedAt.Format "Jan 2, 2006 3:04 PM"}}</dd>
+      {{end}}
+      {{if .State.UpdateError}}
+      <dt>Check error</dt>
+      <dd class="text-danger">{{.State.UpdateError}}</dd>
+      {{end}}
+      {{if .State.RestartRequired}}
+      <dt>Restart required</dt>
+      <dd class="text-warning">Restart Cannon to run the updated binary.</dd>
+      {{end}}
+    </dl>
+    <div class="admin-form-actions">
+      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top">
+        {{csrfField}}
+        <input type="hidden" name="action" value="check">
+        <button type="submit" class="btn-admin-outline"><i class="bi bi-arrow-repeat"></i> Check Now</button>
+      </form>
+      {{if .State.UpdateAvailable}}
+      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top" onsubmit="return confirm('Download and install Cannon {{.State.LatestVersion}}? You will need to restart the process afterward.')">
+        {{csrfField}}
+        <input type="hidden" name="action" value="apply">
+        <button type="submit" class="btn-admin-primary"><i class="bi bi-download"></i> Update to {{.State.LatestVersion}}</button>
+      </form>
+      {{end}}
+    </div>
+    <p class="admin-form-help mb-0">Cannon checks <code class="admin-code">cannon.json</code> from GitHub releases every six hours, using the same manifest format as extensions.</p>
+  </div>
+</div>

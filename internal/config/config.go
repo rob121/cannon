@@ -11,10 +11,16 @@ import (
 
 const ConfigName = "sites"
 
+// UpdateConfig holds Cannon application update settings.
+type UpdateConfig struct {
+	URLBase string `json:"url_base"`
+}
+
 // App holds the parsed sites.json configuration.
 type App struct {
 	InstallEnabled bool             `json:"install_enabled"`
 	DataRoot       string           `json:"data_root"`
+	Update         UpdateConfig     `json:"update"`
 	Extensions     ExtensionsConfig `json:"extensions"`
 	Session        SessionConfig    `json:"session"`
 	Sites          []SiteConfig     `json:"sites"`
@@ -209,5 +215,8 @@ func applyDefaults(cfg *App) {
 	}
 	if cfg.Extensions.SocketsDir == "" {
 		cfg.Extensions.SocketsDir = filepath.Join(cfg.DataRoot, "sockets")
+	}
+	if strings.TrimSpace(cfg.Update.URLBase) == "" {
+		cfg.Update.URLBase = "https://github.com/rob121/cannon/releases/download"
 	}
 }

@@ -10,11 +10,21 @@ import (
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/server"
+	"github.com/rob121/cannon/internal/version"
 )
 
 func main() {
 	port := flag.Int("port", 8001, "HTTP listen port")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		if version.Commit != "" {
+			fmt.Printf("cannon %s (%s)\n", version.Version, version.Commit)
+		} else {
+			fmt.Printf("cannon %s\n", version.Version)
+		}
+		return
+	}
 
 	wd, _ := os.Getwd()
 	cfg, cfgPath, err := config.Load()
@@ -29,8 +39,8 @@ func main() {
 	if cfgPath == "" {
 		log.Printf("config: using defaults (no sites.json found, cwd=%s)", wd)
 	} else {
-		log.Printf("config: loaded %s (install_enabled=%v sites=%d mode=%s cwd=%s)",
-			cfgPath, cfg.InstallEnabled, len(cfg.Sites), mode, wd)
+		log.Printf("config: loaded %s (install_enabled=%v sites=%d mode=%s version=%s cwd=%s)",
+			cfgPath, cfg.InstallEnabled, len(cfg.Sites), mode, version.Version, wd)
 	}
 
 	srv, err := server.New(cfg)

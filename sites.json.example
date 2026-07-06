@@ -1,6 +1,9 @@
 {
   "install_enabled": true,
   "data_root": "./data",
+  "update": {
+    "url_base": "https://github.com/rob121/cannon/releases/download"
+  },
   "extensions": {
     "dir": "./data/extensions",
     "sockets_dir": "./data/sockets"
