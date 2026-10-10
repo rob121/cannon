@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/rob121/cannon/internal/settings"
 )
 
 func parseSort(r *http.Request, allowed map[string]string, defaultCol string) (col, dir, orderBy string) {
@@ -106,6 +108,9 @@ func listExtraFromData(data map[string]any) url.Values {
 			v.Set("menu_id", strconv.FormatUint(uint64(menuID), 10))
 		}
 	}
+	if size, ok := data["PageSize"].(int); ok && size > 0 {
+		v.Set(pageSizeParam, strconv.Itoa(size))
+	}
 	return v
 }
 
@@ -127,6 +132,15 @@ func listQueryFromData(data map[string]any) string {
 	sort, _ := data["Sort"].(string)
 	dir, _ := data["Dir"].(string)
 	return listQueryExtra(page, sort, dir, listExtraFromData(data))
+}
+
+func pageSizeLinkFromData(data map[string]any, size int) string {
+	basePath, _ := data["BasePath"].(string)
+	sort, _ := data["Sort"].(string)
+	dir, _ := data["Dir"].(string)
+	extra := listExtraFromData(data)
+	extra.Set(pageSizeParam, strconv.Itoa(settings.NormalizeListLimit(size)))
+	return basePath + listQueryExtra(1, sort, dir, extra)
 }
 
 func sortLink(basePath string, page int, currentSort, currentDir, col string) string {

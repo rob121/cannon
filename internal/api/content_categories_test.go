@@ -103,12 +103,33 @@ func TestMenusForViewer(t *testing.T) {
 		t.Fatal(err)
 	}
 	routeID := route.RouteID
-	item := models.MenuItem{MenuID: menu.MenuID, Name: "Home", RouteID: &routeID, Sort: 1}
+	item := models.MenuItem{MenuID: menu.MenuID, Name: "Home", RouteID: &routeID, Status: models.StatusActive, Sort: 1}
 	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	inactive := models.MenuItem{MenuID: menu.MenuID, Name: "Hidden", RouteID: &routeID, Status: models.StatusInactive, Sort: 2}
+	if err := db.Create(&inactive).Error; err != nil {
+		t.Fatal(err)
+	}
+	inactiveParent := models.MenuItem{MenuID: menu.MenuID, Name: "Hidden Parent", RouteID: &routeID, Status: models.StatusInactive, Sort: 3}
+	if err := db.Create(&inactiveParent).Error; err != nil {
+		t.Fatal(err)
+	}
+	childOfInactive := models.MenuItem{MenuID: menu.MenuID, Name: "Hidden Child", RouteID: &routeID, ParentID: &inactiveParent.MenuItemID, Status: models.StatusActive, Sort: 1}
+	if err := db.Create(&childOfInactive).Error; err != nil {
 		t.Fatal(err)
 	}
 	public := seedPublicGroup(t, ctx)
 	if err := db.Model(&item).Association("Groups").Append(&public); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&inactive).Association("Groups").Append(&public); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&inactiveParent).Association("Groups").Append(&public); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&childOfInactive).Association("Groups").Append(&public); err != nil {
 		t.Fatal(err)
 	}
 	viewerGroups, err := groups.ViewerGroupIDs(ctx)

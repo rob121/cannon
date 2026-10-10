@@ -3,9 +3,11 @@ package admin
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/config"
@@ -86,6 +88,7 @@ func (h *Handler) siteForm(w http.ResponseWriter, r *http.Request, siteID string
 		if err := h.saveSite(cfg, &row, isNew, r); err != nil {
 			h.render(w, r, "Site", "admin/sites_form.html", formData(map[string]any{
 				"ActiveNav": "sites", "Error": err.Error(), "Row": row, "IsNew": isNew,
+				"BasePath": sitesBase, "FormAction": siteFormAction(row, isNew),
 			}))
 			return
 		}
@@ -98,12 +101,23 @@ func (h *Handler) siteForm(w http.ResponseWriter, r *http.Request, siteID string
 	}
 	h.render(w, r, title, "admin/sites_form.html", formData(map[string]any{
 		"ActiveNav": "sites", "Row": row, "IsNew": isNew, "BasePath": sitesBase,
+		"FormAction": siteFormAction(row, isNew),
 	}))
+}
+
+func siteFormAction(row config.SiteConfig, isNew bool) string {
+	if isNew {
+		return sitesBase + "/new"
+	}
+	return sitesBase + "/" + row.ID
 }
 
 func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, r *http.Request) error {
 	name := formString(r, "name")
 	host := formString(r, "host")
+	if host == "" {
+		return fmt.Errorf("host URL is required")
+	}
 	dbType := formString(r, "database_type")
 	if dbType == "" {
 		dbType = "sqlite"
@@ -123,6 +137,9 @@ func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, 
 			if s.ID == id {
 				return fmt.Errorf("site id %q already exists", id)
 			}
+		}
+		if err := validateUniqueSiteHost(cfg, id, host); err != nil {
+			return err
 		}
 		siteDir := filepath.Join(dataRoot, id)
 		row.ID = id
@@ -148,6 +165,9 @@ func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, 
 		}
 		cfg.Sites = append(cfg.Sites, *row)
 	} else {
+		if err := validateUniqueSiteHost(cfg, row.ID, host); err != nil {
+			return err
+		}
 		row.Name = name
 		row.Host = host
 		row.Database.Type = dbType
@@ -162,10 +182,6 @@ func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, 
 				break
 			}
 		}
-	}
-
-	if host == "" {
-		row.Host = "http://localhost:8001"
 	}
 
 	if err := config.Save(cfg); err != nil {
@@ -196,6 +212,79 @@ func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, 
 		return h.activate(cfg)
 	}
 	return nil
+}
+
+func validateUniqueSiteHost(cfg *config.App, excludeID, host string) error {
+	keys, err := siteHostKeys(host)
+	if err != nil {
+		return err
+	}
+	for _, site := range cfg.Sites {
+		if site.ID == excludeID {
+			continue
+		}
+		existingKeys, err := siteHostKeys(site.Host)
+		if err != nil {
+			return fmt.Errorf("site %s host: %w", site.ID, err)
+		}
+		for key := range keys {
+			if _, ok := existingKeys[key]; ok {
+				return fmt.Errorf("host URL conflicts with site %q", site.ID)
+			}
+		}
+	}
+	return nil
+}
+
+func siteHostKeys(raw string) (map[string]struct{}, error) {
+	key, err := siteHostKey(raw)
+	if err != nil {
+		return nil, err
+	}
+	keys := map[string]struct{}{key: {}}
+	if alias, ok := siteLocalHostAlias(key); ok {
+		keys[alias] = struct{}{}
+	}
+	return keys, nil
+}
+
+func siteHostKey(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("host URL is required")
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("invalid host URL")
+	}
+	return siteNormalizeHost(u.Host), nil
+}
+
+func siteNormalizeHost(host string) string {
+	host = strings.TrimSpace(host)
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	if idx := strings.Index(host, "/"); idx >= 0 {
+		host = host[:idx]
+	}
+	if idx := strings.Index(host, ":"); idx >= 0 {
+		host = host[:idx]
+	}
+	return strings.ToLower(host)
+}
+
+func siteLocalHostAlias(host string) (string, bool) {
+	switch host {
+	case "localhost":
+		return "127.0.0.1", true
+	case "127.0.0.1":
+		return "localhost", true
+	default:
+		return "", false
+	}
 }
 
 func (h *Handler) siteDelete(w http.ResponseWriter, r *http.Request, siteID string) {

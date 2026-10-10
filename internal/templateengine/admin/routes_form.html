@@ -225,7 +225,7 @@
               <select class="admin-form-control" name="controller_data_{{.Name}}" {{if .Required}}data-required="1"{{end}}>
                 <option value="">Select author</option>
                 {{range $.Users}}
-                <option value="{{.Username}}" {{if eq (index $.PageData $fieldName) .Username}}selected{{end}}>{{if .GivenName}}{{.GivenName}} {{.FamilyName}}{{else}}{{.Username}}{{end}}</option>
+                <option value="{{.Username}}" {{if eq (index $.PageData $fieldName) .Username}}selected{{end}}>{{userName .}}</option>
                 {{end}}
               </select>
               {{else if eq .Type "select"}}

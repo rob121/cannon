@@ -169,6 +169,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			return sortLinkExtra(basePath, page, sort, dir, col, listExtraFromData(root))
 		},
 		"listQueryFromData": listQueryFromData,
+		"pageSizeLinkRoot":  pageSizeLinkFromData,
 		"listQuery": func(page int, sort, dir string) string {
 			return listQueryExtra(page, sort, dir, listExtra)
 		},

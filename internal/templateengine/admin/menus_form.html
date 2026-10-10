@@ -36,6 +36,7 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Status</th>
           <th>Parent</th>
           <th>Route</th>
           <th>Sort</th>
@@ -46,13 +47,14 @@
         {{range .ItemRows}}
         <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
           <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" .IsCurrent)}}</td>
+          <td>{{template "status_toggle" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "Status" .Item.Status "ListQuery" (printf "?return_to=/admin/menus/%d" $.Row.MenuID))}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
           <td>{{.Item.Sort}}</td>
-          {{template "row_actions" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" (printf "menu_id=%d" $.Row.MenuID))}}
+          {{template "row_actions" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" (printf "?menu_id=%d" $.Row.MenuID))}}
         </tr>
         {{else}}
-        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add the first link to start building this menu." "ActionURL" .AddMenuItemURL "ActionLabel" "Add menu item" "ActionIcon" "bi-plus-lg")}}</td></tr>
+        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add the first link to start building this menu." "ActionURL" .AddMenuItemURL "ActionLabel" "Add menu item" "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

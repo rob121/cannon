@@ -94,15 +94,22 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
 	var rows []models.Route
-	var total int64
-	db.Model(&models.Route{}).Count(&total)
-	data := listPage(r, page, total, routesBase,
+	data := listPage(r, page, 0, routesBase,
 		"Custom URL paths and handlers. Built-in content, auth, and account routes are listed separately below.",
 		"Add Route", map[string]any{"ActiveNav": "routes"})
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "path": "path", "type": "type", "status": "status", "sort": "sort",
 	}, "sort")
-	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
+	db.Order(order + ", route_id asc").Find(&rows)
+
+	customRows := make([]models.Route, 0, len(rows))
+	for _, row := range rows {
+		if !router.IsBuiltinControllerRoute(row) {
+			customRows = append(customRows, row)
+		}
+	}
+	data["Total"] = int64(len(customRows))
+	rows = paginateRoutes(customRows, page, pageSizeFor(r))
 
 	var ordered []models.Route
 	var allRoutes []models.Route
@@ -131,6 +138,24 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 	data["BuiltinRoutes"] = router.BuiltinControllerRoutes()
 	data["BuiltinRouteRows"] = loadBuiltinRouteRows(db)
 	h.render(w, r, "Routes", "admin/routes.html", data)
+}
+
+func paginateRoutes(rows []models.Route, page, size int) []models.Route {
+	if size <= 0 {
+		size = defaultPageSize
+	}
+	if page < 1 {
+		page = 1
+	}
+	start := (page - 1) * size
+	if start >= len(rows) {
+		return []models.Route{}
+	}
+	end := start + size
+	if end > len(rows) {
+		end = len(rows)
+	}
+	return rows[start:end]
 }
 
 type builtinRouteRow struct {

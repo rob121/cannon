@@ -570,10 +570,10 @@ func (m *Manager) AdminRuntimes() []*Runtime {
 }
 
 // RenderAdmin proxies an admin-area request to an extension admin handler.
-func (m *Manager) RenderAdmin(ctx context.Context, extensionName, suffixPath string, r *http.Request, userCtx map[string]any) (string, error) {
+func (m *Manager) RenderAdmin(ctx context.Context, extensionName, suffixPath string, r *http.Request, userCtx map[string]any) (WireResponse, error) {
 	rt, ok := m.runtime(extensionName)
 	if !ok || rt.Capabilities.Admin == "" {
-		return "", fmt.Errorf("extension %s has no admin capability", extensionName)
+		return WireResponse{}, fmt.Errorf("extension %s has no admin capability", extensionName)
 	}
 	adminPath := "/" + strings.TrimPrefix(rt.Capabilities.Admin, "/")
 	if suffixPath != "" {
@@ -584,20 +584,20 @@ func (m *Manager) RenderAdmin(ctx context.Context, extensionName, suffixPath str
 	}
 	wire, err := m.buildWireRequest(r, userCtx)
 	if err != nil {
-		return "", err
+		return WireResponse{}, err
 	}
 	raw, _ := json.Marshal(wire)
 	resp, err := m.do(rt.Model.Socket, http.MethodPost, adminPath, bytes.NewReader(raw))
 	if err != nil {
-		return "", err
+		return WireResponse{}, err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var out WireResponse
 	if err := json.Unmarshal(body, &out); err != nil {
-		return string(body), nil
+		return WireResponse{StatusCode: http.StatusOK, Body: string(body)}, nil
 	}
-	return out.Body, nil
+	return out, nil
 }
 
 // Start launches an extension process if it is not already running.

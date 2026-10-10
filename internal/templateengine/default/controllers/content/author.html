@@ -1,5 +1,5 @@
 <div class="site-page mb-4">
-  {{template "pageHeader" (dict "Title" .Author.Username "Subtitle" (lang "content.author_items_subtitle" "Count" (printf "%d" .Total)))}}
+  {{template "pageHeader" (dict "Title" (userName .Author .AuthorProfile.DisplayName) "Subtitle" (lang "content.author_items_subtitle" "Count" (printf "%d" .Total)))}}
 
   {{if .AuthorProfile}}
   <section class="site-author-profile mb-4" aria-labelledby="author-profile-heading">
@@ -8,7 +8,7 @@
       <img src="{{.AuthorProfile.AvatarURL}}" alt="" class="site-profile-avatar-image rounded-circle" width="96" height="96">
       {{end}}
       <div>
-        <h2 id="author-profile-heading" class="h5 mb-1">{{if .AuthorProfile.DisplayName}}{{.AuthorProfile.DisplayName}}{{else}}{{.Author.Username}}{{end}}</h2>
+        <h2 id="author-profile-heading" class="h5 mb-1">{{userName .Author .AuthorProfile.DisplayName}}</h2>
         {{if .AuthorProfile.Email}}<p class="text-muted mb-0">{{.AuthorProfile.Email}}</p>{{end}}
       </div>
     </div>

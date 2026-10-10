@@ -40,19 +40,38 @@ func TestApplyListSortDescExplicit(t *testing.T) {
 
 func TestListQueryFromDataIncludesFiltersAndSort(t *testing.T) {
 	got := listQueryFromData(map[string]any{
-		"Page":         2,
-		"Sort":         "name",
-		"Dir":          "desc",
-		"SpaceFilter":  "footer",
-		"StatusFilter": "published",
+		"Page":           2,
+		"PageSize":       50,
+		"Sort":           "name",
+		"Dir":            "desc",
+		"SpaceFilter":    "footer",
+		"StatusFilter":   "published",
 		"CategoryFilter": "3",
-		"SearchQuery":  "hello",
-		"Filter":       "pending",
+		"SearchQuery":    "hello",
+		"Filter":         "pending",
 	})
-	for _, part := range []string{"page=2", "sort=name", "dir=desc", "space=footer", "status=published", "category=3", "q=hello", "filter=pending"} {
+	for _, part := range []string{"page=2", "page_size=50", "sort=name", "dir=desc", "space=footer", "status=published", "category=3", "q=hello", "filter=pending"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("listQueryFromData: missing %q in %q", part, got)
 		}
+	}
+}
+
+func TestPageSizeLinkFromData(t *testing.T) {
+	got := pageSizeLinkFromData(map[string]any{
+		"BasePath": "/admin/routes",
+		"Page":     3,
+		"PageSize": 25,
+		"Sort":     "path",
+		"Dir":      "desc",
+	}, 100)
+	for _, part := range []string{"/admin/routes?", "page_size=100", "sort=path", "dir=desc"} {
+		if !strings.Contains(got, part) {
+			t.Fatalf("pageSizeLinkFromData: missing %q in %q", part, got)
+		}
+	}
+	if strings.Contains(got, "page=3") {
+		t.Fatalf("pageSizeLinkFromData should reset to page 1: %q", got)
 	}
 }
 

@@ -32,6 +32,8 @@ func (h *Handler) menuItems(w http.ResponseWriter, r *http.Request, path string)
 		h.menuItemForm(w, r, 0)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.menuItemDelete(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "toggle-status":
+		h.menuItemToggleStatus(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "move-up":
 		h.menuItemMoveSort(w, r, parts[0], -1)
 	case len(parts) == 2 && parts[1] == "move-down":
@@ -57,7 +59,7 @@ func (h *Handler) menuItemList(w http.ResponseWriter, r *http.Request) {
 	data["HasMenuFilter"] = hasMenuFilter
 
 	order := applyListSort(r, data, map[string]string{
-		"name": "name", "menu": "menu_id", "sort": "sort",
+		"name": "name", "menu": "menu_id", "status": "status", "sort": "sort",
 	}, "sort")
 	sortParam := strings.TrimSpace(r.URL.Query().Get("sort"))
 	useTreeOrder := sortParam == "" || sortParam == "sort"
@@ -145,6 +147,7 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.Name = formString(r, "name")
 		row.Class = formString(r, "class")
 		row.Target = formString(r, "target")
+		row.Status = formStatus(r)
 		row.Sort = formInt(r, "sort", 0)
 		row.ParentID = formUintPtr(r, "parent_id")
 		if isNew {
@@ -173,6 +176,9 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 		}
 		var saveErr error
 		if isNew {
+			if row.Status == "" {
+				row.Status = models.StatusActive
+			}
 			saveErr = db.Create(&row).Error
 		} else {
 			saveErr = db.Save(&row).Error
@@ -185,7 +191,7 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 			h.renderMenuItemForm(w, r, row, allGroups, isNew, err.Error())
 			return
 		}
-		redirectList(w, r, menuItemsBase)
+		redirectList(w, r, menuItemsBase+menuItemListQuery(r))
 		return
 	}
 	h.renderMenuItemForm(w, r, row, allGroups, isNew, "")
@@ -216,6 +222,7 @@ func (h *Handler) renderMenuItemForm(w http.ResponseWriter, r *http.Request, row
 		"ParentOptions": parentOptions,
 		"IsNew":         isNew,
 		"BasePath":      menuItemsBase,
+		"FormAction":    menuItemFormAction(row, isNew, r),
 		"Subtitle":      subtitle,
 		"Routes":        h.loadRoutes(r),
 		"AllMenus":      h.loadMenus(r),
@@ -233,6 +240,14 @@ func (h *Handler) renderMenuItemForm(w http.ResponseWriter, r *http.Request, row
 	}
 	data["ListQuery"] = menuItemListQuery(r)
 	h.render(w, r, title, "admin/menu_item_form.html", data)
+}
+
+func menuItemFormAction(row models.MenuItem, isNew bool, r *http.Request) string {
+	base := menuItemsBase + "/new"
+	if !isNew {
+		base = fmt.Sprintf("%s/%d", menuItemsBase, row.MenuItemID)
+	}
+	return base + menuItemListQuery(r)
 }
 
 func (h *Handler) menuItemDelete(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -264,6 +279,43 @@ func (h *Handler) menuItemDelete(w http.ResponseWriter, r *http.Request, idStr s
 		return
 	}
 	redirectList(w, r, menuItemsBase)
+}
+
+func (h *Handler) menuItemToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	db, err := sites.DB(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := toggleModelStatus(db, id, &models.MenuItem{}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if returnTo := menuItemToggleReturnTo(r); returnTo != "" {
+		http.Redirect(w, r, returnTo, http.StatusSeeOther)
+		return
+	}
+	redirectList(w, r, menuItemsBase+menuItemListQuery(r))
+}
+
+func menuItemToggleReturnTo(r *http.Request) string {
+	returnTo := strings.TrimSpace(r.URL.Query().Get("return_to"))
+	if returnTo == "" || strings.HasPrefix(returnTo, "//") || strings.ContainsAny(returnTo, "\r\n") {
+		return ""
+	}
+	if !strings.HasPrefix(returnTo, menusBase+"/") {
+		return ""
+	}
+	return returnTo
 }
 
 func (h *Handler) loadMenus(r *http.Request) []models.Menu {

@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/rob121/cannon/internal/models"
@@ -71,5 +73,19 @@ func TestMenuItemSortPositions(t *testing.T) {
 	}
 	if pos[3].canMoveUp || pos[3].canMoveDown {
 		t.Fatalf("only child item: %+v", pos[3])
+	}
+}
+
+func TestMenuItemFormActionPreservesMenuFilter(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/admin/menu-items/new?menu_id=7", nil)
+	got := menuItemFormAction(models.MenuItem{}, true, r)
+	if got != "/admin/menu-items/new?menu_id=7" {
+		t.Fatalf("new action = %q", got)
+	}
+
+	r = httptest.NewRequest(http.MethodGet, "/admin/menu-items/3?menu_id=7&sort=name&dir=desc", nil)
+	got = menuItemFormAction(models.MenuItem{MenuItemID: 3}, false, r)
+	if got != "/admin/menu-items/3?dir=desc&menu_id=7&sort=name" {
+		t.Fatalf("edit action = %q", got)
 	}
 }

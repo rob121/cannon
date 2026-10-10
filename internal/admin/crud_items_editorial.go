@@ -49,7 +49,7 @@ func (h *Handler) itemTrashList(w http.ResponseWriter, r *http.Request) {
 			lr.CategoryName = row.Category.Name
 		}
 		if row.Author != nil {
-			lr.AuthorName = row.Author.Username
+			lr.AuthorName = user.DisplayName(row.Author)
 		}
 		listRows = append(listRows, lr)
 	}
@@ -136,7 +136,7 @@ func (h *Handler) itemReviewList(w http.ResponseWriter, r *http.Request) {
 			lr.CategoryName = row.Category.Name
 		}
 		if row.Author != nil {
-			lr.AuthorName = row.Author.Username
+			lr.AuthorName = user.DisplayName(row.Author)
 		}
 		listRows = append(listRows, lr)
 	}
@@ -307,6 +307,6 @@ func currentEditor(r *http.Request) (*uint, string) {
 		return nil, ""
 	}
 	id := u.UserID
-	name := u.Username
+	name := user.DisplayName(u)
 	return &id, name
 }

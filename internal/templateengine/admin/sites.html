@@ -32,7 +32,7 @@
                 <i class="bi bi-shield-lock"></i>
               </a>
               {{end}}
-              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.ID}}" title="Edit">
+              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.ID}}" data-turbo-frame="_top" title="Edit">
                 <i class="bi bi-pencil"></i>
               </a>
               <form method="post" action="{{$.BasePath}}/{{.ID}}/delete" class="admin-inline-form" onsubmit="return confirm('Delete this site?')">

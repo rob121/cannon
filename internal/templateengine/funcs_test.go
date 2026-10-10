@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"html/template"
 	"testing"
+
+	"github.com/rob121/cannon/internal/models"
 )
 
 func TestSprigFuncsAvailable(t *testing.T) {
@@ -16,6 +18,9 @@ func TestSprigFuncsAvailable(t *testing.T) {
 	}
 	if _, ok := funcs["lenspace"]; !ok {
 		t.Fatal("expected cannon lenspace function")
+	}
+	if _, ok := funcs["hasSpace"]; !ok {
+		t.Fatal("expected cannon hasSpace function")
 	}
 }
 
@@ -44,5 +49,17 @@ func TestCannonAddOverridesSprig(t *testing.T) {
 	}
 	if buf.String() != "3" {
 		t.Fatalf("add: got %q", buf.String())
+	}
+}
+
+func TestFuncMapIncludesUserName(t *testing.T) {
+	funcs := FuncMap(nil, nil)
+	fn, ok := funcs["userName"].(func(...any) string)
+	if !ok {
+		t.Fatalf("userName helper missing or has wrong type: %T", funcs["userName"])
+	}
+	got := fn(models.User{GivenName: "Ada", FamilyName: "Lovelace", Username: "ada"})
+	if got != "Ada Lovelace" {
+		t.Fatalf("userName() = %q", got)
 	}
 }

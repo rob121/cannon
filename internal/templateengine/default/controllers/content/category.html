@@ -5,9 +5,16 @@
   {{if .CanCreate}}<p class="mb-3"><a class="btn btn-sm btn-primary" href="/content/edit/new?category_id={{.Category.CategoryID}}">{{lang "content.create_in_category"}}</a></p>{{end}}
   <section aria-labelledby="category-items-heading">
     <h2 id="category-items-heading" class="visually-hidden">{{lang "content.items_in_category" "Name" .Category.Name}}</h2>
+    {{if .LeadingItems}}
+    <div class="site-item-list site-item-list--leading mb-4">
+      {{range .LeadingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore)}}{{end}}
+    </div>
+    {{end}}
     <div class="{{.ItemListClass}}">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
+      {{range .RemainingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore)}}{{else}}
+      {{if not $.LeadingItems}}
       <p class="text-muted mb-0">{{lang "content.no_category_items"}}</p>
+      {{end}}
       {{end}}
     </div>
     {{template "contentPagination" .}}

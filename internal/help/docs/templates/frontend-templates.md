@@ -68,6 +68,67 @@ SEO **Additional Head Markup** from Configuration → SEO uses the `{{siteHeadEx
 
 ---
 
+## Header templates
+
+Public pages use three cooperating header pieces. Override these partials in a custom theme when you want consistent page chrome without duplicating markup in every controller template.
+
+### Document `<head>` (`layout.html` + `meta-tags`)
+
+`layout.html` sets the HTML document title and includes the `metaTags` partial:
+
+```html
+<title>{{if .MetaTitle}}{{.MetaTitle}}{{else if .Title}}{{.Title}}{{else}}{{lang "common.home"}}{{end}}{{if siteName}} · {{siteName}}{{end}}</title>
+{{template "metaTags" .}}
+<link href="{{themeAsset "site.css"}}" rel="stylesheet">
+```
+
+`meta-tags.html` (`{{define "metaTags"}}`) renders SEO and social tags. It falls back to Configuration → SEO defaults via `siteMetaDescription`, `siteOGTitle`, and related functions. Canonical and image URLs use `absoluteURL` so relative paths work behind reverse proxies.
+
+Controllers and extension routes can pass page-level SEO fields on the layout data:
+
+| Field | Used for |
+|-------|----------|
+| `.MetaTitle` | `<title>`, `og:title`, `twitter:title` |
+| `.MetaDescription` | `description`, `og:description`, `twitter:description` |
+| `.MetaKeywords` | `keywords` |
+| `.CanonicalURL` | `<link rel="canonical">` (passed through `absoluteURL`) |
+| `.OGImage` | `og:image`, `twitter:image` |
+
+### Page header block (`page-header`)
+
+Most controller templates open with the shared `pageHeader` partial:
+
+```html
+{{template "pageHeader" (dict "Title" (lang "search.title") "Subtitle" (lang "search.subtitle"))}}
+```
+
+`page-header.html` respects route configuration through `showRouteTitle`. When a route hides its title in **Admin → Routes**, the header is omitted unless you pass `AlwaysShow`:
+
+| `dict` key | Description |
+|------------|-------------|
+| `Title` | Main `<h1>` text |
+| `Subtitle` | Optional lead paragraph under the title |
+| `Eyebrow` | Small uppercase label above the title (errors, extension pages) |
+| `AlwaysShow` | Render even when `showRouteTitle` is false (maintenance, errors) |
+
+Example with route-aware visibility:
+
+```html
+{{if .ShowCategoryTitle}}{{template "pageHeader" (dict "Title" .Category.Name)}}{{end}}
+```
+
+### Navigation active state
+
+Menu partials (`menu-nav.html`) mark the current page with `isCurrentPath`:
+
+```html
+<a class="nav-link{{if isCurrentPath $item.Href}} active{{end}}" href="{{$item.Href}}">{{$item.Name}}</a>
+```
+
+Use `isRoute "content" "item"` when matching controller/action pairs instead of static paths.
+
+---
+
 ## Theme assets
 
 Place CSS, JS, fonts, and images in **`{theme}/assets/`**. They are served at **`/theme/{path}`** when the theme is active:
@@ -166,7 +227,11 @@ Extension page routes wrap handler HTML in `layout.html` + `page.html`. Data inc
 
 **Auto-escaping.** `html/template` escapes `{{.Field}}` by default. Use trusted HTML only for extension output.
 
-**Bootstrap.** Built-in styles use `/theme/site.css`. Override by placing `site.css` in your theme's `assets/` folder.
+**Bootstrap.** Built-in styles use `{{themeAsset "site.css"}}`. Override by placing `site.css` in your theme's `assets/` folder.
+
+**Page headers.** Use `{{template "pageHeader" …}}` for in-page titles; see **Header templates** above.
+
+**Item listings.** Use `userName`, `itemDate`, `itemDateISO`, and `excerpt` in cards and search results — see **Help → Templates → Template Functions**.
 
 **Site name.** `{{siteName}}` and `{{year}}` are available in layouts.
 

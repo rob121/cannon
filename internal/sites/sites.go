@@ -40,8 +40,14 @@ func NewManager(cfg *config.App) (*Manager, error) {
 		if err != nil {
 			return nil, fmt.Errorf("site %s host: %w", site.ID, err)
 		}
+		if existing, ok := m.hosts[hostKey]; ok && existing.ID != site.ID {
+			return nil, fmt.Errorf("site %s host conflicts with site %s", site.ID, existing.ID)
+		}
 		m.hosts[hostKey] = site
 		if alias, ok := localHostAlias(hostKey); ok {
+			if existing, ok := m.hosts[alias]; ok && existing.ID != site.ID {
+				return nil, fmt.Errorf("site %s host conflicts with site %s", site.ID, existing.ID)
+			}
 			m.hosts[alias] = site
 		}
 		if _, err := database.Connect(site); err != nil {

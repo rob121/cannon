@@ -10,15 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/rob121/cannon/internal/admin"
 	"github.com/rob121/cannon/internal/api"
 	"github.com/rob121/cannon/internal/blocks"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/config"
-	cms "github.com/rob121/cannon/internal/content"
-	"github.com/rob121/cannon/internal/groups"
 	_ "github.com/rob121/cannon/internal/controllers/auth"
 	_ "github.com/rob121/cannon/internal/controllers/content"
 	_ "github.com/rob121/cannon/internal/notifications"
@@ -27,11 +24,9 @@ import (
 	"github.com/rob121/cannon/internal/install"
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
-	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/realtime"
 	"github.com/rob121/cannon/internal/roles"
 	"github.com/rob121/cannon/internal/router"
-	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
@@ -237,164 +232,12 @@ func (s *Server) frontendHandler() http.Handler {
 		eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
 			templateengine.CSRFFuncs(r),
 			lang.FuncMap(middleware.LocaleFromContext(r.Context()), lang.TranslationPreviewActive(r)),
-			template.FuncMap{
-			"menu": func(name string) ([]map[string]any, error) {
-				return router.MenuData(renderCtx(), name)
-			},
-			"siteName": func() string {
-				return site.Name
-			},
-			"isOffline": func() bool {
-				offline, err := settings.SiteOffline(r.Context())
-				return err == nil && offline
-			},
-			"homeURL": func() string {
-				return sites.DefaultRoutePath(r.Context())
-			},
-			"controllerURL": func(controller, action string) string {
-				return routepath.Controller(r.Context(), controller, action)
-			},
-			"controllerURLFor": func(controller, action, suffix string) string {
-				return routepath.ControllerWithSuffix(r.Context(), controller, action, suffix)
-			},
-			"isDefaultRoute": func() bool {
-				return router.IsDefaultRouteContext(renderCtx())
-			},
-			"routeName": func() string {
-				if route, ok := router.RouteFromContext(renderCtx()); ok {
-					return route.Name
-				}
-				return ""
-			},
-			"routePath": func() string {
-				if route, ok := router.RouteFromContext(renderCtx()); ok {
-					return route.Path
-				}
-				return ""
-			},
-			"routeController": func() string {
-				if route, ok := router.RouteFromContext(renderCtx()); ok {
-					return route.Controller
-				}
-				return ""
-			},
-			"routeAction": func() string {
-				if route, ok := router.RouteFromContext(renderCtx()); ok {
-					return route.Action
-				}
-				return ""
-			},
-			"showRouteTitle": func() bool {
-				if route, ok := router.MatchedRoute(renderCtx()); ok {
-					return router.ShowTitleForRoute(route)
-				}
-				return true
-			},
-			"siteMetaDescription": func() string {
-				desc, _ := settings.SiteMetaDescription(r.Context())
-				return desc
-			},
-			"siteMetaKeywords": func() string {
-				keywords, _ := settings.SiteMetaKeywords(r.Context())
-				return keywords
-			},
-			"siteOGTitle": func() string {
-				title, _ := settings.SiteOGTitle(r.Context())
-				return title
-			},
-			"siteOGImage": func() string {
-				image, _ := settings.SiteOGImage(r.Context())
-				return image
-			},
-			"siteTwitterCard": func() string {
-				card, _ := settings.SiteTwitterCard(r.Context())
-				return card
-			},
-			"siteTwitterSite": func() string {
-				site, _ := settings.SiteTwitterSite(r.Context())
-				return site
-			},
-			"siteTwitterCreator": func() string {
-				creator, _ := settings.SiteTwitterCreator(r.Context())
-				return creator
-			},
-			"siteHeadExtra": func() template.HTML {
-				raw, _ := settings.SiteHeadExtra(r.Context())
-				return template.HTML(raw)
-			},
-			"year": func() int {
-				return time.Now().Year()
-			},
-			"richText": func(src string) template.HTML {
-				html, err := cms.RichTextToHTML(src)
-				if err != nil {
-					return template.HTML("")
-				}
-				return template.HTML(html)
-			},
-			"items": func(mode string, limit int) ([]models.Item, error) {
-				viewerGroups, err := groups.ViewerGroupIDs(r.Context())
-				if err != nil {
-					return nil, err
-				}
-				opts := cms.ListOptions{Page: 1, Limit: limit}
-				switch strings.TrimSpace(strings.ToLower(mode)) {
-				case "featured":
-					opts.Featured = true
-				case "popular":
-					return cms.PopularItems(r.Context(), viewerGroups, limit)
-				}
-				items, _, err := cms.ListItems(r.Context(), viewerGroups, opts)
-				return items, err
-			},
-			"itemURL": func(slug string) string {
-				return cms.ItemURLForContext(r.Context(), slug)
-			},
-			"categoryURL": func(slug string) string {
-				return cms.CategoryURLForContext(r.Context(), slug)
-			},
-			"tagURL": func(slug string) string {
-				return cms.TagURLForContext(r.Context(), slug)
-			},
-			"authorURL": func(key string) string {
-				return cms.AuthorURLForContext(r.Context(), key)
-			},
-			"searchURL": func(query string) string {
-				return cms.SearchURLForContext(r.Context(), query)
-			},
-			"featuredURL": func() string {
-				return cms.FeaturedURLForContext(r.Context())
-			},
-			"categories": func() ([]models.Category, error) {
-				return cms.CategoryTree(r.Context())
-			},
-			"tags": func() ([]models.Tag, error) {
-				return cms.ListTags(r.Context())
-			},
-			"tagCloud": func(limit int) ([]cms.TagCount, error) {
-				viewerGroups, err := groups.ViewerGroupIDs(r.Context())
-				if err != nil {
-					return nil, err
-				}
-				return cms.TagCloud(r.Context(), viewerGroups, limit)
-			},
-			"commentCount": func(itemID uint) (int64, error) {
-				return cms.CommentCount(r.Context(), itemID)
-			},
-			"fieldOptions": func(raw string) []cms.FieldOption {
-				return cms.ParseFieldConfig(raw).Options
-			},
-			"fieldValueContains": cms.FieldValueContains,
-			"safeHTML": func(s string) template.HTML {
-				return template.HTML(s)
-			},
-			"formatDateTimeLocal": func(t *time.Time) string {
-				if t == nil || t.IsZero() {
-					return ""
-				}
-				return t.Format("2006-01-02T15:04")
-			},
-		}))
+			frontendFuncMap(frontendFuncOpts{
+				Request:   r,
+				Site:      site,
+				RenderCtx: renderCtx,
+			}),
+		))
 		router.NewDispatcher(ext, eng).ServeHTTP(w, r)
 	})
 }

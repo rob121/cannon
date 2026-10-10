@@ -34,6 +34,13 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			}
 			return blockLen(name)
 		},
+		"hasSpace": func(name string) bool {
+			if blockLen == nil {
+				return false
+			}
+			n, err := blockLen(name)
+			return err == nil && n > 0
+		},
 		// Keep Cannon math helpers so admin pagination works with int64 totals.
 		"add": func(a, b any) int { return asInt(a) + asInt(b) },
 		"sub": func(a, b any) int { return asInt(a) - asInt(b) },
@@ -118,7 +125,8 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 			}
 			return false
 		},
-		"showRouteTitle": func() bool { return true },
+		"showRouteTitle":      func() bool { return true },
+		"userName":            UserName,
 		"siteName":            func() string { return "" },
 		"siteMetaDescription": func() string { return "" },
 		"siteMetaKeywords":    func() string { return "" },
@@ -128,6 +136,9 @@ func cannonFuncMap(blocks BlockRenderer, blockLen BlockLenRenderer) template.Fun
 		"siteTwitterSite":     func() string { return "" },
 		"siteTwitterCreator":  func() string { return "" },
 		"siteHeadExtra":       func() template.HTML { return "" },
+		"themeAsset":          ThemeAssetURL,
+		"absoluteURL":         func(path string) string { return path },
+		"isCurrentPath":       func(string) bool { return false },
 		// captcha emits a <captcha> placeholder expanded by Cannon before onAfterRender.
 		// Usage: {{captcha "login"}} or {{captcha "comment" "any"}}
 		"captcha": func(args ...string) template.HTML {

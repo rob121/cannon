@@ -40,7 +40,7 @@
               <select class="form-select" id="search-author" name="author">
                 <option value="">{{lang "search.all_authors"}}</option>
                 {{range .Authors}}
-                <option value="{{.UserID}}" {{if eq $.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
+                <option value="{{.UserID}}" {{if eq $.AuthorID .UserID}}selected{{end}}>{{userName .}}</option>
                 {{end}}
               </select>
             </div>

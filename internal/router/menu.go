@@ -115,13 +115,44 @@ func loadActiveMenuItemsForViewer(ctx context.Context, menuName string, viewerGr
 		return nil, err
 	}
 
+	byID := make(map[uint]models.MenuItem, len(menu.Items))
+	for _, item := range menu.Items {
+		byID[item.MenuItemID] = item
+	}
+
 	viewable := make([]models.MenuItem, 0, len(menu.Items))
 	for _, item := range menu.Items {
+		if item.Status != models.StatusActive {
+			continue
+		}
+		if menuItemHasInactiveAncestor(item, byID) {
+			continue
+		}
 		if groups.CanView(viewerGroups, item.Groups) {
 			viewable = append(viewable, item)
 		}
 	}
 	return viewable, nil
+}
+
+func menuItemHasInactiveAncestor(item models.MenuItem, byID map[uint]models.MenuItem) bool {
+	seen := make(map[uint]struct{})
+	for item.ParentID != nil && *item.ParentID != 0 {
+		parentID := *item.ParentID
+		if _, ok := seen[parentID]; ok {
+			return false
+		}
+		seen[parentID] = struct{}{}
+		parent, ok := byID[parentID]
+		if !ok {
+			return false
+		}
+		if parent.Status != models.StatusActive {
+			return true
+		}
+		item = parent
+	}
+	return false
 }
 
 func buildMenuTree(items []models.MenuItem) []map[string]any {

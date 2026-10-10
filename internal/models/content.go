@@ -14,31 +14,33 @@ const (
 
 // Category is a nested content taxonomy node.
 type Category struct {
-	CategoryID           uint   `gorm:"primaryKey"`
-	ParentID             *uint  `gorm:"index"`
-	Locale               string `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_category_locale_slug,priority:1"`
-	TranslationGroupID   *uint  `gorm:"index"`
-	Name                 string `gorm:"size:256;not null"`
-	Slug                 string `gorm:"size:256;not null;uniqueIndex:idx_category_locale_slug,priority:2"`
-	Description     string `gorm:"type:text"`
-	Image           string `gorm:"size:1024"`
-	Template        string `gorm:"size:256"`
-	FieldGroupID    *uint  `gorm:"index"`
-	InheritSettings     bool `gorm:"not null;default:true"`
-	InheritPermissions  bool `gorm:"not null;default:true"`
-	ShowTitle       bool   `gorm:"not null;default:true"`
-	ShowDescription bool   `gorm:"not null;default:true"`
-	ListColumns     int    `gorm:"not null;default:3"`
-	ListPagination  bool   `gorm:"not null;default:true"`
-	ListPageSize    int    `gorm:"not null;default:20"`
-	Sort            int    `gorm:"not null;default:0"`
-	Status          Status `gorm:"size:16;not null;default:active"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Groups          []Group `gorm:"many2many:category_groups;"`
-	CreateGroups    []Group `gorm:"many2many:category_create_groups;"`
-	EditGroups      []Group `gorm:"many2many:category_edit_groups;"`
-	PublishGroups   []Group `gorm:"many2many:category_publish_groups;"`
+	CategoryID         uint   `gorm:"primaryKey"`
+	ParentID           *uint  `gorm:"index"`
+	Locale             string `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_category_locale_slug,priority:1"`
+	TranslationGroupID *uint  `gorm:"index"`
+	Name               string `gorm:"size:256;not null"`
+	Slug               string `gorm:"size:256;not null;uniqueIndex:idx_category_locale_slug,priority:2"`
+	Description        string `gorm:"type:text"`
+	Image              string `gorm:"size:1024"`
+	Template           string `gorm:"size:256"`
+	FieldGroupID       *uint  `gorm:"index"`
+	InheritSettings    bool   `gorm:"not null;default:true"`
+	InheritPermissions bool   `gorm:"not null;default:true"`
+	ShowTitle          bool   `gorm:"not null;default:true"`
+	ShowDescription    bool   `gorm:"not null;default:true"`
+	ShowReadMore       bool   `gorm:"not null;default:false"`
+	LeadingArticles    int    `gorm:"not null;default:0"`
+	ListColumns        int    `gorm:"not null;default:3"`
+	ListPagination     bool   `gorm:"not null;default:true"`
+	ListPageSize       int    `gorm:"not null;default:20"`
+	Sort               int    `gorm:"not null;default:0"`
+	Status             Status `gorm:"size:16;not null;default:active"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Groups             []Group `gorm:"many2many:category_groups;"`
+	CreateGroups       []Group `gorm:"many2many:category_create_groups;"`
+	EditGroups         []Group `gorm:"many2many:category_edit_groups;"`
+	PublishGroups      []Group `gorm:"many2many:category_publish_groups;"`
 }
 
 // Tag is a reusable content label.
@@ -52,71 +54,71 @@ type Tag struct {
 
 // Item is the primary CMS content unit.
 type Item struct {
-	ItemID               uint       `gorm:"primaryKey"`
-	Locale               string     `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_item_locale_slug,priority:1;index"`
-	TranslationGroupID   *uint      `gorm:"index"`
-	Title                string     `gorm:"size:512;not null"`
-	Slug                 string     `gorm:"size:512;not null;uniqueIndex:idx_item_locale_slug,priority:2"`
-	Intro           string     `gorm:"type:text"`
-	Body            string     `gorm:"type:text"`
-	Status          ItemStatus `gorm:"size:16;not null;default:draft;index"`
-	Featured        bool       `gorm:"not null;default:false;index"`
-	FeaturedSort    int        `gorm:"not null;default:0;index"`
-	PublishStart    *time.Time `gorm:"index"`
-	PublishEnd      *time.Time `gorm:"index"`
-	AuthorID        *uint      `gorm:"index"`
-	CategoryID      *uint      `gorm:"index"`
-	Image           string     `gorm:"size:1024"`
-	GalleryJSON     string     `gorm:"type:text"`
-	EmbedJSON       string     `gorm:"type:text"`
-	AttachmentsJSON string     `gorm:"type:text"`
-	MetaTitle       string     `gorm:"size:512"`
-	MetaDescription string     `gorm:"type:text"`
-	MetaKeywords    string     `gorm:"size:512"`
-	CanonicalURL    string     `gorm:"size:1024"`
-	PreviewToken    string     `gorm:"size:64;index"`
-	PreviewExpiresAt *time.Time `gorm:"index"`
-	Sort            int        `gorm:"not null;default:0;index"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Author          *User      `gorm:"foreignKey:AuthorID;references:UserID;constraint:-"`
-	Category        *Category  `gorm:"foreignKey:CategoryID;references:CategoryID;constraint:-"`
-	Tags            []Tag      `gorm:"many2many:item_tags;"`
-	Groups          []Group    `gorm:"many2many:item_groups;"`
-	FieldValues     []ItemFieldValue `gorm:"foreignKey:ItemID;constraint:-"`
-	Revisions       []ItemRevision   `gorm:"foreignKey:ItemID;constraint:-"`
+	ItemID             uint       `gorm:"primaryKey"`
+	Locale             string     `gorm:"size:16;not null;default:en-US;uniqueIndex:idx_item_locale_slug,priority:1;index"`
+	TranslationGroupID *uint      `gorm:"index"`
+	Title              string     `gorm:"size:512;not null"`
+	Slug               string     `gorm:"size:512;not null;uniqueIndex:idx_item_locale_slug,priority:2"`
+	Intro              string     `gorm:"type:text"`
+	Body               string     `gorm:"type:text"`
+	Status             ItemStatus `gorm:"size:16;not null;default:draft;index"`
+	Featured           bool       `gorm:"not null;default:false;index"`
+	FeaturedSort       int        `gorm:"not null;default:0;index"`
+	PublishStart       *time.Time `gorm:"index"`
+	PublishEnd         *time.Time `gorm:"index"`
+	AuthorID           *uint      `gorm:"index"`
+	CategoryID         *uint      `gorm:"index"`
+	Image              string     `gorm:"size:1024"`
+	GalleryJSON        string     `gorm:"type:text"`
+	EmbedJSON          string     `gorm:"type:text"`
+	AttachmentsJSON    string     `gorm:"type:text"`
+	MetaTitle          string     `gorm:"size:512"`
+	MetaDescription    string     `gorm:"type:text"`
+	MetaKeywords       string     `gorm:"size:512"`
+	CanonicalURL       string     `gorm:"size:1024"`
+	PreviewToken       string     `gorm:"size:64;index"`
+	PreviewExpiresAt   *time.Time `gorm:"index"`
+	Sort               int        `gorm:"not null;default:0;index"`
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Author             *User            `gorm:"foreignKey:AuthorID;references:UserID;constraint:-"`
+	Category           *Category        `gorm:"foreignKey:CategoryID;references:CategoryID;constraint:-"`
+	Tags               []Tag            `gorm:"many2many:item_tags;"`
+	Groups             []Group          `gorm:"many2many:item_groups;"`
+	FieldValues        []ItemFieldValue `gorm:"foreignKey:ItemID;constraint:-"`
+	Revisions          []ItemRevision   `gorm:"foreignKey:ItemID;constraint:-"`
 }
 
 // ItemRevision stores a point-in-time snapshot of an item for rollback and audit.
 type ItemRevision struct {
-	RevisionID     uint      `gorm:"primaryKey"`
-	ItemID         uint      `gorm:"index;not null"`
-	RevisionNumber int       `gorm:"not null;index"`
-	SnapshotJSON   string    `gorm:"type:text;not null"`
-	EditorID       *uint     `gorm:"index"`
-	EditorName     string    `gorm:"size:128"`
-	Note           string    `gorm:"size:512"`
+	RevisionID     uint   `gorm:"primaryKey"`
+	ItemID         uint   `gorm:"index;not null"`
+	RevisionNumber int    `gorm:"not null;index"`
+	SnapshotJSON   string `gorm:"type:text;not null"`
+	EditorID       *uint  `gorm:"index"`
+	EditorName     string `gorm:"size:128"`
+	Note           string `gorm:"size:512"`
 	CreatedAt      time.Time
 }
 
 // ContentFieldGroup groups custom fields assignable to categories.
 type ContentFieldGroup struct {
-	FieldGroupID uint   `gorm:"primaryKey"`
-	Name         string `gorm:"size:128;uniqueIndex;not null"`
+	FieldGroupID uint           `gorm:"primaryKey"`
+	Name         string         `gorm:"size:128;uniqueIndex;not null"`
 	Fields       []ContentField `gorm:"foreignKey:FieldGroupID;constraint:-"`
 }
 
 // ContentField is a custom field definition.
 type ContentField struct {
-	FieldID        uint   `gorm:"primaryKey"`
-	FieldGroupID   uint   `gorm:"index;not null"`
-	Name           string `gorm:"size:128;not null"`
-	Label          string `gorm:"size:256;not null"`
-	Type           string `gorm:"size:64;not null"`
-	Required       bool   `gorm:"not null;default:false"`
-	Sort           int    `gorm:"not null;default:0"`
-	Status         Status `gorm:"size:16;not null;default:active"`
-	Configuration  string `gorm:"type:text"`
+	FieldID       uint   `gorm:"primaryKey"`
+	FieldGroupID  uint   `gorm:"index;not null"`
+	Name          string `gorm:"size:128;not null"`
+	Label         string `gorm:"size:256;not null"`
+	Type          string `gorm:"size:64;not null"`
+	Required      bool   `gorm:"not null;default:false"`
+	Sort          int    `gorm:"not null;default:0"`
+	Status        Status `gorm:"size:16;not null;default:active"`
+	Configuration string `gorm:"type:text"`
 }
 
 // ItemFieldValue stores a custom field value for an item.
@@ -154,6 +156,6 @@ type Comment struct {
 	IP          string `gorm:"size:64"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	Item        *Item  `gorm:"foreignKey:ItemID;references:ItemID;constraint:-"`
-	User        *User  `gorm:"foreignKey:UserID;references:UserID;constraint:-"`
+	Item        *Item `gorm:"foreignKey:ItemID;references:ItemID;constraint:-"`
+	User        *User `gorm:"foreignKey:UserID;references:UserID;constraint:-"`
 }

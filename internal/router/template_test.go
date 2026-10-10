@@ -42,3 +42,23 @@ func TestRouteFromContext(t *testing.T) {
 		t.Fatal("expected ShowTitleForRoute false")
 	}
 }
+
+func TestIsRouteContext(t *testing.T) {
+	route := models.Route{
+		RouteID:          5,
+		Name:             "Items",
+		Path:             "/content/item/*",
+		Controller:       "content",
+		ControllerAction: "item",
+	}
+	ctx := router.WithMatchedRoute(context.Background(), route)
+	if !router.IsRouteContext(ctx, "content", "item") {
+		t.Fatal("expected content/item match")
+	}
+	if router.IsRouteContext(ctx, "content", "category") {
+		t.Fatal("expected action mismatch")
+	}
+	if !router.IsRouteContext(ctx, "content", "") {
+		t.Fatal("expected controller-only match")
+	}
+}

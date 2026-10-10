@@ -68,7 +68,7 @@ func BuildRSS(siteName, siteURL, feedTitle, feedLink, feedDesc string, items []m
 		}
 		author := ""
 		if item.Author != nil {
-			author = item.Author.Username
+			author = authorDisplayName(item.Author)
 		}
 		channel.Items = append(channel.Items, rssItem{
 			Title:       item.Title,
@@ -85,4 +85,15 @@ func BuildRSS(siteName, siteURL, feedTitle, feedLink, feedDesc string, items []m
 		return nil, err
 	}
 	return append([]byte(xml.Header), raw...), nil
+}
+
+func authorDisplayName(user *models.User) string {
+	if user == nil {
+		return ""
+	}
+	name := strings.TrimSpace(strings.TrimSpace(user.GivenName + " " + user.FamilyName))
+	if name != "" {
+		return name
+	}
+	return strings.TrimSpace(user.Username)
 }

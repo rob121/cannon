@@ -66,6 +66,7 @@ func addRouteToMenu(db *gorm.DB, route models.Route, menuID uint, parentID *uint
 		ParentID: parentID,
 		Name:     name,
 		RouteID:  &route.RouteID,
+		Status:   models.StatusActive,
 		Sort:     nextMenuItemSort(db, menuID, parentID),
 	}
 	if err := router.ValidateMenuItemParent(menuItems, item, parentID); err != nil {

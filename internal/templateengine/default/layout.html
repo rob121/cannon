@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-  <link href="/theme/site.css" rel="stylesheet">
+  <link href="{{themeAsset "site.css"}}" rel="stylesheet">
   {{if .HeadExtra}}{{.HeadExtra}}{{end}}
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -59,7 +59,7 @@
     </div>
   </nav>
 
-  {{if gt (lenspace "header") 0}}
+  {{if hasSpace "header"}}
   <div class="site-banner border-bottom bg-body-tertiary">
     <div class="container py-3">{{space "header"}}</div>
   </div>
@@ -68,10 +68,10 @@
   <main class="site-main flex-grow-1 py-4 py-lg-5">
     <div class="container">
       <div class="row g-4">
-        <div class="col-12{{if gt (lenspace "sidebar") 0}} col-lg-9{{end}}">
+        <div class="col-12{{if hasSpace "sidebar"}} col-lg-9{{end}}">
           {{.Main}}
         </div>
-        {{if gt (lenspace "sidebar") 0}}
+        {{if hasSpace "sidebar"}}
         <aside class="col-12 col-lg-3" aria-label="{{lang "common.sidebar"}}">
           {{space "sidebar"}}
         </aside>
@@ -110,7 +110,7 @@
           </ul>
         </div>
       </div>
-      {{if gt (lenspace "footer") 0}}
+      {{if hasSpace "footer"}}
       <div class="site-footer-blocks mt-4 pt-4 border-top">{{space "footer"}}</div>
       {{end}}
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4 pt-3 border-top text-muted small">

@@ -2,7 +2,7 @@
 <div class="admin-form-card">
   <div class="admin-form-card-body">
     {{template "error_alert" .}}
-    <form method="post">
+    <form method="post" action="{{.FormAction}}">
       {{csrfField}}
       <div class="row g-3">
         {{if .IsNew}}
@@ -24,6 +24,13 @@
         <div class="col-md-6">
           <label class="admin-form-label">Name</label>
           <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label">Status</label>
+          <select class="admin-form-control" name="status">
+            <option value="active" {{if ne .Row.Status "inactive"}}selected{{end}}>Active</option>
+            <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
+          </select>
         </div>
         <div class="col-md-6">
           <label class="admin-form-label">Parent Item</label>
@@ -77,6 +84,7 @@
       <thead>
         <tr>
           <th>Name</th>
+          <th>Status</th>
           <th>Parent</th>
           <th>Route</th>
           <th>Sort</th>
@@ -86,6 +94,7 @@
         {{range .MenuItemRows}}
         <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
           <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" .IsCurrent)}}</td>
+          <td>{{template "status_badge" .Item.Status}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
           <td>{{.Item.Sort}}</td>

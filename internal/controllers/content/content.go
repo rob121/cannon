@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rob121/cannon/internal/captcha"
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers"
-	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -159,6 +159,7 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
+	leadingItems, remainingItems := cms.SplitCategoryLeadingItems(items, listSettings, page)
 	categories, _ := cms.CategoryTree(ctx.GoContext())
 	showTitle, _ := cms.CategoryShowTitle(ctx.GoContext(), cat)
 	showDescription, _ := cms.CategoryShowDescription(ctx.GoContext(), cat)
@@ -170,17 +171,21 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		}
 	}
 	data := map[string]any{
-		"Category":          cat,
-		"Items":             items,
-		"Total":             total,
-		"Page":              page,
-		"PageSize":          listSettings.PageSize,
-		"TotalPages":        cms.ListTotalPages(total, listSettings.PageSize),
-		"Pagination":        listSettings.Pagination,
-		"ListColumns":       listSettings.Columns,
-		"ItemListClass":     cms.CategoryItemListClass(listSettings.Columns),
-		"PaginationBaseURL": cms.CategoryURLForContext(ctx.GoContext(), cat.Slug),
-		"Categories":        categories,
+		"Category":                cat,
+		"Items":                   items,
+		"LeadingItems":            leadingItems,
+		"RemainingItems":          remainingItems,
+		"Total":                   total,
+		"Page":                    page,
+		"PageSize":                listSettings.PageSize,
+		"TotalPages":              cms.ListTotalPages(total, listSettings.PageSize),
+		"Pagination":              listSettings.Pagination,
+		"ListColumns":             listSettings.Columns,
+		"ItemListClass":           cms.CategoryItemListClass(listSettings.Columns),
+		"ShowReadMore":            listSettings.ShowReadMore,
+		"LeadingArticles":         listSettings.LeadingItems,
+		"PaginationBaseURL":       cms.CategoryURLForContext(ctx.GoContext(), cat.Slug),
+		"Categories":              categories,
 		"ShowCategoryTitle":       showTitle,
 		"ShowCategoryDescription": showDescription,
 		"CanCreate":               canCreate,
@@ -498,31 +503,31 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 		title = "Search: " + query
 	}
 	return controllers.HTML(title, map[string]any{
-		"Query":               query,
-		"Items":               items,
-		"Total":               total,
-		"Page":                page,
-		"PageSize":            searchPageSize,
-		"TotalPages":          cms.ListTotalPages(total, searchPageSize),
-		"Pagination":          true,
-		"PaginationBaseURL":   searchPaginationBaseURL(ctx.Request),
-		"ResultFrom":          resultFrom,
-		"ResultTo":            resultTo,
-		"Categories":          categoryOptions,
-		"Tags":                tags,
-		"Authors":             authors,
-		"CategoryID":          categoryID,
-		"TagID":               tagID,
-		"AuthorID":            authorID,
-		"Sort":                sort,
-		"SearchFields":        searchFields,
-		"FieldFilters":        opts.FieldFilters,
-		"HasFilters":          hasFilters,
-		"HasQueryOrFilters":   hasQueryOrFilters,
-		"ClearFiltersURL":     searchClearFiltersURL(query),
-		"SelectedCategory":    selectedCategory,
-		"SelectedTag":         selectedTag,
-		"SelectedAuthor":      selectedAuthor,
+		"Query":             query,
+		"Items":             items,
+		"Total":             total,
+		"Page":              page,
+		"PageSize":          searchPageSize,
+		"TotalPages":        cms.ListTotalPages(total, searchPageSize),
+		"Pagination":        true,
+		"PaginationBaseURL": searchPaginationBaseURL(ctx.Request),
+		"ResultFrom":        resultFrom,
+		"ResultTo":          resultTo,
+		"Categories":        categoryOptions,
+		"Tags":              tags,
+		"Authors":           authors,
+		"CategoryID":        categoryID,
+		"TagID":             tagID,
+		"AuthorID":          authorID,
+		"Sort":              sort,
+		"SearchFields":      searchFields,
+		"FieldFilters":      opts.FieldFilters,
+		"HasFilters":        hasFilters,
+		"HasQueryOrFilters": hasQueryOrFilters,
+		"ClearFiltersURL":   searchClearFiltersURL(query),
+		"SelectedCategory":  selectedCategory,
+		"SelectedTag":       selectedTag,
+		"SelectedAuthor":    selectedAuthor,
 	})
 }
 

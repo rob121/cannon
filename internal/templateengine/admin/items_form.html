@@ -211,7 +211,7 @@
               <select class="admin-form-control" id="item-author" name="author_id">
                 <option value="">None</option>
                 {{range .Users}}
-                <option value="{{.UserID}}" {{if uintPtrEq $.Row.AuthorID .UserID}}selected{{end}}>{{.Username}}</option>
+                <option value="{{.UserID}}" {{if uintPtrEq $.Row.AuthorID .UserID}}selected{{end}}>{{userName .}}</option>
                 {{end}}
               </select>
             </div>

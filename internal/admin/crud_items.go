@@ -11,6 +11,7 @@ import (
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -138,7 +139,7 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 			lr.CategoryName = row.Category.Name
 		}
 		if row.Author != nil {
-			lr.AuthorName = row.Author.Username
+			lr.AuthorName = user.DisplayName(row.Author)
 		}
 		if pos, ok := sortPos[row.ItemID]; ok {
 			lr.CanMoveUp = pos.canMoveUp
@@ -368,27 +369,27 @@ func (h *Handler) renderItemForm(w http.ResponseWriter, r *http.Request, db *gor
 		tagIDs = append(tagIDs, t.TagID)
 	}
 	data := formData(map[string]any{
-		"ActiveNav":     "items",
-		"Row":           row,
-		"IsNew":         isNew,
-		"BasePath":      itemsBase,
-		"Subtitle":      subtitle,
-		"AllGroups":     allGroups,
-		"SelectedIDs":   defaultGroupSelectedIDs(db, row.Groups, isNew),
-		"AllTags":       allTags,
+		"ActiveNav":      "items",
+		"Row":            row,
+		"IsNew":          isNew,
+		"BasePath":       itemsBase,
+		"Subtitle":       subtitle,
+		"AllGroups":      allGroups,
+		"SelectedIDs":    defaultGroupSelectedIDs(db, row.Groups, isNew),
+		"AllTags":        allTags,
 		"SelectedTagIDs": tagIDs,
-		"Categories":    content.FlattenCategoryOptions(categories),
-		"Users":         users,
-		"CustomFields":  customFields,
-		"FieldValues":   fieldValues,
-		"Gallery":       content.ParseGalleryJSON(row.GalleryJSON),
-		"Embeds":        content.ParseEmbedsJSON(row.EmbedJSON),
-		"Attachments":   content.ParseAttachmentsJSON(row.AttachmentsJSON),
-		"PreviewURL":    itemPreviewURL(r, row),
-		"ShowPreview":   r.URL.Query().Get("preview") == "1",
-		"RevisionsURL":  fmt.Sprintf("%s/%d/revisions", itemsBase, row.ItemID),
+		"Categories":     content.FlattenCategoryOptions(categories),
+		"Users":          users,
+		"CustomFields":   customFields,
+		"FieldValues":    fieldValues,
+		"Gallery":        content.ParseGalleryJSON(row.GalleryJSON),
+		"Embeds":         content.ParseEmbedsJSON(row.EmbedJSON),
+		"Attachments":    content.ParseAttachmentsJSON(row.AttachmentsJSON),
+		"PreviewURL":     itemPreviewURL(r, row),
+		"ShowPreview":    r.URL.Query().Get("preview") == "1",
+		"RevisionsURL":   fmt.Sprintf("%s/%d/revisions", itemsBase, row.ItemID),
 		"ContentLocales": adminContentLocales(r),
-		"Translations":  itemTranslations(r, row),
+		"Translations":   itemTranslations(r, row),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

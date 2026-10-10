@@ -8,7 +8,7 @@
   </div>
   <div class="admin-form-card-body">
     {{template "error_alert" .}}
-    <form method="post">
+    <form method="post" action="{{.FormAction}}">
       {{csrfField}}
       <div class="row g-3">
         {{if not .IsNew}}
@@ -23,7 +23,7 @@
         </div>
         <div class="col-md-4">
           <label class="admin-form-label">Host URL</label>
-          <input class="admin-form-control" name="host" value="{{.Row.Host}}" placeholder="http://localhost:8001">
+          <input class="admin-form-control" name="host" value="{{.Row.Host}}" placeholder="http://example.test" required>
         </div>
         <div class="col-12"><div class="admin-form-divider"></div></div>
         <div class="col-md-4">

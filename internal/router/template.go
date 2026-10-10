@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"strings"
 
 	"github.com/rob121/cannon/internal/models"
 )
@@ -43,7 +44,25 @@ func ShowTitleForRoute(route models.Route) bool {
 	}
 	return route.ShowTitle
 }
+
+// IsDefaultRouteContext reports whether the matched route is the site default.
 func IsDefaultRouteContext(ctx context.Context) bool {
 	route, ok := MatchedRoute(ctx)
 	return ok && route.IsDefault
+}
+
+// IsRouteContext reports whether the matched route equals controller and optional action.
+func IsRouteContext(ctx context.Context, controller, action string) bool {
+	route, ok := RouteFromContext(ctx)
+	if !ok {
+		return false
+	}
+	if !strings.EqualFold(strings.TrimSpace(controller), route.Controller) {
+		return false
+	}
+	action = strings.TrimSpace(action)
+	if action == "" {
+		return true
+	}
+	return strings.EqualFold(action, route.Action)
 }

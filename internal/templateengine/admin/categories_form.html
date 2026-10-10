@@ -92,44 +92,58 @@
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Inherit Settings</label>
-              {{template "form_toggle" (dict "Name" "inherit_settings" "Checked" .Row.InheritSettings "OnLabel" "Inherit from parent" "OffLabel" "Custom settings")}}
+              {{template "form_toggle" (dict "Name" "inherit_settings" "Checked" .Row.InheritSettings "OnLabel" "Inherit From Parent" "OffLabel" "Custom Settings")}}
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Show Title</label>
-              {{template "form_toggle" (dict "Name" "show_title" "Checked" .Row.ShowTitle "OnLabel" "Show category title" "OffLabel" "Hide category title")}}
+              {{template "form_toggle" (dict "Name" "show_title" "Checked" .Row.ShowTitle "OnLabel" "Show Category Title" "OffLabel" "Hide Category Title")}}
               <p class="admin-form-help mb-0">When inherit is enabled, the parent category&rsquo;s setting applies.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Show Description</label>
-              {{template "form_toggle" (dict "Name" "show_description" "Checked" .Row.ShowDescription "OnLabel" "Show description on page" "OffLabel" "Hide description on page")}}
+              {{template "form_toggle" (dict "Name" "show_description" "Checked" .Row.ShowDescription "OnLabel" "Show Description On Page" "OffLabel" "Hide Description On Page")}}
               <p class="admin-form-help mb-0">When inherit is enabled, the parent category&rsquo;s setting applies.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Read More</label>
+              {{template "form_toggle" (dict "Name" "show_read_more" "Checked" .Row.ShowReadMore "OnLabel" "Show Read More Buttons" "OffLabel" "Hide Read More Buttons")}}
+              <p class="admin-form-help mb-0">When enabled, category item intros include a Read More button linking to the full item.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Leading Articles</label>
+              <select class="admin-form-control" name="leading_articles">
+                {{range .LeadingArticleOptions}}
+                <option value="{{.}}" {{if eq $.Row.LeadingArticles .}}selected{{end}}>{{.}}</option>
+                {{end}}
+              </select>
+              <p class="admin-form-help mb-0">Number of category items to show full width before the column layout begins.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Columns Per Row</label>
               <select class="admin-form-control" name="list_columns">
-                <option value="1" {{if eq .Row.ListColumns 1}}selected{{end}}>1 column</option>
-                <option value="2" {{if eq .Row.ListColumns 2}}selected{{end}}>2 columns</option>
-                <option value="3" {{if or (eq .Row.ListColumns 3) (eq .Row.ListColumns 0)}}selected{{end}}>3 columns</option>
-                <option value="4" {{if eq .Row.ListColumns 4}}selected{{end}}>4 columns</option>
+                <option value="1" {{if eq .Row.ListColumns 1}}selected{{end}}>1 Column</option>
+                <option value="2" {{if eq .Row.ListColumns 2}}selected{{end}}>2 Columns</option>
+                <option value="3" {{if or (eq .Row.ListColumns 3) (eq .Row.ListColumns 0)}}selected{{end}}>3 Columns</option>
+                <option value="4" {{if eq .Row.ListColumns 4}}selected{{end}}>4 Columns</option>
               </select>
               <p class="admin-form-help mb-0">How many item cards appear on each row.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Pagination</label>
-              {{template "form_toggle" (dict "Name" "list_pagination" "Checked" .Row.ListPagination "OnLabel" "Paginate items" "OffLabel" "Show all items")}}
+              {{template "form_toggle" (dict "Name" "list_pagination" "Checked" .Row.ListPagination "OnLabel" "Paginate Items" "OffLabel" "Show All Items")}}
               <p class="admin-form-help mb-0">When disabled, every item in the category is shown on one page.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Items Per Page</label>
               <select class="admin-form-control" name="list_page_size">
-                <option value="6" {{if eq .Row.ListPageSize 6}}selected{{end}}>6 items</option>
-                <option value="9" {{if eq .Row.ListPageSize 9}}selected{{end}}>9 items</option>
-                <option value="12" {{if eq .Row.ListPageSize 12}}selected{{end}}>12 items</option>
-                <option value="18" {{if eq .Row.ListPageSize 18}}selected{{end}}>18 items</option>
-                <option value="20" {{if or (eq .Row.ListPageSize 20) (eq .Row.ListPageSize 0)}}selected{{end}}>20 items</option>
-                <option value="24" {{if eq .Row.ListPageSize 24}}selected{{end}}>24 items</option>
-                <option value="30" {{if eq .Row.ListPageSize 30}}selected{{end}}>30 items</option>
-                <option value="50" {{if eq .Row.ListPageSize 50}}selected{{end}}>50 items</option>
+                <option value="6" {{if eq .Row.ListPageSize 6}}selected{{end}}>6 Items</option>
+                <option value="9" {{if eq .Row.ListPageSize 9}}selected{{end}}>9 Items</option>
+                <option value="12" {{if eq .Row.ListPageSize 12}}selected{{end}}>12 Items</option>
+                <option value="18" {{if eq .Row.ListPageSize 18}}selected{{end}}>18 Items</option>
+                <option value="20" {{if or (eq .Row.ListPageSize 20) (eq .Row.ListPageSize 0)}}selected{{end}}>20 Items</option>
+                <option value="24" {{if eq .Row.ListPageSize 24}}selected{{end}}>24 Items</option>
+                <option value="30" {{if eq .Row.ListPageSize 30}}selected{{end}}>30 Items</option>
+                <option value="50" {{if eq .Row.ListPageSize 50}}selected{{end}}>50 Items</option>
               </select>
               <p class="admin-form-help mb-0">Used when pagination is enabled.</p>
             </div>

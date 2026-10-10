@@ -25,6 +25,7 @@ Available on **public site and admin** templates (from `templateengine.FuncMap`)
 |----------|-----------|-------------|
 | `space` | `space "name"` | Renders the HTML for a block space. Returns trusted `template.HTML`. No-op when block rendering is unavailable (admin previews). |
 | `lenspace` | `lenspace "name"` | Returns the count of active blocks assigned to the space for the current viewer. Use with `if gt (lenspace "header") 0`. |
+| `hasSpace` | `hasSpace "name"` | `true` when `lenspace` is greater than zero. Shorthand for layout conditionals. |
 
 ### Math (integer-friendly)
 
@@ -37,44 +38,133 @@ Cannon replaces Sprig's float-oriented math for pagination and list UI. Argument
 | `mul` | `{{mul 3 4}}` | `12` |
 | `div` | `{{div 10 3}}` | `4` (ceiling division; `0` if divisor is `0`) |
 | `min` | `{{min 3 7}}` | `3` |
+| `intRange` | `{{range intRange 3}}…{{end}}` | Iterate `0`, `1`, `2` |
 
-### Maps and strings
+### Maps, strings, and lists
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `dict` | `dict "key1" val1 "key2" val2` | Builds a `map[string]any` for passing structured data to partials. Keys must be strings; odd argument count errors at render time. |
 | `queryEscape` | `queryEscape "a b"` | URL-query-escapes a string (`url.QueryEscape`). |
 | `initials` | `initials "Jane" "Doe"` | First letter of each non-empty argument, uppercased, max two characters. Returns `"?"` when empty. |
+| `paginationURL` | `paginationURL "/path" 2` | Appends `?page=2` or `&page=2` to a base URL. |
+| `inUint` | `inUint .SelectedIDs 3` | Whether a `[]uint` contains the id. |
+| `inString` | `inString .Values "draft"` | Whether a `[]string` contains the value. |
 
-## Frontend-only functions
-
-Added when rendering the public site (`internal/server/server.go`).
+### Captcha
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `menu` | `menu "main"` | Returns top-level menu items for the named menu. Each item has `Name`, `Href`, `Class`, `Target`, and optional nested `Children` (same shape). Menus are configured under **Admin → Menus**. |
-| `homeURL` | `homeURL` | Path of the site default route (from **Admin → Routes**). |
+| `captcha` | `captcha "login"` or `captcha "comment" "any"` | Emits a `<captcha>` placeholder expanded before render. |
+
+## Frontend-only functions
+
+Added when rendering the public site.
+
+### Localization
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `lang` | `lang "key"` or `lang "key" "name" "value" …` | Looks up a translation. Returns the key when missing. Append `?tp=1` to show keys in parentheses. |
+| `localeTag` | `localeTag` | BCP 47 locale tag for the active request (e.g. `en-US`). |
+
+### Site, routes, and navigation
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `siteName` | `siteName` | Site display name from `sites.json`. |
+| `homeURL` | `homeURL` | Path of the site default route. |
 | `isDefaultRoute` | `isDefaultRoute` | `true` when the current request matched the default route. |
+| `isRoute` | `isRoute "content" "item"` | `true` when the matched controller route equals controller and optional action. |
+| `isCurrentPath` | `isCurrentPath "/blog"` | `true` when the request path matches a menu href or path prefix. |
 | `routeName` | `routeName` | Display name of the matched route, or empty. |
 | `routePath` | `routePath` | Path pattern of the matched route (e.g. `/`, `/content/item/*`). |
 | `routeController` | `routeController` | Controller id for controller routes (e.g. `content`, `auth`). |
 | `routeAction` | `routeAction` | Controller action id (e.g. `index`, `item`). |
-| `richText` | `richText .Category.Description` | Renders stored HTML or Markdown from the admin editor as safe HTML (category descriptions, item intros in listings). |
-| `siteName` | `siteName` | Site display name from `sites.json`. |
+| `showRouteTitle` | `showRouteTitle` | Whether the current route should render a page header title. |
+| `controllerURL` | `controllerURL "auth" "login"` | Resolved path for a controller action. |
+| `controllerURLFor` | `controllerURLFor "content" "item" "slug"` | Controller URL with a suffix segment. |
+| `menu` | `menu "main"` | Top-level menu items. Each item has `Name`, `Href`, `Class`, `Target`, and optional nested `Children`. |
+| `isOffline` | `isOffline` | `true` when the site is in maintenance/offline mode. |
 | `year` | `year` | Current calendar year (for footers). |
 
-Example:
+### Content URLs and queries
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `itemURL` | `itemURL "my-slug"` | Locale-aware path to an item. |
+| `categoryURL` | `categoryURL "news"` | Path to a category. |
+| `tagURL` | `tagURL "release"` | Path to a tag listing. |
+| `authorURL` | `authorURL "ada"` | Path to an author page (username or id). |
+| `searchURL` | `searchURL "query"` | Path to search results. |
+| `featuredURL` | `featuredURL` | Path to the featured items listing. |
+| `items` | `items "featured" 5` | Fetch items (`featured`, `popular`, or latest). Respects viewer groups. |
+| `categories` | `categories` | Category tree for the current site. |
+| `tags` | `tags` | All tags. |
+| `tagCloud` | `tagCloud 20` | Tags with usage counts. |
+| `commentCount` | `commentCount .Item.ItemID` | Approved comment count for an item. |
+
+### Display helpers
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `userName` | `userName .Author` or `userName .Author "Override"` | Display name from given/family name or username. Optional override wins when non-empty. |
+| `formatDate` | `formatDate .PublishStart "January 2, 2006"` | Format a `*time.Time`; empty when nil or zero. |
+| `itemDate` | `itemDate $item "January 2, 2006"` | Format publish start, falling back to created date. |
+| `itemDateISO` | `itemDateISO $item` | ISO date (`2006-01-02`) for `<time datetime="…">`. |
+| `itemHasDate` | `itemHasDate $item` | Whether an item has a publish or created date to show. |
+| `richText` | `richText .Intro` | Render stored HTML or Markdown as safe HTML. |
+| `excerpt` | `excerpt .Intro 160` | Plain-text teaser from rich text, truncated by rune count. |
+| `safeHTML` | `safeHTML .Trusted` | Mark a string as trusted HTML. |
+| `formatDateTimeLocal` | `formatDateTimeLocal .PublishStart` | Value for `<input type="datetime-local">`. |
+
+### SEO, settings, and assets
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `siteMetaDescription` | `siteMetaDescription` | Default meta description from Configuration → SEO. |
+| `siteMetaKeywords` | `siteMetaKeywords` | Default meta keywords. |
+| `siteOGTitle` | `siteOGTitle` | Default Open Graph title. |
+| `siteOGImage` | `siteOGImage` | Default Open Graph image URL. |
+| `siteTwitterCard` | `siteTwitterCard` | Twitter card type (`summary` or `summary_large_image`). |
+| `siteTwitterSite` | `siteTwitterSite` | Site Twitter handle. |
+| `siteTwitterCreator` | `siteTwitterCreator` | Default creator Twitter handle. |
+| `siteHeadExtra` | `siteHeadExtra` | Additional trusted head markup from Configuration → SEO. |
+| `absoluteURL` | `absoluteURL "/path"` | Build an absolute URL using the current request host and scheme. |
+| `themeAsset` | `themeAsset "site.css"` | Public URL for a theme asset (`/theme/…`). |
+| `setting` | `setting "general" "site_name"` | Read an allowlisted public configuration string. Returns empty for private keys. |
+| `settingBool` | `settingBool "content" "allow_comments"` | Read an allowlisted public boolean configuration value. |
+
+Allowlisted `setting` / `settingBool` sections:
+
+- **general** — `site_name`, `frontend_theme`, `allow_login`, `allow_signup`, `content_multilingual`, `content_default_locale`, `content_locales`
+- **seo** — `site_meta_description`, `site_meta_keywords`, `site_og_title`, `site_og_image`, `site_twitter_card`, `site_twitter_site`, `site_twitter_creator`, `site_head_extra`
+- **content** — `allow_comments`, `require_login`, `allow_anonymous`, `auto_approve`, `show_title`, `show_author`, `show_published_date`, `show_author_bio`, `show_comments`
+- **analytics** — `enabled`
+
+### Custom fields
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `fieldOptions` | `fieldOptions .Field.Configuration` | Parsed select/radio/checkbox options. |
+| `fieldValueContains` | `fieldValueContains $value "opt"` | Whether a stored multi-value contains an option. |
+
+### Examples
 
 ```html
 <footer>
   <p>&copy; {{year}} {{siteName}}</p>
   {{range menu "footer"}}
-  <a href="{{.Href}}">{{.Name}}</a>
-  {{range .Children}}
-  <a href="{{.Href}}">{{.Name}}</a>
-  {{end}}
+  <a href="{{.Href}}" class="{{if isCurrentPath .Href}}active{{end}}">{{.Name}}</a>
   {{end}}
 </footer>
+
+<link href="{{themeAsset "site.css"}}" rel="stylesheet">
+<link rel="canonical" href="{{absoluteURL .CanonicalURL}}">
+
+{{if settingBool "content" "allow_comments"}}
+  …
+{{end}}
 ```
 
 ## Admin-only functions
@@ -267,6 +357,6 @@ Pipeline syntax passes the left value as the last argument to the right function
 
 ## Related topics
 
-- **Help → Templates → Frontend Templates** — layout, block spaces, menus, and override workflow.
+- **Help → Templates → Frontend Templates** — layout, header partials, block spaces, menus, and override workflow.
 - **Admin → Templates** — browse and override built-in `default/` and `admin/` HTML.
 - **EXTENSIONS.md** (repository) — extension template overrides under `extension/`.

@@ -169,6 +169,8 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.InheritSettings = formBool(r, "inherit_settings")
 		row.ShowTitle = formBool(r, "show_title")
 		row.ShowDescription = formBool(r, "show_description")
+		row.ShowReadMore = formBool(r, "show_read_more")
+		row.LeadingArticles = content.NormalizeCategoryLeadingArticles(formInt(r, "leading_articles", 0))
 		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
 		row.ListPagination = formBool(r, "list_pagination")
 		row.ListPageSize = content.NormalizeCategoryListPageSize(formInt(r, "list_page_size", content.DefaultCategoryListPageSize))
@@ -186,7 +188,7 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		if isNew {
 			saveErr = db.Select(
 				"ParentID", "Locale", "Name", "Slug", "Description", "Image", "Template",
-				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
+				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ShowReadMore", "LeadingArticles", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
 			).Create(&row).Error
 		} else {
 			saveErr = db.Save(&row).Error
@@ -218,16 +220,21 @@ func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row
 	}
 	db, _ := sites.DB(r.Context())
 	data := formData(map[string]any{
-		"ActiveNav":       "categories",
-		"Row":             row,
-		"IsNew":           isNew,
-		"BasePath":        categoriesBase,
-		"Subtitle":        subtitle,
-		"AllGroups":       allGroups,
-		"SelectedIDs":     defaultGroupSelectedIDs(db, row.Groups, isNew),
-		"FieldGroups":     fieldGroups,
-		"AllCategories":   content.CategoryParentOptions(allCats, row.CategoryID),
+		"ActiveNav":      "categories",
+		"Row":            row,
+		"IsNew":          isNew,
+		"BasePath":       categoriesBase,
+		"Subtitle":       subtitle,
+		"AllGroups":      allGroups,
+		"SelectedIDs":    defaultGroupSelectedIDs(db, row.Groups, isNew),
+		"FieldGroups":    fieldGroups,
+		"AllCategories":  content.CategoryParentOptions(allCats, row.CategoryID),
 		"ContentLocales": adminContentLocales(r),
+		"LeadingArticleOptions": []int{
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+			11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+			21, 22, 23, 24, 25,
+		},
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

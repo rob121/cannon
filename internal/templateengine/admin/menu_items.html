@@ -20,6 +20,7 @@
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
           {{template "sort_th" (dict "Root" $ "Key" "menu" "Label" "Menu")}}
+          {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th>Parent</th>
           <th>Route</th>
           <th>Order</th>
@@ -33,13 +34,14 @@
             {{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" false)}}
           </td>
           <td>{{if index $.MenuNames .Item.MenuID}}{{index $.MenuNames .Item.MenuID}}{{else}}—{{end}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .Item.MenuItemID "Status" .Item.Status "ListQuery" $.ListQuery)}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
           <td>{{template "sort_controls" (dict "Root" $ "ID" .Item.MenuItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery)}}
         </tr>
         {{else}}
-        <tr><td colspan="6" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add links and pages to build this menu's structure." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
+        <tr><td colspan="7" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-list-nested" "Title" "No menu items yet" "Message" "Add links and pages to build this menu's structure." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
         {{end}}
       </tbody>
     </table>

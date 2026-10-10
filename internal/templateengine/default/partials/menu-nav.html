@@ -9,14 +9,14 @@
 {{$hasChildren := and $children (lt $depth 3)}}
 {{if $hasChildren}}
 <li class="nav-item dropdown{{if gt $depth 1}} dropend{{end}}">
-  <a class="nav-link dropdown-toggle {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+  <a class="nav-link dropdown-toggle{{if isCurrentPath $item.Href}} active{{end}} {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
   <ul class="dropdown-menu">
     {{range $children}}{{template "menu-nav-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
   </ul>
 </li>
 {{else}}
 <li class="nav-item">
-  <a class="nav-link {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+  <a class="nav-link{{if isCurrentPath $item.Href}} active{{end}} {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
 </li>
 {{end}}
 {{end}}
@@ -28,12 +28,12 @@
 {{$hasChildren := and $children (lt $depth 3)}}
 {{if $hasChildren}}
 <li class="dropend">
-  <a class="dropdown-item dropdown-toggle {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
+  <a class="dropdown-item dropdown-toggle{{if isCurrentPath $item.Href}} active{{end}} {{$item.Class}}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a>
   <ul class="dropdown-menu">
     {{range $children}}{{template "menu-nav-dropdown-node" (dict "Item" . "Depth" (add $depth 1))}}{{end}}
   </ul>
 </li>
 {{else}}
-<li><a class="dropdown-item {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a></li>
+<li><a class="dropdown-item{{if isCurrentPath $item.Href}} active{{end}} {{$item.Class}}" href="{{$item.Href}}"{{template "menu-nav-link-attrs" $item}}>{{$item.Name}}</a></li>
 {{end}}
 {{end}}

@@ -13,8 +13,8 @@ import (
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/models"
-	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/settings"
+	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -139,11 +139,21 @@ func slugify(v string) string {
 	return v
 }
 
-const defaultPageSize = 25
+const (
+	defaultPageSize = 25
+	pageSizeParam   = "page_size"
+)
+
+var pageSizeOptions = []int{25, 50, 75, 100, 200, 500}
 
 func pageSizeFor(r *http.Request) int {
 	if r == nil {
 		return defaultPageSize
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get(pageSizeParam)); raw != "" {
+		if size, err := strconv.Atoi(raw); err == nil && size > 0 {
+			return settings.NormalizeListLimit(size)
+		}
 	}
 	limit, err := settings.DefaultListLimit(r.Context())
 	if err != nil || limit <= 0 {
@@ -152,9 +162,15 @@ func pageSizeFor(r *http.Request) int {
 	return limit
 }
 
+func adminPageSizeOptions() []int {
+	out := make([]int, len(pageSizeOptions))
+	copy(out, pageSizeOptions)
+	return out
+}
+
 func listData(page int, total int64, size int, extra map[string]any) map[string]any {
 	data := map[string]any{
-		"Page": page, "Total": total, "PageSize": size,
+		"Page": page, "Total": total, "PageSize": size, "PageSizeOptions": adminPageSizeOptions(),
 		"Sort": "", "Dir": "asc",
 	}
 	for k, v := range extra {
@@ -195,16 +211,12 @@ func layoutContext(r *http.Request) map[string]any {
 	}
 	if svc, err := user.FromContext(r.Context()); err == nil {
 		if u, err := svc.Current(r.Context()); err == nil {
-			displayName := strings.TrimSpace(strings.TrimSpace(u.GivenName + " " + u.FamilyName))
-			if displayName == "" {
-				displayName = u.Username
-			}
 			data["CurrentUser"] = map[string]any{
 				"ID":          u.UserID,
 				"Username":    u.Username,
 				"GivenName":   u.GivenName,
 				"FamilyName":  u.FamilyName,
-				"DisplayName": displayName,
+				"DisplayName": user.DisplayName(u),
 			}
 		}
 	}
@@ -221,10 +233,7 @@ func layoutContext(r *http.Request) map[string]any {
 func dashboardWelcomeSubtitle(r *http.Request) string {
 	if svc, err := user.FromContext(r.Context()); err == nil {
 		if u, err := svc.Current(r.Context()); err == nil {
-			name := strings.TrimSpace(strings.TrimSpace(u.GivenName + " " + u.FamilyName))
-			if name == "" {
-				name = u.Username
-			}
+			name := user.DisplayName(u)
 			if name != "" {
 				return "Welcome back, " + name + ". Here's an overview of your site today."
 			}

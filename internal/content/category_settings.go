@@ -16,9 +16,11 @@ const (
 
 // CategoryListingSettings controls how items render on a category page.
 type CategoryListingSettings struct {
-	Columns    int
-	Pagination bool
-	PageSize   int
+	Columns      int
+	Pagination   bool
+	PageSize     int
+	ShowReadMore bool
+	LeadingItems int
 }
 
 // ResolveCategorySettings returns the category whose display settings apply,
@@ -77,15 +79,19 @@ func ResolveCategoryListingSettings(ctx context.Context, cat *models.Category) (
 	}
 	if resolved == nil {
 		return CategoryListingSettings{
-			Columns:    DefaultCategoryListColumns,
-			Pagination: true,
-			PageSize:   DefaultCategoryListPageSize,
+			Columns:      DefaultCategoryListColumns,
+			Pagination:   true,
+			PageSize:     DefaultCategoryListPageSize,
+			ShowReadMore: false,
+			LeadingItems: 0,
 		}, nil
 	}
 	return CategoryListingSettings{
-		Columns:    NormalizeCategoryListColumns(resolved.ListColumns),
-		Pagination: resolved.ListPagination,
-		PageSize:   NormalizeCategoryListPageSize(resolved.ListPageSize),
+		Columns:      NormalizeCategoryListColumns(resolved.ListColumns),
+		Pagination:   resolved.ListPagination,
+		PageSize:     NormalizeCategoryListPageSize(resolved.ListPageSize),
+		ShowReadMore: resolved.ShowReadMore,
+		LeadingItems: NormalizeCategoryLeadingArticles(resolved.LeadingArticles),
 	}, nil
 }
 
@@ -107,6 +113,41 @@ func NormalizeCategoryListPageSize(size int) int {
 	default:
 		return DefaultCategoryListPageSize
 	}
+}
+
+// NormalizeCategoryLeadingArticles clamps the number of full-width leading articles to 0–25.
+func NormalizeCategoryLeadingArticles(count int) int {
+	if count < 0 {
+		return 0
+	}
+	if count > 25 {
+		return 25
+	}
+	return count
+}
+
+// SplitCategoryLeadingItems separates the current page's items into full-width leading items and the remaining column items.
+func SplitCategoryLeadingItems(items []models.Item, settings CategoryListingSettings, page int) ([]models.Item, []models.Item) {
+	leading := NormalizeCategoryLeadingArticles(settings.LeadingItems)
+	if leading <= 0 || len(items) == 0 {
+		return nil, items
+	}
+	if page < 1 {
+		page = 1
+	}
+	pageSize := NormalizeCategoryListPageSize(settings.PageSize)
+	offset := 0
+	if settings.Pagination {
+		offset = (page - 1) * pageSize
+	}
+	remainingLeading := leading - offset
+	if remainingLeading <= 0 {
+		return nil, items
+	}
+	if remainingLeading > len(items) {
+		remainingLeading = len(items)
+	}
+	return items[:remainingLeading], items[remainingLeading:]
 }
 
 // CategoryItemColumnClass returns a Bootstrap column class for item cards.

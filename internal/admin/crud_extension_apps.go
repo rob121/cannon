@@ -58,11 +58,18 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	html, err := extMgr.RenderAdmin(r.Context(), name, suffixPath, r, userCtx)
+	resp, err := extMgr.RenderAdmin(r.Context(), name, suffixPath, r, userCtx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
+		if loc := http.Header(resp.Header).Get("Location"); loc != "" {
+			http.Redirect(w, r, loc, resp.StatusCode)
+			return
+		}
+	}
+	html := resp.Body
 	db, _ := sites.DB(r.Context())
 	title := extensionMenuLabel(name, extensionMenuNames(db))
 	h.render(w, r, title, "admin/extension_app.html", map[string]any{

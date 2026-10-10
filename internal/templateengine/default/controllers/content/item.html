@@ -9,11 +9,11 @@
   {{if or .ContentSettings.ShowAuthor .ContentSettings.ShowPublishedDate}}
   <p class="text-muted small mb-3">
     {{if and .ContentSettings.ShowAuthor .Item.Author}}
-    <span>By <a href="{{authorURL .Item.Author.Username}}">{{if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></span>
+    <span>By <a href="{{authorURL .Item.Author.Username}}">{{userName .Item.Author}}</a></span>
     {{end}}
-    {{if and .ContentSettings.ShowPublishedDate (not .Item.CreatedAt.IsZero)}}
+    {{if and .ContentSettings.ShowPublishedDate (itemHasDate .Item)}}
     {{if and .ContentSettings.ShowAuthor .Item.Author}} · {{end}}
-    <time datetime="{{.Item.CreatedAt.Format "2006-01-02"}}">{{if .Item.PublishStart}}{{.Item.PublishStart.Format "January 2, 2006"}}{{else}}{{.Item.CreatedAt.Format "January 2, 2006"}}{{end}}</time>
+    <time datetime="{{itemDateISO .Item}}">{{itemDate .Item "January 2, 2006"}}</time>
     {{end}}
   </p>
   {{end}}
@@ -30,7 +30,7 @@
   <section class="card shadow-sm mb-4">
     <div class="card-body">
       <h2 class="h5 card-title">About the author</h2>
-      <p class="mb-3"><a href="{{authorURL .Item.Author.Username}}">{{if and .AuthorProfile .AuthorProfile.DisplayName}}{{.AuthorProfile.DisplayName}}{{else if .Item.Author.GivenName}}{{.Item.Author.GivenName}} {{.Item.Author.FamilyName}}{{else}}{{.Item.Author.Username}}{{end}}</a></p>
+      <p class="mb-3"><a href="{{authorURL .Item.Author.Username}}">{{userName .Item.Author .AuthorProfile.DisplayName}}</a></p>
       {{if and .AuthorProfile .AuthorProfile.Fields}}
       <dl class="row mb-0">
         {{range .AuthorProfile.Fields}}

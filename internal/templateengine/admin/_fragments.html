@@ -52,11 +52,21 @@
 {{define "pagination"}}
 {{if .Total}}
 <div class="admin-pagination">
+  <div class="admin-pagination-meta">
   <span class="admin-pagination-summary">
     Showing
     <strong>{{add (mul (sub .Page 1) .PageSize) 1}}</strong>–<strong>{{if lt (mul .Page .PageSize) .Total}}{{mul .Page .PageSize}}{{else}}{{.Total}}{{end}}</strong>
     of <strong>{{.Total}}</strong> results
   </span>
+  <label class="admin-pagination-size">
+    <span>Items per page</span>
+    <select class="admin-form-control admin-form-control-sm" onchange="if (this.value) window.location.href = this.value">
+      {{range .PageSizeOptions}}
+      <option value="{{pageSizeLinkRoot $ .}}" {{if eq $.PageSize .}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </label>
+  </div>
   <div class="admin-pagination-actions">
     {{if gt .Page 1}}
     <a class="btn-admin-ghost btn-admin-sm" href="{{listQuery (sub .Page 1) .Sort .Dir}}" data-turbo-frame="main-content">Previous</a>
@@ -94,6 +104,7 @@
 {{define "sort_preserve_fields"}}
 {{with .Sort}}<input type="hidden" name="sort" value="{{.}}">{{end}}
 {{with .Dir}}<input type="hidden" name="dir" value="{{.}}">{{end}}
+{{with .PageSize}}<input type="hidden" name="page_size" value="{{.}}">{{end}}
 {{end}}
 
 {{define "sort_th"}}
