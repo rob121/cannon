@@ -142,6 +142,131 @@ func TestCategoryListingSettingsUsesOwnReadMoreWhenNotInheriting(t *testing.T) {
 	}
 }
 
+func TestResolveItemDisplaySettingsUsesCategoryItemDisplaySetting(t *testing.T) {
+	ctx, db := categorySettingsTestContext(t)
+
+	cat := models.Category{
+		Name:              "News",
+		Slug:              "news-item-display",
+		ItemTitleDisplay:  content.DisplayYes,
+		ItemAuthorDisplay: content.DisplayNo,
+		ItemDateDisplay:   content.DisplayYes,
+		InheritSettings:   false,
+		Status:            models.StatusActive,
+	}
+	if err := db.Create(&cat).Error; err != nil {
+		t.Fatal(err)
+	}
+	item := models.Item{Title: "Story", Slug: "story", Category: &cat}
+
+	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: false, ShowAuthor: true, ShowPublishedDate: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.ShowTitle || got.ShowAuthor || !got.ShowPublishedDate {
+		t.Fatalf("item display = title:%v author:%v date:%v, want true/false/true from category", got.ShowTitle, got.ShowAuthor, got.ShowPublishedDate)
+	}
+}
+
+func TestResolveItemDisplaySettingsInheritsCategoryItemDisplaySetting(t *testing.T) {
+	ctx, db := categorySettingsTestContext(t)
+
+	parent := models.Category{Name: "Parent", Slug: "parent-item-display", ItemTitleDisplay: content.DisplayNo, ItemAuthorDisplay: content.DisplayNo, ItemDateDisplay: content.DisplayNo, InheritSettings: false, Status: models.StatusActive}
+	if err := db.Create(&parent).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&parent).Updates(map[string]any{
+		"item_title_display":  content.DisplayNo,
+		"item_author_display": content.DisplayNo,
+		"item_date_display":   content.DisplayNo,
+		"inherit_settings":    false,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	child := models.Category{Name: "Child", Slug: "child-item-display", ParentID: &parent.CategoryID, ItemTitleDisplay: content.DisplayYes, ItemAuthorDisplay: content.DisplayYes, ItemDateDisplay: content.DisplayYes, InheritSettings: true, Status: models.StatusActive}
+	if err := db.Create(&child).Error; err != nil {
+		t.Fatal(err)
+	}
+	item := models.Item{Title: "Story", Slug: "story", Category: &child}
+
+	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: true, ShowAuthor: true, ShowPublishedDate: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ShowTitle || got.ShowAuthor || got.ShowPublishedDate {
+		t.Fatalf("item display = title:%v author:%v date:%v, want inherited parent false values", got.ShowTitle, got.ShowAuthor, got.ShowPublishedDate)
+	}
+}
+
+func TestFeaturedCategorySettingsRoundTrip(t *testing.T) {
+	ctx, _ := categorySettingsTestContext(t)
+
+	row := content.FeaturedCategoryDefaults(ctx)
+	row.Name = "Featured Picks"
+	row.Description = "<p>Curated work</p>"
+	row.Image = "/media/featured.jpg"
+	row.Template = "custom/featured.html"
+	row.InheritSettings = false
+	row.ShowTitle = false
+	row.ShowDescription = false
+	row.ShowReadMore = true
+	row.ItemTitleDisplay = content.DisplayNo
+	row.ItemAuthorDisplay = content.DisplayYes
+	row.ItemDateDisplay = content.DisplayNo
+	row.LeadingArticles = 3
+	row.ListColumns = 2
+	row.ListPagination = false
+	row.ListPageSize = 12
+	if err := content.SaveFeaturedCategorySettings(ctx, row); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := content.FeaturedCategorySettings(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Name != "Featured Picks" || got.Slug != "featured" || got.Description != "<p>Curated work</p>" || got.Image != "/media/featured.jpg" || got.Template != "custom/featured.html" {
+		t.Fatalf("featured category identity = %+v, want saved display fields with virtual slug", got)
+	}
+	if got.InheritSettings || got.ShowTitle || got.ShowDescription || !got.ShowReadMore || got.ItemTitleDisplay != content.DisplayNo || got.ItemAuthorDisplay != content.DisplayYes || got.ItemDateDisplay != content.DisplayNo || got.LeadingArticles != 3 || got.ListColumns != 2 || got.ListPagination || got.ListPageSize != 12 {
+		t.Fatalf("featured category settings = %+v, want saved custom settings", got)
+	}
+
+	resolved := content.ResolveFeaturedListingSettings(ctx, got)
+	if resolved.Columns != 2 || resolved.Pagination || resolved.PageSize != 12 || !resolved.ShowReadMore || resolved.LeadingItems != 3 {
+		t.Fatalf("resolved featured settings = %+v, want custom values", resolved)
+	}
+	if content.FeaturedShowTitle(ctx, got) || content.FeaturedShowDescription(ctx, got) {
+		t.Fatalf("featured visibility should use custom hidden title/description")
+	}
+	itemDisplay := content.ResolveFeaturedItemDisplaySettings(ctx, got, content.Settings{ShowTitle: true, ShowAuthor: false, ShowPublishedDate: true})
+	if itemDisplay.ShowTitle || !itemDisplay.ShowAuthor || itemDisplay.ShowPublishedDate {
+		t.Fatalf("featured item display = %+v, want false/true/false", itemDisplay)
+	}
+}
+
+func TestFeaturedCategorySettingsInheritUsesOwnSettingsWithoutParent(t *testing.T) {
+	ctx, _ := categorySettingsTestContext(t)
+
+	row := content.FeaturedCategoryDefaults(ctx)
+	row.InheritSettings = true
+	row.ShowTitle = false
+	row.ShowDescription = false
+	row.ShowReadMore = true
+	row.LeadingArticles = 3
+	row.ListColumns = 2
+	row.ListPagination = false
+	row.ListPageSize = 12
+
+	resolved := content.ResolveFeaturedListingSettings(ctx, row)
+	if resolved.Columns != 2 || resolved.Pagination || resolved.PageSize != 12 || !resolved.ShowReadMore || resolved.LeadingItems != 3 {
+		t.Fatalf("inherited featured settings = %+v, want own top-level settings", resolved)
+	}
+	if content.FeaturedShowTitle(ctx, row) || content.FeaturedShowDescription(ctx, row) {
+		t.Fatalf("inherited featured title/description should use own top-level settings")
+	}
+}
+
 func TestCategoryItemColumnClass(t *testing.T) {
 	if cms := content.CategoryItemColumnClass(1); cms != "col-12" {
 		t.Fatalf("1 column: %q", cms)

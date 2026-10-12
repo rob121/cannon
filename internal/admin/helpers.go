@@ -205,7 +205,7 @@ func formData(extra map[string]any) map[string]any {
 func layoutContext(r *http.Request) map[string]any {
 	data := map[string]any{}
 	if site, err := sites.FromContext(r.Context()); err == nil {
-		data["SiteName"] = site.Name
+		data["SiteName"] = adminSiteDisplayName(r, site)
 		data["SiteURL"] = siteFrontendURL(site.Host)
 		data["SiteHostLabel"] = siteHostLabel(site.Host)
 	}
@@ -228,6 +228,22 @@ func layoutContext(r *http.Request) map[string]any {
 	data["NavAPIVisible"] = navGroupVisible(navCan, "api_credentials", "api_settings")
 	data["NavSystemVisible"] = navGroupVisible(navCan, "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log", "system_update")
 	return data
+}
+
+func adminSiteDisplayName(r *http.Request, site *config.SiteConfig) string {
+	if r != nil {
+		if name, err := settings.GlobalString(r.Context(), settings.SectionGeneral, "site_name"); err == nil {
+			if name = strings.TrimSpace(name); name != "" {
+				return name
+			}
+		}
+	}
+	if site != nil {
+		if name := strings.TrimSpace(site.Name); name != "" {
+			return name
+		}
+	}
+	return "Cannon"
 }
 
 func dashboardWelcomeSubtitle(r *http.Request) string {

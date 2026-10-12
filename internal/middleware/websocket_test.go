@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rob121/cannon/internal/accesslog"
@@ -48,6 +49,40 @@ func TestSiteMiddlewarePreservesHijackerForWebSocket(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	if sawAccesslogWrapper {
 		t.Fatal("websocket upgrade should bypass accesslog ResponseWriter wrapper")
+	}
+}
+
+func TestSiteMiddlewareShowsFriendlyErrorWhenNoSitesConfigured(t *testing.T) {
+	mgr, err := sites.NewManager(&config.App{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain := NewChain(mgr)
+
+	var called bool
+	handler := chain.Site(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://unknown.test/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if called {
+		t.Fatal("next handler should not run when no sites are configured")
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "No Sites Configured") {
+		t.Fatalf("expected friendly no-sites page, got %q", body)
+	}
+	if strings.TrimSpace(body) == "site not found" {
+		t.Fatal("expected friendly page instead of plain site not found text")
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/html") {
+		t.Fatalf("expected html content type, got %q", got)
 	}
 }
 

@@ -6,6 +6,7 @@
   var ckEditorLoadPromise = null;
   var codeMirrorLoadPromise = null;
   var ckEditorInstances = [];
+  var ckEditorSourceRecords = [];
   var templateEditors = [];
 
   function isCollapsed() {
@@ -120,11 +121,17 @@
     }
     var pending = [];
     container.querySelectorAll('[data-ckeditor]').forEach(function (el) {
+      if (el.dataset.ckEditorReady && !findCKEditorInstanceForElement(el)) {
+        resetCKEditorSourceElement(el);
+      }
       if (!el.id || el.dataset.ckEditorReady) {
         return;
       }
+      if (el.dataset.ckEditorSourceMode === '1') {
+        return;
+      }
       var key = el.getAttribute('data-ckeditor') || el.id;
-      var config = key === 'body' ? ckEditorBodyToolbar : ckEditorIntroToolbar;
+      var config = ckEditorConfig(key === 'body' ? 'body' : 'intro');
       pending.push({ element: el, config: config, key: key });
     });
     if (!pending.length) {
@@ -135,9 +142,9 @@
         if (item.element.dataset.ckEditorReady) {
           return null;
         }
-        return ClassicEditor.create(item.element, item.config).then(function (editor) {
+        return createCKEditor(ClassicEditor, item.element, item.config).then(function (editor) {
           item.element.dataset.ckEditorReady = '1';
-          ckEditorInstances.push(editor);
+          registerCKEditor(editor, item.element, item.config);
           return editor;
         });
       }));
@@ -1641,8 +1648,9 @@
   }
 
   function loadCKEditor5() {
-    if (window.ClassicEditor) {
-      return Promise.resolve(window.ClassicEditor);
+    var editorCtor = getCKEditor5Constructor();
+    if (editorCtor) {
+      return Promise.resolve(editorCtor);
     }
     if (ckEditorLoadPromise) {
       return ckEditorLoadPromise;
@@ -1652,8 +1660,9 @@
       script.src = CKEDITOR5_URL;
       script.async = true;
       script.onload = function () {
-        if (window.ClassicEditor) {
-          resolve(window.ClassicEditor);
+        var editorCtor = getCKEditor5Constructor();
+        if (editorCtor) {
+          resolve(editorCtor);
         } else {
           reject(new Error('CKEditor failed to load'));
         }
@@ -1666,6 +1675,100 @@
     return ckEditorLoadPromise;
   }
 
+  function getCKEditor5Constructor() {
+    if (window.ClassicEditor) {
+      return window.ClassicEditor;
+    }
+    if (window.CKEDITOR && window.CKEDITOR.ClassicEditor) {
+      return window.CKEDITOR.ClassicEditor;
+    }
+    return null;
+  }
+
+  function createCKEditor(ClassicEditor, element, config) {
+    return ClassicEditor.create(element, config);
+  }
+
+  function ckEditorPlugins(kind) {
+    var c = window.CKEDITOR;
+    if (!c || !c.GeneralHtmlSupport) {
+      return null;
+    }
+    var plugins = [
+      c.Essentials,
+      c.Paragraph,
+      c.GeneralHtmlSupport,
+      c.Bold,
+      c.Italic,
+      c.Link,
+      c.List
+    ];
+    if (kind === 'body') {
+      plugins = plugins.concat([
+        c.Heading,
+        c.BlockQuote,
+        c.Table,
+        c.TableToolbar,
+        c.MediaEmbed
+      ]);
+    }
+    return plugins.filter(Boolean);
+  }
+
+  function ckEditorConfig(kind) {
+    var toolbar = kind === 'body' ? [
+      'heading', '|',
+      'bold', 'italic', 'link', '|',
+      'bulletedList', 'numberedList', 'blockQuote', '|',
+      'insertTable', 'mediaEmbed', '|',
+      'undo', 'redo'
+    ] : ['bold', 'italic', 'link', '|', 'bulletedList', 'numberedList', '|', 'undo', 'redo'];
+
+    var config = {
+      toolbar: toolbar
+    };
+    var plugins = ckEditorPlugins(kind);
+    if (!plugins) {
+      return config;
+    }
+
+    config.licenseKey = 'GPL';
+    config.plugins = plugins;
+    config.htmlSupport = {
+      allow: [
+        {
+          name: /^(?!script$).+/,
+          styles: true,
+          classes: true,
+          attributes: [
+            'id',
+            'title',
+            'lang',
+            'dir',
+            'role',
+            'aria-label',
+            'aria-describedby',
+            /^data-[\w-]+$/
+          ]
+        }
+      ],
+      disallow: [
+        {
+          name: /^(script|iframe|object|embed)$/i
+        },
+        {
+          attributes: /^on.*$/i
+        }
+      ]
+    };
+    if (kind === 'body') {
+      config.table = {
+        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
+      };
+    }
+    return config;
+  }
+
   function syncCKEditors() {
     ckEditorInstances.forEach(function (editor) {
       if (editor && typeof editor.updateSourceElement === 'function') {
@@ -1674,14 +1777,56 @@
     });
   }
 
+  function findCKEditorInstanceForElement(element) {
+    for (var i = 0; i < ckEditorInstances.length; i += 1) {
+      if (ckEditorInstances[i] && ckEditorInstances[i].sourceElement === element) {
+        return ckEditorInstances[i];
+      }
+    }
+    return null;
+  }
+
+  function resetCKEditorSourceElement(element) {
+    if (!element) {
+      return;
+    }
+    delete element.dataset.ckEditorReady;
+    delete element.dataset.ckEditorSourceMode;
+    element.classList.remove('ck-hidden', 'admin-richtext-source-mode');
+    element.hidden = false;
+    element.style.display = '';
+
+    var field = element.closest('.admin-richtext-field');
+    if (!field) {
+      return;
+    }
+    field.querySelectorAll('.admin-richtext-source-bar').forEach(function (bar) {
+      bar.remove();
+    });
+    field.querySelectorAll('.ck.ck-editor').forEach(function (wrapper) {
+      wrapper.remove();
+    });
+  }
+
+  function resetStaleCKEditorUI(root) {
+    var scope = root || document;
+    scope.querySelectorAll('textarea[data-ckeditor]').forEach(resetCKEditorSourceElement);
+  }
+
   function destroyCKEditors() {
     var editors = ckEditorInstances.slice();
     ckEditorInstances = [];
+    ckEditorSourceRecords = [];
     editors.forEach(function (editor) {
+      if (editor && typeof editor.updateSourceElement === 'function') {
+        editor.updateSourceElement();
+      }
+      resetCKEditorSourceElement(editor && editor.sourceElement);
       if (editor && typeof editor.destroy === 'function') {
         editor.destroy().catch(function () {});
       }
     });
+    resetStaleCKEditorUI();
     ['item-form', 'category-form'].forEach(function (formID) {
       var form = document.getElementById(formID);
       if (form) {
@@ -1690,11 +1835,136 @@
     });
   }
 
+  function shouldUseCKEditorSourceToggle(element) {
+    return element && (element.id === 'item-intro' || element.id === 'item-body');
+  }
+
+  function findCKEditorSourceRecord(element) {
+    for (var i = 0; i < ckEditorSourceRecords.length; i += 1) {
+      if (ckEditorSourceRecords[i].element === element) {
+        return ckEditorSourceRecords[i];
+      }
+    }
+    return null;
+  }
+
+  function removeCKEditorInstance(editor) {
+    ckEditorInstances = ckEditorInstances.filter(function (item) {
+      return item !== editor;
+    });
+  }
+
+  function registerCKEditor(editor, element, config) {
+    ckEditorInstances.push(editor);
+    if (!shouldUseCKEditorSourceToggle(element)) {
+      return;
+    }
+    var record = findCKEditorSourceRecord(element);
+    if (!record) {
+      record = { element: element, editor: editor, config: config, sourceMode: false };
+      ckEditorSourceRecords.push(record);
+    } else {
+      record.editor = editor;
+      record.config = config;
+      record.sourceMode = false;
+    }
+    ensureCKEditorSourceToggle(record);
+  }
+
+  function ensureCKEditorSourceToggle(record) {
+    var element = record.element;
+    var field = element.closest('.admin-richtext-field');
+    if (!field) {
+      return;
+    }
+    var existing = field.querySelector('[data-ckeditor-source-toggle]');
+    if (existing) {
+      existing._ckEditorSourceRecord = record;
+      return;
+    }
+    var bar = document.createElement('div');
+    bar.className = 'admin-richtext-source-bar';
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn-admin-outline btn-admin-sm admin-richtext-source-toggle';
+    button.setAttribute('data-ckeditor-source-toggle', element.id);
+    button.setAttribute('aria-pressed', 'false');
+    button.innerHTML = '<i class="bi bi-code-slash" aria-hidden="true"></i> <span>HTML Source</span>';
+    button._ckEditorSourceRecord = record;
+    button.addEventListener('click', function () {
+      toggleCKEditorSourceMode(button._ckEditorSourceRecord, button);
+    });
+    bar.appendChild(button);
+    field.insertBefore(bar, field.firstChild);
+  }
+
+  function setCKEditorSourceToggleState(button, sourceMode, busy) {
+    if (!button) {
+      return;
+    }
+    button.disabled = !!busy;
+    button.classList.toggle('is-active', !!sourceMode);
+    button.setAttribute('aria-pressed', sourceMode ? 'true' : 'false');
+    var label = button.querySelector('span');
+    if (label) {
+      label.textContent = sourceMode ? 'Visual Editor' : 'HTML Source';
+    }
+  }
+
+  function toggleCKEditorSourceMode(record, button) {
+    if (!record || !record.element) {
+      return;
+    }
+    var element = record.element;
+    if (record.sourceMode || element.dataset.ckEditorSourceMode === '1') {
+      setCKEditorSourceToggleState(button, true, true);
+      loadCKEditor5().then(function (ClassicEditor) {
+        return createCKEditor(ClassicEditor, element, record.config);
+      }).then(function (editor) {
+        element.dataset.ckEditorReady = '1';
+        delete element.dataset.ckEditorSourceMode;
+        element.classList.remove('admin-richtext-source-mode');
+        record.editor = editor;
+        record.sourceMode = false;
+        registerCKEditor(editor, element, record.config);
+        setCKEditorSourceToggleState(button, false, false);
+      }).catch(function (err) {
+        console.error('CKEditor failed to restore visual editor:', err);
+        setCKEditorSourceToggleState(button, true, false);
+      });
+      return;
+    }
+    if (!record.editor || typeof record.editor.destroy !== 'function') {
+      return;
+    }
+    setCKEditorSourceToggleState(button, false, true);
+    if (typeof record.editor.updateSourceElement === 'function') {
+      record.editor.updateSourceElement();
+    }
+    var editor = record.editor;
+    editor.destroy().then(function () {
+      removeCKEditorInstance(editor);
+      record.editor = null;
+      record.sourceMode = true;
+      element.dataset.ckEditorReady = '';
+      element.dataset.ckEditorSourceMode = '1';
+      element.classList.add('admin-richtext-source-mode');
+      element.style.display = '';
+      element.hidden = false;
+      setCKEditorSourceToggleState(button, true, false);
+      element.focus();
+    }).catch(function (err) {
+      console.error('CKEditor failed to switch to source mode:', err);
+      setCKEditorSourceToggleState(button, false, false);
+    });
+  }
+
   function initRichTextForm(formID, fields) {
     var form = document.getElementById(formID);
     if (!form || form.dataset.ckEditorInit) {
       return;
     }
+    resetStaleCKEditorUI(form);
     var configs = [];
     fields.forEach(function (field) {
       var el = document.getElementById(field.id);
@@ -1713,11 +1983,14 @@
         return;
       }
       return Promise.all(configs.map(function (item) {
-        return ClassicEditor.create(item.element, item.config);
+        return createCKEditor(ClassicEditor, item.element, item.config).then(function (editor) {
+          if (document.getElementById(formID)) {
+            registerCKEditor(editor, item.element, item.config);
+          }
+          return editor;
+        });
       })).then(function (editors) {
-        if (document.getElementById(formID)) {
-          ckEditorInstances = ckEditorInstances.concat(editors);
-        } else {
+        if (!document.getElementById(formID)) {
           editors.forEach(function (editor) {
             editor.destroy().catch(function () {});
           });
@@ -1729,20 +2002,6 @@
     });
   }
 
-  var ckEditorIntroToolbar = {
-    toolbar: ['bold', 'italic', 'link', '|', 'bulletedList', 'numberedList', '|', 'undo', 'redo']
-  };
-
-  var ckEditorBodyToolbar = {
-    toolbar: [
-      'heading', '|',
-      'bold', 'italic', 'link', '|',
-      'bulletedList', 'numberedList', 'blockQuote', '|',
-      'insertTable', 'mediaEmbed', '|',
-      'undo', 'redo'
-    ]
-  };
-
   function syncItemEditors() {
     syncCKEditors();
   }
@@ -1753,14 +2012,14 @@
 
   function initItemEditors() {
     initRichTextForm('item-form', [
-      { id: 'item-intro', key: 'intro', config: ckEditorIntroToolbar },
-      { id: 'item-body', key: 'body', config: ckEditorBodyToolbar }
+      { id: 'item-intro', key: 'intro', config: ckEditorConfig('intro') },
+      { id: 'item-body', key: 'body', config: ckEditorConfig('body') }
     ]);
   }
 
   function initCategoryEditors() {
     initRichTextForm('category-form', [
-      { id: 'category-description', key: 'description', config: ckEditorIntroToolbar }
+      { id: 'category-description', key: 'description', config: ckEditorConfig('intro') }
     ]);
   }
 
@@ -1946,6 +2205,58 @@
       }
     }
 
+    function replacePickerFrame(html) {
+      if (!frame) {
+        return;
+      }
+      var template = document.createElement('template');
+      template.innerHTML = String(html || '').trim();
+      var returnedFrame = template.content.querySelector('#media-picker-frame');
+      frame.innerHTML = returnedFrame ? returnedFrame.innerHTML : html;
+      initMediaUpload();
+      initMediaFolders();
+      syncPickerUploadToggle();
+    }
+
+    function syncPickerUploadToggle(root) {
+      var scope = root || frame || document;
+      var panel = scope.querySelector('[data-media-picker-upload-panel]');
+      var toggle = scope.querySelector('[data-media-picker-upload-toggle]');
+      if (!panel || !toggle) {
+        return;
+      }
+      var isOpen = panel.classList.contains('is-open') && !panel.hidden;
+      toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      var label = toggle.querySelector('[data-media-picker-upload-toggle-label]');
+      if (label) {
+        label.textContent = isOpen ? 'Hide Upload' : 'Upload';
+      }
+    }
+
+    function submitPickerForm(form) {
+      if (!form || !frame) {
+        return;
+      }
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+      }
+      fetch(form.action, {
+        method: form.method || 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      }).then(function (response) {
+        return response.text();
+      }).then(function (html) {
+        replacePickerFrame(html);
+      }).catch(function () {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
     document.addEventListener('click', function (e) {
       var galleryBtn = e.target.closest('[data-gallery-picker-open]');
       if (galleryBtn) {
@@ -1972,6 +2283,24 @@
         }
         return;
       }
+      var uploadToggle = e.target.closest('[data-media-picker-upload-toggle]');
+      if (uploadToggle) {
+        var picker = uploadToggle.closest('[data-media-picker]');
+        var panel = picker ? picker.querySelector('[data-media-picker-upload-panel]') : document.querySelector('[data-media-picker-upload-panel]');
+        if (panel) {
+          var isOpen = !panel.classList.contains('is-open') || panel.hidden;
+          panel.classList.toggle('is-open', isOpen);
+          panel.hidden = !isOpen;
+          syncPickerUploadToggle(picker || document);
+          if (isOpen) {
+            var input = panel.querySelector('#media-file-input');
+            if (input) {
+              input.focus();
+            }
+          }
+        }
+        return;
+      }
     });
 
     document.addEventListener('change', function (e) {
@@ -1981,6 +2310,15 @@
       }
       var folder = folderSelect.value || '';
       frame.src = pickerURLWithParams(folder);
+    });
+
+    document.addEventListener('submit', function (e) {
+      var form = e.target.closest('[data-media-picker-upload-form], [data-media-picker-folder-form]');
+      if (!form) {
+        return;
+      }
+      e.preventDefault();
+      submitPickerForm(form);
     });
 
     if (dialog) {

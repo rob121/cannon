@@ -100,7 +100,7 @@
 
     {{if .Items}}
     <div class="site-search-results">
-      {{range .Items}}{{template "searchResultCard" (dict "Item" .)}}{{end}}
+      {{range .Items}}{{template "searchResultCard" (dict "Item" . "ItemDisplay" $.ItemDisplay)}}{{end}}
     </div>
     {{template "contentPagination" .}}
     {{else if .HasQueryOrFilters}}

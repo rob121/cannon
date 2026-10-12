@@ -53,13 +53,17 @@ func (c *Controller) handlePreview(ctx *controllers.Context) controllers.Result 
 	if settings.ShowAuthorBio && item.AuthorID != nil {
 		authorProfile, _ = cms.LoadAuthorProfile(ctx.GoContext(), *item.AuthorID)
 	}
+	displaySettings, err := cms.ResolveItemDisplaySettings(ctx.GoContext(), item, settings)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
 	data := map[string]any{
 		"Item":            item,
 		"FieldDisplays":   fieldDisplays,
 		"Comments":        []models.Comment{},
 		"CommentCount":    0,
 		"CommentSettings": settings,
-		"ContentSettings": settings,
+		"ContentSettings": displaySettings,
 		"AuthorProfile":   authorProfile,
 		"CanEdit":         false,
 		"PreviewMode":     true,

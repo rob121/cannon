@@ -28,22 +28,25 @@
         "description": "Publish new comments immediately without moderation."
       },
       "show_title": {
-        "type": "boolean",
+        "type": "string",
         "title": "Show Item Title",
-        "default": true,
-        "description": "Display the item title in the page header on item views."
+        "enum": ["inherit", "yes", "no"],
+        "default": "yes",
+        "description": "Display the item title in item lists and page headers."
       },
       "show_author": {
-        "type": "boolean",
+        "type": "string",
         "title": "Show Author",
-        "default": true,
-        "description": "Display the author name on item pages."
+        "enum": ["inherit", "yes", "no"],
+        "default": "yes",
+        "description": "Display author names on item lists and item pages."
       },
       "show_published_date": {
-        "type": "boolean",
+        "type": "string",
         "title": "Show Published Date",
-        "default": true,
-        "description": "Display the publish date on item pages."
+        "enum": ["inherit", "yes", "no"],
+        "default": "yes",
+        "description": "Display publish dates on item lists and item pages."
       },
       "show_author_bio": {
         "type": "boolean",

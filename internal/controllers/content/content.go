@@ -120,11 +120,14 @@ func (c *Controller) handleIndex(ctx *controllers.Context) controllers.Result {
 		Limit:    6,
 	})
 	categories, _ := cms.CategoryTree(ctx.GoContext())
+	settings, _ := cms.LoadSettings(ctx.GoContext())
+	itemDisplay := cms.ItemDisplayFromSettings(settings)
 	return controllers.HTML("Home", map[string]any{
-		"RouteName":  ctx.Route.Name,
-		"Items":      items,
-		"Featured":   featured,
-		"Categories": categories,
+		"RouteName":   ctx.Route.Name,
+		"Items":       items,
+		"Featured":    featured,
+		"Categories":  categories,
+		"ItemDisplay": itemDisplay,
 	})
 }
 
@@ -138,6 +141,11 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		return controllers.Error(http.StatusNotFound, "category not found")
 	}
 	listSettings, err := cms.ResolveCategoryListingSettings(ctx.GoContext(), cat)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	settings, _ := cms.LoadSettings(ctx.GoContext())
+	itemDisplay, err := cms.ResolveCategoryItemDisplaySettings(ctx.GoContext(), cat, settings)
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
@@ -183,6 +191,7 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		"ListColumns":             listSettings.Columns,
 		"ItemListClass":           cms.CategoryItemListClass(listSettings.Columns),
 		"ShowReadMore":            listSettings.ShowReadMore,
+		"ItemDisplay":             itemDisplay,
 		"LeadingArticles":         listSettings.LeadingItems,
 		"PaginationBaseURL":       cms.CategoryURLForContext(ctx.GoContext(), cat.Slug),
 		"Categories":              categories,
@@ -256,7 +265,10 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 	if settings.ShowAuthorBio && item.AuthorID != nil {
 		authorProfile, _ = cms.LoadAuthorProfile(ctx.GoContext(), *item.AuthorID)
 	}
-	displaySettings := settings
+	displaySettings, err := cms.ResolveItemDisplaySettings(ctx.GoContext(), item, settings)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
 	data := map[string]any{
 		"Item":            item,
 		"FieldDisplays":   fieldDisplays,
@@ -358,11 +370,13 @@ func (c *Controller) handleTag(ctx *controllers.Context) controllers.Result {
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
+	settings, _ := cms.LoadSettings(ctx.GoContext())
 	return controllers.HTML(tag.Name, map[string]any{
-		"Tag":   tag,
-		"Items": items,
-		"Total": total,
-		"Page":  page,
+		"Tag":         tag,
+		"Items":       items,
+		"Total":       total,
+		"Page":        page,
+		"ItemDisplay": cms.ItemDisplayFromSettings(settings),
 	})
 }
 
@@ -386,31 +400,64 @@ func (c *Controller) handleAuthor(ctx *controllers.Context) controllers.Result {
 	}
 	name := authorDisplayName(author)
 	profile, _ := cms.LoadAuthorProfile(ctx.GoContext(), author.UserID)
+	settings, _ := cms.LoadSettings(ctx.GoContext())
 	return controllers.HTML(name, map[string]any{
 		"Author":        author,
 		"AuthorProfile": profile,
 		"Items":         items,
 		"Total":         total,
 		"Page":          page,
+		"ItemDisplay":   cms.ItemDisplayFromSettings(settings),
 	})
 }
 
 func (c *Controller) handleFeatured(ctx *controllers.Context) controllers.Result {
-	page := queryPage(ctx.Request)
-	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, cms.ListOptions{
-		Featured: true,
-		Page:     page,
-		Limit:    20,
-		Sort:     "sort",
-	})
+	featuredCat, err := cms.FeaturedCategorySettings(ctx.GoContext())
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
-	return controllers.HTML("Featured", map[string]any{
-		"Items": items,
-		"Total": total,
-		"Page":  page,
-	})
+	listSettings := cms.ResolveFeaturedListingSettings(ctx.GoContext(), featuredCat)
+	page := queryPage(ctx.Request)
+	listOpts := cms.ListOptions{
+		Featured: true,
+		Page:     page,
+		Limit:    listSettings.PageSize,
+		Sort:     "sort",
+	}
+	if !listSettings.Pagination {
+		listOpts.NoPagination = true
+		listOpts.Page = 1
+	}
+	items, total, err := cms.ListItems(ctx.GoContext(), ctx.ViewerGroups, listOpts)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	settings, _ := cms.LoadSettings(ctx.GoContext())
+	itemDisplay := cms.ResolveFeaturedItemDisplaySettings(ctx.GoContext(), featuredCat, settings)
+	leadingItems, remainingItems := cms.SplitCategoryLeadingItems(items, listSettings, page)
+	data := map[string]any{
+		"FeaturedCategory":        featuredCat,
+		"Items":                   items,
+		"LeadingItems":            leadingItems,
+		"RemainingItems":          remainingItems,
+		"Total":                   total,
+		"Page":                    page,
+		"PageSize":                listSettings.PageSize,
+		"TotalPages":              cms.ListTotalPages(total, listSettings.PageSize),
+		"Pagination":              listSettings.Pagination,
+		"ListColumns":             listSettings.Columns,
+		"ItemListClass":           cms.CategoryItemListClass(listSettings.Columns),
+		"ShowReadMore":            listSettings.ShowReadMore,
+		"ItemDisplay":             itemDisplay,
+		"LeadingArticles":         listSettings.LeadingItems,
+		"PaginationBaseURL":       cms.FeaturedURLForContext(ctx.GoContext()),
+		"ShowFeaturedTitle":       cms.FeaturedShowTitle(ctx.GoContext(), featuredCat),
+		"ShowFeaturedDescription": cms.FeaturedShowDescription(ctx.GoContext(), featuredCat),
+	}
+	if featuredCat.Template != "" {
+		return controllers.HTMLPage(featuredCat.Name, featuredCat.Template, data)
+	}
+	return controllers.HTML(featuredCat.Name, data)
 }
 
 const searchPageSize = 20
@@ -464,6 +511,7 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 	tags, _ := cms.ListTags(ctx.GoContext())
 	authors, _ := cms.ListAuthorsWithItems(ctx.GoContext(), ctx.ViewerGroups)
 	searchFields, _ := cms.SearchableFields(ctx.GoContext())
+	settings, _ := cms.LoadSettings(ctx.GoContext())
 
 	hasFilters := categoryID > 0 || tagID > 0 || authorID > 0 || sort != "" || len(opts.FieldFilters) > 0
 	hasQueryOrFilters := query != "" || hasFilters
@@ -528,6 +576,7 @@ func (c *Controller) handleSearch(ctx *controllers.Context) controllers.Result {
 		"SelectedCategory":  selectedCategory,
 		"SelectedTag":       selectedTag,
 		"SelectedAuthor":    selectedAuthor,
+		"ItemDisplay":       cms.ItemDisplayFromSettings(settings),
 	})
 }
 

@@ -19,6 +19,8 @@ type categoryListRow struct {
 	Depth       int
 	CanMoveUp   bool
 	CanMoveDown bool
+	Magic       bool
+	EditURL     string
 }
 
 func (h *Handler) categories(w http.ResponseWriter, r *http.Request, path string) {
@@ -28,6 +30,8 @@ func (h *Handler) categories(w http.ResponseWriter, r *http.Request, path string
 		h.categoryList(w, r)
 	case parts[0] == "new":
 		h.categoryForm(w, r, 0)
+	case parts[0] == "featured":
+		h.featuredCategoryForm(w, r)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.categoryDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
@@ -97,7 +101,13 @@ func (h *Handler) categoryList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	listRows := make([]categoryListRow, 0, len(rows))
+	featured, _ := content.FeaturedCategorySettings(r.Context())
+	listRows := make([]categoryListRow, 0, len(rows)+1)
+	listRows = append(listRows, categoryListRow{
+		Category: featured,
+		Magic:    true,
+		EditURL:  categoriesBase + "/featured",
+	})
 	for _, row := range rows {
 		item := categoryListRow{
 			Category: row,
@@ -133,6 +143,9 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.InheritPermissions = true
 		row.ShowTitle = true
 		row.ShowDescription = true
+		row.ItemTitleDisplay = content.DisplayInherit
+		row.ItemAuthorDisplay = content.DisplayInherit
+		row.ItemDateDisplay = content.DisplayInherit
 		row.ListColumns = content.DefaultCategoryListColumns
 		row.ListPagination = true
 		row.ListPageSize = content.DefaultCategoryListPageSize
@@ -170,6 +183,9 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.ShowTitle = formBool(r, "show_title")
 		row.ShowDescription = formBool(r, "show_description")
 		row.ShowReadMore = formBool(r, "show_read_more")
+		row.ItemTitleDisplay = content.NormalizeDisplayMode(formString(r, "item_title_display"))
+		row.ItemAuthorDisplay = content.NormalizeDisplayMode(formString(r, "item_author_display"))
+		row.ItemDateDisplay = content.NormalizeDisplayMode(formString(r, "item_date_display"))
 		row.LeadingArticles = content.NormalizeCategoryLeadingArticles(formInt(r, "leading_articles", 0))
 		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
 		row.ListPagination = formBool(r, "list_pagination")
@@ -188,7 +204,7 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		if isNew {
 			saveErr = db.Select(
 				"ParentID", "Locale", "Name", "Slug", "Description", "Image", "Template",
-				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ShowReadMore", "LeadingArticles", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
+				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ShowReadMore", "ItemTitleDisplay", "ItemAuthorDisplay", "ItemDateDisplay", "LeadingArticles", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
 			).Create(&row).Error
 		} else {
 			saveErr = db.Save(&row).Error
@@ -211,20 +227,66 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 	h.renderCategoryForm(w, r, row, allGroups, fieldGroups, allCats, isNew, "")
 }
 
-func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row models.Category, allGroups []models.Group, fieldGroups []models.ContentFieldGroup, allCats []models.Category, isNew bool, errMsg string) {
+func (h *Handler) featuredCategoryForm(w http.ResponseWriter, r *http.Request) {
+	row, err := content.FeaturedCategorySettings(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		row.Name = formString(r, "name")
+		if row.Name == "" {
+			row.Name = "Featured"
+		}
+		row.Description = r.FormValue("description")
+		row.Image = formString(r, "image")
+		row.Template = formString(r, "template")
+		row.InheritSettings = formBool(r, "inherit_settings")
+		row.ShowTitle = formBool(r, "show_title")
+		row.ShowDescription = formBool(r, "show_description")
+		row.ShowReadMore = formBool(r, "show_read_more")
+		row.ItemTitleDisplay = content.NormalizeDisplayMode(formString(r, "item_title_display"))
+		row.ItemAuthorDisplay = content.NormalizeDisplayMode(formString(r, "item_author_display"))
+		row.ItemDateDisplay = content.NormalizeDisplayMode(formString(r, "item_date_display"))
+		row.LeadingArticles = content.NormalizeCategoryLeadingArticles(formInt(r, "leading_articles", 0))
+		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
+		row.ListPagination = formBool(r, "list_pagination")
+		row.ListPageSize = content.NormalizeCategoryListPageSize(formInt(r, "list_page_size", content.DefaultCategoryListPageSize))
+		if err := content.SaveFeaturedCategorySettings(r.Context(), row); err != nil {
+			h.renderCategoryForm(w, r, row, nil, nil, nil, false, err.Error(), true)
+			return
+		}
+		redirectList(w, r, categoriesBase)
+		return
+	}
+	h.renderCategoryForm(w, r, row, nil, nil, nil, false, "", true)
+}
+
+func (h *Handler) renderCategoryForm(w http.ResponseWriter, r *http.Request, row models.Category, allGroups []models.Group, fieldGroups []models.ContentFieldGroup, allCats []models.Category, isNew bool, errMsg string, magic ...bool) {
 	title := "Add Category"
 	subtitle := "Create a category for grouping items."
 	if !isNew {
 		title = "Edit Category"
 		subtitle = "Update category details, template, and access."
 	}
+	isMagic := len(magic) > 0 && magic[0]
+	if isMagic {
+		title = "Edit Featured"
+		subtitle = "Configure the virtual Featured listing."
+	}
 	db, _ := sites.DB(r.Context())
 	data := formData(map[string]any{
 		"ActiveNav":      "categories",
 		"Row":            row,
 		"IsNew":          isNew,
+		"MagicCategory":  isMagic,
 		"BasePath":       categoriesBase,
 		"Subtitle":       subtitle,
+		"CancelURL":      categoriesBase,
 		"AllGroups":      allGroups,
 		"SelectedIDs":    defaultGroupSelectedIDs(db, row.Groups, isNew),
 		"FieldGroups":    fieldGroups,

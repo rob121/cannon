@@ -41,7 +41,7 @@ func builtinPartialsFor(name string) []string {
 	if name == "default/controllers/content/search.html" {
 		partials = append(partials, "default/partials/content/search-result-card.html")
 	}
-	if name == "default/controllers/content/category.html" || name == "default/controllers/content/search.html" {
+	if name == "default/controllers/content/category.html" || name == "default/controllers/content/featured.html" || name == "default/controllers/content/search.html" {
 		partials = append(partials, "default/partials/content/pagination.html")
 	}
 	if name == "default/controllers/content/item.html" {

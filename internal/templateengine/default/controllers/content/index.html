@@ -9,7 +9,7 @@
   <section class="mb-5" aria-labelledby="home-featured-heading">
     <h2 id="home-featured-heading" class="h4 mb-3"><a href="{{featuredURL}}" class="text-decoration-none">{{lang "content.featured"}}</a></h2>
     <div class="site-item-list">
-      {{range .Featured}}{{template "itemCard" (dict "Item" .)}}{{end}}
+      {{range .Featured}}{{template "itemCard" (dict "Item" . "ItemDisplay" $.ItemDisplay)}}{{end}}
     </div>
   </section>
   {{end}}
@@ -17,7 +17,7 @@
   <section class="mb-5" aria-labelledby="home-latest-heading">
     <h2 id="home-latest-heading" class="h4 mb-3">{{lang "content.latest_items"}}</h2>
     <div class="site-item-list site-item-list--grid">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" . "ItemDisplay" $.ItemDisplay)}}{{else}}
       <p class="text-muted mb-0">{{lang "content.no_items"}}</p>
       {{end}}
     </div>

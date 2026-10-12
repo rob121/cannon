@@ -118,98 +118,18 @@ func (h *Handler) mediaUpload(w http.ResponseWriter, r *http.Request) {
 		defaultFolder = norm
 	}
 	if r.Method == http.MethodPost {
-		mediaCfg, err := media.LoadSettings(r.Context())
+		asset, folder, err := h.saveMediaUpload(r, site, defaultFolder)
 		if err != nil {
-			h.renderMediaUpload(w, r, defaultFolder, err.Error())
+			if isMediaPickerRequest(r) {
+				h.renderMediaPicker(w, r, folder, mediaPickerFilesMode(r), err.Error(), "")
+			} else {
+				h.renderMediaUpload(w, r, folder, err.Error())
+			}
 			return
 		}
-		maxMultipart := mediaCfg.MaxFileSizeBytes + (1 << 20)
-		if maxMultipart < 32<<20 {
-			maxMultipart = 32 << 20
-		}
-		if err := r.ParseMultipartForm(maxMultipart); err != nil {
-			h.renderMediaUpload(w, r, defaultFolder, err.Error())
+		if isMediaPickerRequest(r) {
+			h.renderMediaPicker(w, r, folder, mediaPickerFilesMode(r), "", asset.Path)
 			return
-		}
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			h.renderMediaUpload(w, r, defaultFolder, err.Error())
-			return
-		}
-		defer file.Close()
-		if err := media.ValidateUpload(mediaCfg, header.Filename, header.Size); err != nil {
-			h.renderMediaUpload(w, r, defaultFolder, err.Error())
-			return
-		}
-		folder := formString(r, "folder")
-		if folder == "" {
-			folder = "content"
-		}
-		folder, err = normalizeMediaFolder(folder)
-		if err != nil {
-			h.renderMediaUpload(w, r, defaultFolder, err.Error())
-			return
-		}
-		if folder == "" {
-			folder = "content"
-		}
-		destDir := filepath.Join(site.AssetsDir, "media", filepath.FromSlash(folder))
-		if err := os.MkdirAll(destDir, 0o755); err != nil {
-			h.renderMediaUpload(w, r, folder, err.Error())
-			return
-		}
-		safeName := filepath.Base(header.Filename)
-		safeName = strings.ReplaceAll(safeName, " ", "-")
-		destPath := filepath.Join(destDir, safeName)
-		if _, err := os.Stat(destPath); err == nil {
-			ext := filepath.Ext(safeName)
-			base := strings.TrimSuffix(safeName, ext)
-			safeName = fmt.Sprintf("%s-%d%s", base, time.Now().Unix(), ext)
-			destPath = filepath.Join(destDir, safeName)
-		}
-		out, err := os.Create(destPath)
-		if err != nil {
-			h.renderMediaUpload(w, r, folder, err.Error())
-			return
-		}
-		size, err := io.Copy(out, io.LimitReader(file, mediaCfg.MaxFileSizeBytes+1))
-		out.Close()
-		if err != nil {
-			h.renderMediaUpload(w, r, folder, err.Error())
-			return
-		}
-		if mediaCfg.MaxFileSizeBytes > 0 && size > mediaCfg.MaxFileSizeBytes {
-			_ = os.Remove(destPath)
-			h.renderMediaUpload(w, r, folder, fmt.Sprintf("file exceeds the maximum upload size of %d MB", mediaCfg.MaxFileSizeBytes/(1024*1024)))
-			return
-		}
-		mimeType := strings.TrimSpace(header.Header.Get("Content-Type"))
-		if mimeType == "" {
-			mimeType = detectMIME(destPath)
-		}
-		width, height := imageDimensions(destPath)
-		webPath := "/assets/media/" + folder + "/" + safeName
-		db, _ := sites.DB(r.Context())
-		asset := models.MediaAsset{
-			Name:   safeName,
-			Path:   webPath,
-			MIME:   mimeType,
-			Size:   size,
-			Folder: folder,
-			Alt:    formString(r, "alt"),
-			Width:  width,
-			Height: height,
-		}
-		if err := db.Create(&asset).Error; err != nil {
-			h.renderMediaUpload(w, r, folder, err.Error())
-			return
-		}
-		_, _ = hooks.Fire(r.Context(), hooks.OnMediaUpload, map[string]any{
-			"asset":  asset,
-			"folder": folder,
-		})
-		if strings.HasPrefix(mimeType, "image/") {
-			_, _ = media.GenerateThumbnail(destPath)
 		}
 		dest := mediaBase + "?uploaded=1"
 		if folder != "" {
@@ -219,6 +139,93 @@ func (h *Handler) mediaUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.renderMediaUpload(w, r, defaultFolder, "")
+}
+
+func (h *Handler) saveMediaUpload(r *http.Request, site *config.SiteConfig, defaultFolder string) (models.MediaAsset, string, error) {
+	mediaCfg, err := media.LoadSettings(r.Context())
+	if err != nil {
+		return models.MediaAsset{}, defaultFolder, err
+	}
+	maxMultipart := mediaCfg.MaxFileSizeBytes + (1 << 20)
+	if maxMultipart < 32<<20 {
+		maxMultipart = 32 << 20
+	}
+	if err := r.ParseMultipartForm(maxMultipart); err != nil {
+		return models.MediaAsset{}, defaultFolder, err
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return models.MediaAsset{}, defaultFolder, err
+	}
+	defer file.Close()
+	if err := media.ValidateUpload(mediaCfg, header.Filename, header.Size); err != nil {
+		return models.MediaAsset{}, defaultFolder, err
+	}
+	folder := formString(r, "folder")
+	if folder == "" {
+		folder = "content"
+	}
+	folder, err = normalizeMediaFolder(folder)
+	if err != nil {
+		return models.MediaAsset{}, defaultFolder, err
+	}
+	if folder == "" {
+		folder = "content"
+	}
+	destDir := filepath.Join(site.AssetsDir, "media", filepath.FromSlash(folder))
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return models.MediaAsset{}, folder, err
+	}
+	safeName := filepath.Base(header.Filename)
+	safeName = strings.ReplaceAll(safeName, " ", "-")
+	destPath := filepath.Join(destDir, safeName)
+	if _, err := os.Stat(destPath); err == nil {
+		ext := filepath.Ext(safeName)
+		base := strings.TrimSuffix(safeName, ext)
+		safeName = fmt.Sprintf("%s-%d%s", base, time.Now().Unix(), ext)
+		destPath = filepath.Join(destDir, safeName)
+	}
+	out, err := os.Create(destPath)
+	if err != nil {
+		return models.MediaAsset{}, folder, err
+	}
+	size, err := io.Copy(out, io.LimitReader(file, mediaCfg.MaxFileSizeBytes+1))
+	out.Close()
+	if err != nil {
+		return models.MediaAsset{}, folder, err
+	}
+	if mediaCfg.MaxFileSizeBytes > 0 && size > mediaCfg.MaxFileSizeBytes {
+		_ = os.Remove(destPath)
+		return models.MediaAsset{}, folder, fmt.Errorf("file exceeds the maximum upload size of %d MB", mediaCfg.MaxFileSizeBytes/(1024*1024))
+	}
+	mimeType := strings.TrimSpace(header.Header.Get("Content-Type"))
+	if mimeType == "" {
+		mimeType = detectMIME(destPath)
+	}
+	width, height := imageDimensions(destPath)
+	webPath := "/assets/media/" + folder + "/" + safeName
+	db, _ := sites.DB(r.Context())
+	asset := models.MediaAsset{
+		Name:   safeName,
+		Path:   webPath,
+		MIME:   mimeType,
+		Size:   size,
+		Folder: folder,
+		Alt:    formString(r, "alt"),
+		Width:  width,
+		Height: height,
+	}
+	if err := db.Create(&asset).Error; err != nil {
+		return models.MediaAsset{}, folder, err
+	}
+	_, _ = hooks.Fire(r.Context(), hooks.OnMediaUpload, map[string]any{
+		"asset":  asset,
+		"folder": folder,
+	})
+	if strings.HasPrefix(mimeType, "image/") {
+		_, _ = media.GenerateThumbnail(destPath)
+	}
+	return asset, folder, nil
 }
 
 func (h *Handler) renderMediaUpload(w http.ResponseWriter, r *http.Request, defaultFolder, errMsg string) {
@@ -231,16 +238,16 @@ func (h *Handler) renderMediaUpload(w http.ResponseWriter, r *http.Request, defa
 		maxMB = mediaCfg.MaxFileSizeBytes / (1024 * 1024)
 	}
 	data := formData(map[string]any{
-		"ActiveNav":            "media",
-		"BasePath":             mediaBase,
-		"CancelURL":            mediaFolderURL(defaultFolder),
-		"DefaultFolder":        defaultFolder,
-		"FolderOptions":        folderOptions,
-		"ParentFolderOptions":  folderOptions,
-		"MaxFileSizeMB":        maxMB,
-		"ApprovedExtensions":   mediaCfg.ApprovedExtensionsLabel(),
-		"Subtitle":             "Upload images and files to the media library.",
-		"Title":                "Upload Media",
+		"ActiveNav":           "media",
+		"BasePath":            mediaBase,
+		"CancelURL":           mediaFolderURL(defaultFolder),
+		"DefaultFolder":       defaultFolder,
+		"FolderOptions":       folderOptions,
+		"ParentFolderOptions": folderOptions,
+		"MaxFileSizeMB":       maxMB,
+		"ApprovedExtensions":  mediaCfg.ApprovedExtensionsLabel(),
+		"Subtitle":            "Upload images and files to the media library.",
+		"Title":               "Upload Media",
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
@@ -279,6 +286,8 @@ func (h *Handler) mediaCreateFolder(w http.ResponseWriter, r *http.Request) {
 		redirectList(w, r, mediaUploadURL(folder))
 	case "browse":
 		redirectList(w, r, mediaFolderURL(folder))
+	case "picker":
+		h.renderMediaPicker(w, r, folder, mediaPickerFilesMode(r), "", "")
 	default:
 		if formString(r, "from") == "upload" {
 			redirectList(w, r, mediaUploadURL(folder))
@@ -292,6 +301,10 @@ func (h *Handler) renderMediaFolderError(w http.ResponseWriter, r *http.Request,
 	site, _ := sites.FromContext(r.Context())
 	db, _ := sites.DB(r.Context())
 	folderOptions, _ := mediaFolderOptions(site, db)
+	if formString(r, "return") == "picker" {
+		h.renderMediaPicker(w, r, parent, mediaPickerFilesMode(r), errMsg, "")
+		return
+	}
 	if formString(r, "from") == "upload" || formString(r, "return") == "upload" {
 		data := formData(map[string]any{
 			"ActiveNav":           "media",
@@ -476,13 +489,19 @@ func (h *Handler) mediaPicker(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	site, _ := sites.FromContext(r.Context())
-	db, _ := sites.DB(r.Context())
 	folder := strings.TrimSpace(r.URL.Query().Get("folder"))
 	if norm, err := normalizeMediaFolder(folder); err == nil {
 		folder = norm
 	}
-	filesMode := strings.TrimSpace(r.URL.Query().Get("type")) == "files"
+	h.renderMediaPicker(w, r, folder, mediaPickerFilesMode(r), "", "")
+}
+
+func (h *Handler) renderMediaPicker(w http.ResponseWriter, r *http.Request, folder string, filesMode bool, errMsg, uploadedPath string) {
+	site, _ := sites.FromContext(r.Context())
+	db, _ := sites.DB(r.Context())
+	if norm, err := normalizeMediaFolder(folder); err == nil {
+		folder = norm
+	}
 	q := db.Model(&models.MediaAsset{})
 	if !filesMode {
 		q = q.Where("mime LIKE ?", "image/%")
@@ -493,11 +512,42 @@ func (h *Handler) mediaPicker(w http.ResponseWriter, r *http.Request) {
 	var rows []models.MediaAsset
 	q.Order("created_at DESC").Limit(120).Find(&rows)
 	folderOptions, _ := mediaFolderOptions(site, db)
+	mediaCfg, _ := media.LoadSettings(r.Context())
+	maxMB := int64(32)
+	if mediaCfg.MaxFileSizeBytes > 0 {
+		maxMB = mediaCfg.MaxFileSizeBytes / (1024 * 1024)
+	}
+	uploadFolder := folder
+	if uploadFolder == "" {
+		uploadFolder = "content"
+	}
 	h.renderFragment(w, r, "admin/media_picker.html", map[string]any{
-		"BasePath":      mediaBase,
-		"FolderFilter":  folder,
-		"FolderOptions": folderOptions,
-		"Rows":          mediaFileViews(site, rows),
-		"FilesMode":     filesMode,
+		"BasePath":            mediaBase,
+		"FolderFilter":        folder,
+		"FolderOptions":       folderOptions,
+		"ParentFolderOptions": folderOptions,
+		"DefaultFolder":       uploadFolder,
+		"Rows":                mediaFileViews(site, rows),
+		"FilesMode":           filesMode,
+		"PickerType":          mediaPickerType(filesMode),
+		"MaxFileSizeMB":       maxMB,
+		"ApprovedExtensions":  mediaCfg.ApprovedExtensionsLabel(),
+		"Error":               errMsg,
+		"UploadedPath":        uploadedPath,
 	})
+}
+
+func isMediaPickerRequest(r *http.Request) bool {
+	return strings.TrimSpace(r.URL.Query().Get("picker")) == "1" || strings.TrimSpace(r.FormValue("picker")) == "1"
+}
+
+func mediaPickerFilesMode(r *http.Request) bool {
+	return strings.TrimSpace(r.URL.Query().Get("type")) == "files" || strings.TrimSpace(r.FormValue("type")) == "files"
+}
+
+func mediaPickerType(filesMode bool) string {
+	if filesMode {
+		return "files"
+	}
+	return "images"
 }

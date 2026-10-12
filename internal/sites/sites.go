@@ -19,10 +19,11 @@ const siteKey contextKey = iota
 
 // Manager resolves sites and holds runtime state.
 type Manager struct {
-	cfg   *config.App
-	sites map[string]*config.SiteConfig
-	hosts map[string]*config.SiteConfig
-	mu    sync.RWMutex
+	cfg         *config.App
+	defaultSite *config.SiteConfig
+	sites       map[string]*config.SiteConfig
+	hosts       map[string]*config.SiteConfig
+	mu          sync.RWMutex
 }
 
 // NewManager builds a site manager from configuration.
@@ -35,6 +36,9 @@ func NewManager(cfg *config.App) (*Manager, error) {
 
 	for i := range cfg.Sites {
 		site := &cfg.Sites[i]
+		if i == 0 {
+			m.defaultSite = site
+		}
 		m.sites[site.ID] = site
 		hostKey, err := hostKey(site.Host)
 		if err != nil {
@@ -75,6 +79,7 @@ func (m *Manager) Reload(cfg *config.App) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cfg = next.cfg
+	m.defaultSite = next.defaultSite
 	m.sites = next.sites
 	m.hosts = next.hosts
 	return nil
@@ -106,6 +111,10 @@ func (m *Manager) Resolve(r *http.Request) (*config.SiteConfig, error) {
 		if strings.EqualFold(hostKey, key) {
 			return site, nil
 		}
+	}
+
+	if m.defaultSite != nil {
+		return m.defaultSite, nil
 	}
 
 	return nil, fmt.Errorf("no site for host %q", host)

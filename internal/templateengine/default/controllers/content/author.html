@@ -28,7 +28,7 @@
   <section aria-labelledby="author-items-heading">
     <h2 id="author-items-heading" class="h4 mb-3">{{lang "content.items_heading"}}</h2>
     <div class="site-item-list site-item-list--grid">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" . "ItemDisplay" $.ItemDisplay)}}{{else}}
       <p class="text-muted mb-0">{{lang "content.no_author_items"}}</p>
       {{end}}
     </div>

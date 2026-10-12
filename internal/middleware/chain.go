@@ -132,7 +132,7 @@ func (c *Chain) Site(next http.Handler) http.Handler {
 
 		site, err := c.Sites.Resolve(r)
 		if err != nil {
-			http.Error(w, "site not found", http.StatusNotFound)
+			writeNoSitesConfigured(w)
 			return
 		}
 		ctx := sites.WithContext(r.Context(), site)
@@ -152,6 +152,67 @@ func (c *Chain) Site(next http.Handler) http.Handler {
 			accesslog.Write(site, r, rw.Status, rw.Bytes, time.Since(start))
 		}
 	})
+}
+
+func writeNoSitesConfigured(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = io.WriteString(w, `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>No Sites Configured</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f6f7f9;
+      color: #172033;
+    }
+    main {
+      width: min(34rem, calc(100vw - 2rem));
+      padding: 2rem;
+      border: 1px solid #d9dee8;
+      border-radius: 0.5rem;
+      background: #ffffff;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+    h1 {
+      margin: 0 0 0.75rem;
+      font-size: 1.25rem;
+      line-height: 1.25;
+    }
+    p {
+      margin: 0;
+      color: #526070;
+      line-height: 1.55;
+    }
+    code {
+      padding: 0.125rem 0.25rem;
+      border-radius: 0.25rem;
+      background: #eef1f5;
+      color: #172033;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0f172a; color: #e5e7eb; }
+      main { background: #111827; border-color: #334155; box-shadow: none; }
+      p { color: #cbd5e1; }
+      code { background: #1f2937; color: #f8fafc; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>No Sites Configured</h1>
+    <p>Cannon could not find any sites in <code>sites.json</code>. Add at least one site entry, then restart the server.</p>
+  </main>
+</body>
+</html>`)
 }
 
 func isWebSocketUpgrade(r *http.Request) bool {

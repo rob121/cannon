@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,9 +13,13 @@ import (
 	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/database"
+	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/lang"
+	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/roles"
 	"github.com/rob121/cannon/internal/router"
+	sitectx "github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 const sitesBase = "/admin/sites"
@@ -204,12 +209,118 @@ func (h *Handler) saveSite(cfg *config.App, row *config.SiteConfig, isNew bool, 
 		if err := router.EnsureDefaultRoute(db); err != nil {
 			return err
 		}
+		if source := adminCopySourceSite(cfg, row, r); source != nil {
+			if err := copyAdminUsersToSite(source, row); err != nil {
+				return err
+			}
+		}
 	}
 	if err := h.chain.Sites.Reload(cfg); err != nil {
 		return err
 	}
 	if h.activate != nil {
 		return h.activate(cfg)
+	}
+	return nil
+}
+
+func adminCopySourceSite(cfg *config.App, target *config.SiteConfig, r *http.Request) *config.SiteConfig {
+	if target == nil {
+		return nil
+	}
+	if r != nil {
+		if source, err := sitectx.FromContext(r.Context()); err == nil && source != nil && source.ID != target.ID {
+			return source
+		}
+	}
+	if cfg != nil {
+		for i := range cfg.Sites {
+			if cfg.Sites[i].ID != target.ID {
+				return &cfg.Sites[i]
+			}
+		}
+	}
+	return nil
+}
+
+func copyAdminUsersToSite(sourceSite, targetSite *config.SiteConfig) error {
+	if sourceSite == nil || targetSite == nil || sourceSite.ID == targetSite.ID {
+		return nil
+	}
+	sourceDB, err := database.Get(sourceSite.ID)
+	if err != nil {
+		return fmt.Errorf("source admin users: %w", err)
+	}
+	targetDB, err := database.Get(targetSite.ID)
+	if err != nil {
+		return fmt.Errorf("target admin users: %w", err)
+	}
+
+	var sourceAdminGroup models.Group
+	if err := sourceDB.Where("name = ?", groups.AdministratorsGroupName).First(&sourceAdminGroup).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	var admins []models.User
+	if err := sourceDB.
+		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
+		Where("user_groups.group_group_id = ? AND users.hash <> ''", sourceAdminGroup.GroupID).
+		Find(&admins).Error; err != nil {
+		return err
+	}
+	if len(admins) == 0 {
+		return nil
+	}
+
+	var localAuth models.Authenticator
+	if err := targetDB.Where("name = ?", "local").First(&localAuth).Error; err != nil {
+		return err
+	}
+	var targetGroups []models.Group
+	if err := targetDB.Where("name IN ?", []string{
+		groups.PublicGroupName,
+		groups.RegisteredGroupName,
+		groups.AdministratorsGroupName,
+	}).Find(&targetGroups).Error; err != nil {
+		return err
+	}
+
+	for _, admin := range admins {
+		copied := models.User{
+			GivenName:    admin.GivenName,
+			FamilyName:   admin.FamilyName,
+			Email:        admin.Email,
+			Username:     admin.Username,
+			AvatarURL:    admin.AvatarURL,
+			SSOAvatarURL: admin.SSOAvatarURL,
+			Locked:       admin.Locked,
+			Validated:    admin.Validated,
+			Hash:         admin.Hash,
+			Status:       admin.Status,
+			AuthID:       &localAuth.AuthID,
+		}
+		var existing models.User
+		err := targetDB.Where("username = ?", admin.Username).First(&existing).Error
+		if err == nil {
+			copied.UserID = existing.UserID
+			if err := targetDB.Save(&copied).Error; err != nil {
+				return err
+			}
+		} else if errors.Is(err, gorm.ErrRecordNotFound) {
+			if err := targetDB.Create(&copied).Error; err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+		if len(targetGroups) > 0 {
+			if err := targetDB.Model(&copied).Association("Groups").Append(targetGroups); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

@@ -267,10 +267,16 @@
             {{end}}
             <div class="admin-sidebar-field admin-sidebar-field-divider">
               <span class="admin-form-label">Editorial</span>
-              <div class="admin-sidebar-action-links">
-                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/submit-review" class="btn-admin-ghost btn-admin-sm">Submit for Review</button>
-                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/clone" class="btn-admin-ghost btn-admin-sm" onclick="return confirm('Duplicate this item as a new draft?')">Duplicate</button>
-                <a class="btn-admin-ghost btn-admin-sm" href="{{.RevisionsURL}}" data-turbo-frame="_top">Revisions</a>
+              <div class="admin-editorial-actions" role="group" aria-label="Editorial actions">
+                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/submit-review" class="btn-admin-outline btn-admin-sm admin-editorial-action">
+                  <i class="bi bi-send"></i> Submit for Review
+                </button>
+                <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/clone" class="btn-admin-outline btn-admin-sm admin-editorial-action" onclick="return confirm('Duplicate this item as a new draft?')">
+                  <i class="bi bi-files"></i> Duplicate
+                </button>
+                <a class="btn-admin-outline btn-admin-sm admin-editorial-action" href="{{.RevisionsURL}}" data-turbo-frame="_top">
+                  <i class="bi bi-clock-history"></i> Revisions
+                </a>
               </div>
             </div>
             {{end}}

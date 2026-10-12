@@ -7,11 +7,11 @@
     <h2 id="category-items-heading" class="visually-hidden">{{lang "content.items_in_category" "Name" .Category.Name}}</h2>
     {{if .LeadingItems}}
     <div class="site-item-list site-item-list--leading mb-4">
-      {{range .LeadingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore)}}{{end}}
+      {{range .LeadingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore "ItemDisplay" $.ItemDisplay)}}{{end}}
     </div>
     {{end}}
     <div class="{{.ItemListClass}}">
-      {{range .RemainingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore)}}{{else}}
+      {{range .RemainingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore "ItemDisplay" $.ItemDisplay)}}{{else}}
       {{if not $.LeadingItems}}
       <p class="text-muted mb-0">{{lang "content.no_category_items"}}</p>
       {{end}}

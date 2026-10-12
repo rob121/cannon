@@ -3,7 +3,7 @@
   <section aria-labelledby="tag-items-heading">
     <h2 id="tag-items-heading" class="visually-hidden">{{lang "content.items_tagged" "Name" .Tag.Name}}</h2>
     <div class="site-item-list site-item-list--grid">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
+      {{range .Items}}{{template "itemCard" (dict "Item" . "ItemDisplay" $.ItemDisplay)}}{{else}}
       <p class="text-muted mb-0">{{lang "content.no_tag_items"}}</p>
       {{end}}
     </div>

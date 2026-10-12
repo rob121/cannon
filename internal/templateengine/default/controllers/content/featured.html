@@ -1,11 +1,21 @@
 <div class="site-page mb-4">
-  {{template "pageHeader" (dict "Title" (lang "content.featured_title") "Subtitle" (lang "content.featured_subtitle"))}}
+  {{if .ShowFeaturedTitle}}{{template "pageHeader" (dict "Title" .FeaturedCategory.Name)}}{{end}}
+  {{if and .ShowFeaturedDescription .FeaturedCategory.Description}}<div class="lead text-muted mb-4">{{richText .FeaturedCategory.Description}}</div>{{end}}
+  {{if .FeaturedCategory.Image}}<figure class="figure mb-4"><img class="figure-img img-fluid rounded" src="{{.FeaturedCategory.Image}}" alt="{{.FeaturedCategory.Name}}"></figure>{{end}}
   <section aria-labelledby="featured-items-heading">
     <h2 id="featured-items-heading" class="visually-hidden">{{lang "content.featured_items"}}</h2>
-    <div class="site-item-list">
-      {{range .Items}}{{template "itemCard" (dict "Item" .)}}{{else}}
+    {{if .LeadingItems}}
+    <div class="site-item-list site-item-list--leading mb-4">
+      {{range .LeadingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore "ItemDisplay" $.ItemDisplay)}}{{end}}
+    </div>
+    {{end}}
+    <div class="{{.ItemListClass}}">
+      {{range .RemainingItems}}{{template "itemCard" (dict "Item" . "ShowReadMore" $.ShowReadMore "ItemDisplay" $.ItemDisplay)}}{{else}}
+      {{if not $.LeadingItems}}
       <p class="text-muted mb-0">{{lang "content.no_featured"}}</p>
       {{end}}
+      {{end}}
     </div>
+    {{template "contentPagination" .}}
   </section>
 </div>

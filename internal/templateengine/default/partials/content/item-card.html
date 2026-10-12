@@ -1,15 +1,21 @@
 {{define "itemCard"}}
 {{$item := .Item}}
+{{$display := .ItemDisplay}}
+{{$showTitle := or (not $display) $display.ShowTitle}}
+{{$showAuthor := or (not $display) $display.ShowAuthor}}
+{{$showDate := or (not $display) $display.ShowPublishedDate}}
 <article class="site-item-summary">
   <header class="site-item-summary__header">
+    {{if $showTitle}}
     <h2 class="site-item-summary__title"><a href="{{itemURL $item.Slug}}">{{$item.Title}}</a></h2>
-    {{if or $item.Category $item.Author (itemHasDate $item)}}
+    {{end}}
+    {{if or $item.Category (and $showAuthor $item.Author) (and $showDate (itemHasDate $item))}}
     <p class="site-item-summary__meta">
       {{if $item.Category}}<span class="site-item-summary__category"><a href="{{categoryURL $item.Category.Slug}}">{{$item.Category.Name}}</a></span>{{end}}
-      {{if and $item.Category $item.Author}} · {{end}}
-      {{if $item.Author}}<span class="site-item-summary__author">{{lang "content.by"}} <a href="{{authorURL $item.Author.Username}}">{{userName $item.Author}}</a></span>{{end}}
-      {{if itemHasDate $item}}
-      {{if or $item.Category $item.Author}} · {{end}}
+      {{if and $item.Category $showAuthor $item.Author}} · {{end}}
+      {{if and $showAuthor $item.Author}}<span class="site-item-summary__author">{{lang "content.by"}} <a href="{{authorURL $item.Author.Username}}">{{userName $item.Author}}</a></span>{{end}}
+      {{if and $showDate (itemHasDate $item)}}
+      {{if or $item.Category (and $showAuthor $item.Author)}} · {{end}}
       <time datetime="{{itemDateISO $item}}">{{itemDate $item "January 2, 2006"}}</time>
       {{end}}
     </p>

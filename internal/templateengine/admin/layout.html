@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{.Title}} - Cannon Admin</title>
+  <title>{{.Title}} - {{if .SiteName}}{{.SiteName}}{{else}}Cannon{{end}} Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,7 +11,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="/admin/assets/admin.css?v=50" rel="stylesheet">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-esm.js"></script>
-  <script src="/admin/assets/admin.js?v=35" defer></script>
+  <script src="/admin/assets/admin.js?v=41" defer></script>
   {{if .HeadExtra}}{{.HeadExtra}}{{end}}
 </head>
 <body class="admin-body">
@@ -23,7 +23,7 @@
       </button>
       <a class="admin-brand" href="/admin" data-turbo-frame="_top">
         {{template "brand_icon" .}}
-        <span class="admin-brand-text">Cannon</span>
+        <span class="admin-brand-text">{{if .SiteName}}{{.SiteName}}{{else}}Cannon{{end}}</span>
       </a>
       <nav class="admin-nav">
         {{if index .NavCan "dashboard"}}

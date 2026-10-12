@@ -208,6 +208,12 @@ func normalizeSelectFields(html string, data map[string]any) string {
 		if want == "" {
 			return match
 		}
+		if want == "true" && strings.Contains(inner, `value="yes"`) {
+			want = "yes"
+		}
+		if want == "false" && strings.Contains(inner, `value="no"`) {
+			want = "no"
+		}
 		inner = selectOptionRE.ReplaceAllStringFunc(inner, func(opt string) string {
 			sub := selectOptionRE.FindStringSubmatch(opt)
 			if len(sub) < 3 {

@@ -5,13 +5,15 @@ import (
 	"errors"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
 
 const (
-	DefaultCategoryListColumns  = 3
-	DefaultCategoryListPageSize = 20
+	DefaultCategoryListColumns      = 3
+	DefaultCategoryListPageSize     = 20
+	FeaturedCategorySettingsSection = "featured_category"
 )
 
 // CategoryListingSettings controls how items render on a category page.
@@ -21,6 +23,112 @@ type CategoryListingSettings struct {
 	PageSize     int
 	ShowReadMore bool
 	LeadingItems int
+}
+
+// FeaturedCategoryDefaults returns the virtual category used by the featured item listing.
+func FeaturedCategoryDefaults(ctx context.Context) models.Category {
+	return models.Category{
+		Name:               "Featured",
+		Slug:               "featured",
+		Description:        "",
+		Template:           "",
+		InheritSettings:    true,
+		InheritPermissions: true,
+		ShowTitle:          true,
+		ShowDescription:    true,
+		ShowReadMore:       false,
+		ItemTitleDisplay:   DisplayInherit,
+		ItemAuthorDisplay:  DisplayInherit,
+		ItemDateDisplay:    DisplayInherit,
+		LeadingArticles:    0,
+		ListColumns:        DefaultCategoryListColumns,
+		ListPagination:     true,
+		ListPageSize:       DefaultCategoryListPageSize,
+		Status:             models.StatusActive,
+		Locale:             LocaleFromContext(ctx),
+	}
+}
+
+// FeaturedCategorySettings loads the virtual category settings used by /content/featured.
+func FeaturedCategorySettings(ctx context.Context) (models.Category, error) {
+	row := FeaturedCategoryDefaults(ctx)
+	data, err := settings.NewStore().Load(ctx, settings.ScopeGlobal, FeaturedCategorySettingsSection)
+	if err != nil {
+		return row, err
+	}
+	if v := settingsString(data, "name", ""); v != "" {
+		row.Name = v
+	}
+	row.Description = settingsString(data, "description", row.Description)
+	row.Image = settingsString(data, "image", row.Image)
+	row.Template = settingsString(data, "template", row.Template)
+	row.InheritSettings = settingsBool(data, "inherit_settings", row.InheritSettings)
+	row.ShowTitle = settingsBool(data, "show_title", row.ShowTitle)
+	row.ShowDescription = settingsBool(data, "show_description", row.ShowDescription)
+	row.ShowReadMore = settingsBool(data, "show_read_more", row.ShowReadMore)
+	row.ItemTitleDisplay = settingsDisplayMode(data, "item_title_display", row.ItemTitleDisplay)
+	row.ItemAuthorDisplay = settingsDisplayMode(data, "item_author_display", row.ItemAuthorDisplay)
+	row.ItemDateDisplay = settingsDisplayMode(data, "item_date_display", row.ItemDateDisplay)
+	row.LeadingArticles = NormalizeCategoryLeadingArticles(settingsInt(data, "leading_articles", row.LeadingArticles))
+	row.ListColumns = NormalizeCategoryListColumns(settingsInt(data, "list_columns", row.ListColumns))
+	row.ListPagination = settingsBool(data, "list_pagination", row.ListPagination)
+	row.ListPageSize = NormalizeCategoryListPageSize(settingsInt(data, "list_page_size", row.ListPageSize))
+	return row, nil
+}
+
+// SaveFeaturedCategorySettings stores the virtual category settings used by /content/featured.
+func SaveFeaturedCategorySettings(ctx context.Context, row models.Category) error {
+	if row.Name == "" {
+		row.Name = "Featured"
+	}
+	data := map[string]any{
+		"name":                row.Name,
+		"description":         row.Description,
+		"image":               row.Image,
+		"template":            row.Template,
+		"inherit_settings":    row.InheritSettings,
+		"show_title":          row.ShowTitle,
+		"show_description":    row.ShowDescription,
+		"show_read_more":      row.ShowReadMore,
+		"item_title_display":  NormalizeDisplayMode(row.ItemTitleDisplay),
+		"item_author_display": NormalizeDisplayMode(row.ItemAuthorDisplay),
+		"item_date_display":   NormalizeDisplayMode(row.ItemDateDisplay),
+		"leading_articles":    NormalizeCategoryLeadingArticles(row.LeadingArticles),
+		"list_columns":        NormalizeCategoryListColumns(row.ListColumns),
+		"list_pagination":     row.ListPagination,
+		"list_page_size":      NormalizeCategoryListPageSize(row.ListPageSize),
+	}
+	return settings.NewStore().Save(ctx, settings.ScopeGlobal, FeaturedCategorySettingsSection, data)
+}
+
+// FeaturedShowTitle resolves whether the featured listing should display its title.
+func FeaturedShowTitle(ctx context.Context, cat models.Category) bool {
+	return cat.ShowTitle
+}
+
+// FeaturedShowDescription resolves whether the featured listing should display its description.
+func FeaturedShowDescription(ctx context.Context, cat models.Category) bool {
+	return cat.ShowDescription
+}
+
+// ResolveFeaturedListingSettings resolves columns, pagination, and page size for the featured listing.
+func ResolveFeaturedListingSettings(ctx context.Context, cat models.Category) CategoryListingSettings {
+	return CategoryListingSettings{
+		Columns:      NormalizeCategoryListColumns(cat.ListColumns),
+		Pagination:   cat.ListPagination,
+		PageSize:     NormalizeCategoryListPageSize(cat.ListPageSize),
+		ShowReadMore: cat.ShowReadMore,
+		LeadingItems: NormalizeCategoryLeadingArticles(cat.LeadingArticles),
+	}
+}
+
+// ResolveFeaturedItemDisplaySettings resolves item summary display settings for /content/featured.
+func ResolveFeaturedItemDisplaySettings(ctx context.Context, cat models.Category, base Settings) ItemDisplaySettings {
+	return ItemDisplaySettings{
+		ShowTitle:         ResolveDisplayMode(cat.ItemTitleDisplay, base.ShowTitle),
+		ShowAuthor:        ResolveDisplayMode(cat.ItemAuthorDisplay, base.ShowAuthor),
+		ShowPublishedDate: ResolveDisplayMode(cat.ItemDateDisplay, base.ShowPublishedDate),
+	}
 }
 
 // ResolveCategorySettings returns the category whose display settings apply,
@@ -95,6 +203,22 @@ func ResolveCategoryListingSettings(ctx context.Context, cat *models.Category) (
 	}, nil
 }
 
+// ResolveCategoryItemDisplaySettings resolves item display flags for items rendered in a category context.
+func ResolveCategoryItemDisplaySettings(ctx context.Context, cat *models.Category, base Settings) (ItemDisplaySettings, error) {
+	resolved, err := ResolveCategorySettings(ctx, cat)
+	if err != nil {
+		return ItemDisplaySettings{}, err
+	}
+	if resolved == nil {
+		return ItemDisplayFromSettings(base), nil
+	}
+	return ItemDisplaySettings{
+		ShowTitle:         ResolveDisplayMode(resolved.ItemTitleDisplay, base.ShowTitle),
+		ShowAuthor:        ResolveDisplayMode(resolved.ItemAuthorDisplay, base.ShowAuthor),
+		ShowPublishedDate: ResolveDisplayMode(resolved.ItemDateDisplay, base.ShowPublishedDate),
+	}, nil
+}
+
 // NormalizeCategoryListColumns clamps category grid columns to 1–4.
 func NormalizeCategoryListColumns(columns int) int {
 	switch columns {
@@ -124,6 +248,33 @@ func NormalizeCategoryLeadingArticles(count int) int {
 		return 25
 	}
 	return count
+}
+
+func settingsString(data map[string]any, key, fallback string) string {
+	v, ok := data[key]
+	if !ok || v == nil {
+		return fallback
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fallback
+}
+
+func settingsInt(data map[string]any, key string, fallback int) int {
+	v, ok := data[key]
+	if !ok || v == nil {
+		return fallback
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case int:
+		return n
+	case int64:
+		return int(n)
+	}
+	return fallback
 }
 
 // SplitCategoryLeadingItems separates the current page's items into full-width leading items and the remaining column items.

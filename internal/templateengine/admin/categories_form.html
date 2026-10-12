@@ -18,6 +18,7 @@
               <label class="admin-form-label">Name</label>
               <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
             </div>
+            {{if not .MagicCategory}}
             <div class="col-md-6">
               <label class="admin-form-label">Slug</label>
               <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
@@ -50,6 +51,7 @@
                 {{end}}
               </select>
             </div>
+            {{end}}
             <div class="col-12">
               <label class="admin-form-label" for="category-description">Description</label>
               <div class="admin-richtext-field admin-richtext-intro">
@@ -63,7 +65,7 @@
             </div>
             <div class="col-md-6">
               <label class="admin-form-label">Template Override</label>
-              <input class="admin-form-control" name="template" value="{{.Row.Template}}" placeholder="default/controllers/content/category.html">
+              <input class="admin-form-control" name="template" value="{{.Row.Template}}" placeholder="{{if .MagicCategory}}default/controllers/content/featured.html{{else}}default/controllers/content/category.html{{end}}">
             </div>
           </div>
         </div>
@@ -74,11 +76,14 @@
       <div class="admin-form-sidebar-card">
         <div class="admin-sidebar-tabs" role="tablist" aria-label="Category settings">
           <button type="button" class="admin-sidebar-tab is-active" role="tab" aria-selected="true" data-sidebar-tab="settings">Settings</button>
+          {{if not .MagicCategory}}
           <button type="button" class="admin-sidebar-tab" role="tab" aria-selected="false" data-sidebar-tab="access">Access</button>
+          {{end}}
         </div>
 
         <div class="admin-sidebar-panel is-active" data-sidebar-panel="settings" role="tabpanel">
           <div class="admin-sidebar-fields">
+            {{if not .MagicCategory}}
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Sort</label>
               <input class="admin-form-control" type="number" name="sort" value="{{.Row.Sort}}">
@@ -90,9 +95,14 @@
                 <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
               </select>
             </div>
+            {{end}}
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Inherit Settings</label>
+              {{if .MagicCategory}}
+              {{template "form_toggle" (dict "Name" "inherit_settings" "Checked" .Row.InheritSettings "OnLabel" "Inherit Settings" "OffLabel" "Custom Settings")}}
+              {{else}}
               {{template "form_toggle" (dict "Name" "inherit_settings" "Checked" .Row.InheritSettings "OnLabel" "Inherit From Parent" "OffLabel" "Custom Settings")}}
+              {{end}}
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Show Title</label>
@@ -108,6 +118,33 @@
               <label class="admin-form-label">Show Read More</label>
               {{template "form_toggle" (dict "Name" "show_read_more" "Checked" .Row.ShowReadMore "OnLabel" "Show Read More Buttons" "OffLabel" "Hide Read More Buttons")}}
               <p class="admin-form-help mb-0">When enabled, category item intros include a Read More button linking to the full item.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Item Title</label>
+              <select class="admin-form-control" name="item_title_display">
+                <option value="inherit" {{if or (eq .Row.ItemTitleDisplay "") (eq .Row.ItemTitleDisplay "inherit")}}selected{{end}}>Inherit</option>
+                <option value="yes" {{if eq .Row.ItemTitleDisplay "yes"}}selected{{end}}>Yes</option>
+                <option value="no" {{if eq .Row.ItemTitleDisplay "no"}}selected{{end}}>No</option>
+              </select>
+              <p class="admin-form-help mb-0">Controls item titles inside this category and on item pages in this category.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Item Author</label>
+              <select class="admin-form-control" name="item_author_display">
+                <option value="inherit" {{if or (eq .Row.ItemAuthorDisplay "") (eq .Row.ItemAuthorDisplay "inherit")}}selected{{end}}>Inherit</option>
+                <option value="yes" {{if eq .Row.ItemAuthorDisplay "yes"}}selected{{end}}>Yes</option>
+                <option value="no" {{if eq .Row.ItemAuthorDisplay "no"}}selected{{end}}>No</option>
+              </select>
+              <p class="admin-form-help mb-0">Controls author bylines for items in this category.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Item Date</label>
+              <select class="admin-form-control" name="item_date_display">
+                <option value="inherit" {{if or (eq .Row.ItemDateDisplay "") (eq .Row.ItemDateDisplay "inherit")}}selected{{end}}>Inherit</option>
+                <option value="yes" {{if eq .Row.ItemDateDisplay "yes"}}selected{{end}}>Yes</option>
+                <option value="no" {{if eq .Row.ItemDateDisplay "no"}}selected{{end}}>No</option>
+              </select>
+              <p class="admin-form-help mb-0">Controls publish dates for items in this category.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Leading Articles</label>
@@ -150,11 +187,13 @@
           </div>
         </div>
 
+        {{if not .MagicCategory}}
         <div class="admin-sidebar-panel" data-sidebar-panel="access" role="tabpanel">
             <div class="admin-sidebar-fields">
             {{template "group_visibility_sidebar" .}}
           </div>
         </div>
+        {{end}}
 
       </div>
     </aside>

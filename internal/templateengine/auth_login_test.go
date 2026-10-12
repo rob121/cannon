@@ -1,6 +1,7 @@
 package templateengine
 
 import (
+	"html/template"
 	"strings"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func testFrontendFuncs() map[string]any {
 	funcs := map[string]any{
-		"homeURL": func() string { return "/" },
+		"homeURL":       func() string { return "/" },
 		"controllerURL": func(string, string) string { return "/account/profile" },
 		"fieldOptions": func(string) []map[string]string {
 			return nil
@@ -18,6 +19,14 @@ func testFrontendFuncs() map[string]any {
 		"fieldValueContains": func(string, string) bool {
 			return false
 		},
+		"itemURL":     func(slug string) string { return "/content/item/" + slug },
+		"categoryURL": func(slug string) string { return "/content/category/" + slug },
+		"authorURL":   func(username string) string { return "/content/author/" + username },
+		"userName":    func(any) string { return "Author" },
+		"itemHasDate": func(any) bool { return false },
+		"itemDateISO": func(any) string { return "" },
+		"itemDate":    func(any, string) string { return "" },
+		"richText":    func(v any) template.HTML { return template.HTML("") },
 	}
 	for k, v := range lang.TestFuncMap() {
 		funcs[k] = v
@@ -69,8 +78,8 @@ func TestAuthProfileTemplate(t *testing.T) {
 		"ProfileFields": []map[string]any{
 			{"FieldID": uint(1), "Label": "Bio", "Type": "textarea", "Name": "Bio"},
 		},
-		"ProfileValues": map[uint]string{1: "Writer"},
-		"TOTPAllowed":   false,
+		"ProfileValues":   map[uint]string{1: "Writer"},
+		"TOTPAllowed":     false,
 		"PasskeysAllowed": false,
 	})
 	if err != nil {

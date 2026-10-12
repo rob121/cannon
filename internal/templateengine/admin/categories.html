@@ -14,11 +14,42 @@
       <tbody>
         {{range .Rows}}
         <tr>
-          <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Name "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery "Current" false)}}</td>
+          <td>
+            {{if .Magic}}
+            <span class="admin-tree-cell">
+              <span class="admin-tree-glyphs" aria-hidden="true"><i class="bi bi-stars admin-tree-icon"></i></span>
+              <a href="{{.EditURL}}" data-turbo-frame="_top">{{.Name}}</a>
+            </span>
+            {{else}}
+            {{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Name "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery "Current" false)}}
+            {{end}}
+          </td>
           <td><code class="admin-code">{{.Slug}}</code></td>
-          <td>{{template "sort_controls" (dict "Root" $ "ID" .CategoryID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .CategoryID "Status" .Status "ListQuery" $.ListQuery)}}</td>
+          <td>
+            {{if .Magic}}
+            <span class="admin-cell-muted">Always listed</span>
+            {{else}}
+            {{template "sort_controls" (dict "Root" $ "ID" .CategoryID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}
+            {{end}}
+          </td>
+          <td>
+            {{if .Magic}}
+            <span class="admin-badge"><i class="bi bi-stars"></i> Magic</span>
+            {{else}}
+            {{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .CategoryID "Status" .Status "ListQuery" $.ListQuery)}}
+            {{end}}
+          </td>
+          {{if .Magic}}
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              <a class="btn-admin-icon" href="{{.EditURL}}" data-turbo-frame="_top" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+            </div>
+          </td>
+          {{else}}
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .CategoryID "ListQuery" $.ListQuery)}}
+          {{end}}
         </tr>
         {{else}}
         <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-folder2" "Title" "No categories yet" "Message" "Organize your content into categories for easier browsing." "ActionURL" .PageActionURL "ActionLabel" .PageActionLabel "ActionIcon" "bi-plus-lg")}}</td></tr>
