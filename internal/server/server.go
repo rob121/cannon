@@ -190,6 +190,7 @@ func (s *Server) frontendHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		site, _ := sites.FromContext(r.Context())
 		ext := s.chain.Extensions(site)
+		debugSpaces := blocks.DebugSpacesActive(r.Context(), r)
 
 		var eng *templateengine.Engine
 		renderCtx := func() context.Context {
@@ -218,15 +219,15 @@ func (s *Server) frontendHandler() http.Handler {
 			if err != nil {
 				return "", err
 			}
-			if blocks.DebugSpacesActive(r.Context(), r) {
+			if debugSpaces {
 				html = blocks.WrapDebugSpace(name, html)
 			}
 			return template.HTML(html), nil
 		}
 
-		blockLen := func(name string) (int, error) {
+		blockLen := previewBlockLen(func(name string) (int, error) {
 			return blocks.CountForSpace(renderCtx(), ext, name)
-		}
+		}, debugSpaces)
 
 		sel, _ := themes.SelectionFromContext(r.Context())
 		eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
@@ -240,6 +241,18 @@ func (s *Server) frontendHandler() http.Handler {
 		))
 		router.NewDispatcher(ext, eng).ServeHTTP(w, r)
 	})
+}
+
+// In space preview, count the empty outline as one placeholder so conditional
+// layouts using lenspace or hasSpace still reach the space renderer.
+func previewBlockLen(count templateengine.BlockLenRenderer, enabled bool) templateengine.BlockLenRenderer {
+	return func(name string) (int, error) {
+		n, err := count(name)
+		if enabled && err == nil && n == 0 && strings.TrimSpace(name) != "" {
+			return 1, nil
+		}
+		return n, err
+	}
 }
 
 func extensionUserContext(r *http.Request) map[string]any {

@@ -36,6 +36,7 @@ var publicTemplateSettings = map[string]map[string]struct{}{
 		"auto_approve":        {},
 		"show_title":          {},
 		"show_author":         {},
+		"show_category_name":  {},
 		"show_published_date": {},
 		"show_author_bio":     {},
 		"show_comments":       {},

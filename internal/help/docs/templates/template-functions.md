@@ -23,8 +23,8 @@ Available on **public site and admin** templates (from `templateengine.FuncMap`)
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `space` | `space "name"` | Renders the HTML for a block space. Returns trusted `template.HTML`. No-op when block rendering is unavailable (admin previews). |
-| `lenspace` | `lenspace "name"` | Returns the count of active blocks assigned to the space for the current viewer. Use with `if gt (lenspace "header") 0`. |
+| `space` | `space "name"` | Renders the HTML for a block space. Returns trusted `template.HTML`. No-op when block rendering is unavailable (admin previews). Content item pages also call `content-{slug}-start`, `content-{slug}-middle`, and `content-{slug}-end` around intro/body. |
+| `lenspace` | `lenspace "name"` | Returns the count of active blocks assigned to the space for the current viewer. Use with `if gt (lenspace "header") 0`. In template-space debug preview, an empty named space counts as one outline placeholder. |
 | `hasSpace` | `hasSpace "name"` | `true` when `lenspace` is greater than zero. Shorthand for layout conditionals. |
 
 ### Math (integer-friendly)

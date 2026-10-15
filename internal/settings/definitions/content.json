@@ -41,12 +41,26 @@
         "default": "yes",
         "description": "Display author names on item lists and item pages."
       },
+      "show_category_name": {
+        "type": "string",
+        "title": "Show Category Name",
+        "enum": ["inherit", "yes", "no"],
+        "default": "yes",
+        "description": "Display the category name on item lists and item pages unless overridden by category display settings."
+      },
       "show_published_date": {
         "type": "string",
         "title": "Show Published Date",
         "enum": ["inherit", "yes", "no"],
         "default": "yes",
         "description": "Display publish dates on item lists and item pages."
+      },
+      "show_related_items": {
+        "type": "string",
+        "title": "Show Related Items",
+        "enum": ["inherit", "yes", "no"],
+        "default": "yes",
+        "description": "Display related items on item pages unless overridden by category display settings."
       },
       "show_author_bio": {
         "type": "boolean",
@@ -71,7 +85,9 @@
       {"type": "Control", "scope": "#/properties/auto_approve"},
       {"type": "Control", "scope": "#/properties/show_title"},
       {"type": "Control", "scope": "#/properties/show_author"},
+      {"type": "Control", "scope": "#/properties/show_category_name"},
       {"type": "Control", "scope": "#/properties/show_published_date"},
+      {"type": "Control", "scope": "#/properties/show_related_items"},
       {"type": "Control", "scope": "#/properties/show_author_bio"},
       {"type": "Control", "scope": "#/properties/show_comments"}
     ]

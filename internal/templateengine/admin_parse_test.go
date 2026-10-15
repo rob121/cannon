@@ -6,8 +6,35 @@ import (
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/lang"
+	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/themes"
 )
+
+func TestCategoryRelatedItemsControl(t *testing.T) {
+	e := New(&config.SiteConfig{}, themes.Selection{}, nil, nil, testAdminFuncs())
+	tmpl, err := e.parse("admin/categories_form.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"", "inherit", "yes", "no"} {
+		var out strings.Builder
+		if err := tmpl.Execute(&out, map[string]any{"Row": models.Category{ItemRelatedDisplay: mode}}); err != nil {
+			t.Fatal(err)
+		}
+		_, control, found := strings.Cut(out.String(), `name="item_related_display">`)
+		if !found {
+			t.Fatal("missing Show Related Items control")
+		}
+		control, _, _ = strings.Cut(control, "</select>")
+		want := mode
+		if want == "" {
+			want = "inherit"
+		}
+		if !strings.Contains(control, `value="`+want+`" selected`) || strings.Count(control, "selected") != 1 {
+			t.Fatalf("mode %q has incorrect selected option: %s", mode, control)
+		}
+	}
+}
 
 func testAdminFuncs() map[string]any {
 	funcs := map[string]any{

@@ -37,6 +37,33 @@ func TestLoadSettingsShowCommentsDefault(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsShowRelatedItems(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  bool
+	}{
+		{"default", nil, true},
+		{"yes", DisplayYes, true},
+		{"no", DisplayNo, false},
+		{"inherit", DisplayInherit, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := map[string]any{}
+			if tc.value != nil {
+				data["show_related_items"] = tc.value
+			}
+			cfg, err := LoadSettings(commentSettingsContext(t, data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.ShowRelatedItems != tc.want {
+				t.Fatalf("ShowRelatedItems = %v, want %v", cfg.ShowRelatedItems, tc.want)
+			}
+		})
+	}
+}
+
 func commentSettingsContext(t *testing.T, data map[string]any) context.Context {
 	t.Helper()
 	path := t.TempDir() + "/content-settings.sqlite"

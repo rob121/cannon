@@ -12,27 +12,34 @@ func TestBuildBlockRouteSectionsIncludesDefaultAndSitePages(t *testing.T) {
 		{RouteID: 2, Name: "Home", Path: "/", Type: models.RouteTypeController, Controller: "content", ControllerAction: "featured", Status: models.StatusActive, IsDefault: true},
 		{RouteID: 3, Name: "Blog", Path: "/blog", Type: models.RouteTypeController, Controller: "content", ControllerAction: "category", Status: models.StatusActive},
 		{RouteID: 4, Name: "Contact Us", Path: "/contact", Type: models.RouteTypeExtension, Status: models.StatusActive},
+		{RouteID: 5, Name: "About", Path: "/info/about", Type: models.RouteTypeController, Controller: "content", ControllerAction: "item", Status: models.StatusActive},
+		{RouteID: 6, Name: "Content Item", Path: "/content/item/*", Type: models.RouteTypeController, Controller: "content", ControllerAction: "item", Status: models.StatusActive},
+		{RouteID: 7, Name: "Register", Path: "/register", Type: models.RouteTypeURL, Status: models.StatusActive},
 	}
 	sections := buildBlockRouteSections(routes)
-	if len(sections) < 3 {
-		t.Fatalf("sections = %d, want at least 3", len(sections))
-	}
-	if sections[0].Key != "default" || len(sections[0].Routes) != 1 || sections[0].Routes[0].RouteID != 2 {
-		t.Fatalf("default section = %#v", sections[0])
-	}
-
-	var foundBlog bool
+	byKey := map[string]blockRouteSection{}
 	for _, section := range sections {
-		if section.Key != "site" {
-			continue
-		}
-		for _, route := range section.Routes {
-			if route.RouteID == 3 {
-				foundBlog = true
-			}
-		}
+		byKey[section.Key] = section
 	}
-	if !foundBlog {
-		t.Fatal("expected custom site page /blog in site section")
+	if section, ok := byKey["default"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 2 {
+		t.Fatalf("default section = %#v", section)
+	}
+	if section, ok := byKey["content-items"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 5 {
+		t.Fatalf("content-items section = %#v", byKey["content-items"])
+	}
+	if section, ok := byKey["site"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 3 {
+		t.Fatalf("site section = %#v", byKey["site"])
+	}
+	if section, ok := byKey["content"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 6 {
+		t.Fatalf("built-in content section = %#v", byKey["content"])
+	}
+	if section, ok := byKey["auth"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 1 {
+		t.Fatalf("auth section = %#v", byKey["auth"])
+	}
+	if section, ok := byKey["extensions"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 4 {
+		t.Fatalf("extensions section = %#v", byKey["extensions"])
+	}
+	if section, ok := byKey["urls"]; !ok || len(section.Routes) != 1 || section.Routes[0].RouteID != 7 {
+		t.Fatalf("urls section = %#v", byKey["urls"])
 	}
 }

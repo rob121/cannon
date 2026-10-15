@@ -11,6 +11,8 @@ The admin panel is organized into sidebar groups. Which links you see depends on
 
 Manage items, categories, media, and related content tools from the **Content** group. **Routes** and **Menus** configure public site structure.
 
+In a category's **Settings** panel, **Show Related Items** controls the Related section on its item pages. Choose **Yes**, **No**, or **Inherit** (the global **Configuration → Content → Show Related Items** setting). When the category's **Inherit Settings** switch is enabled, its parent category's display settings apply instead. Related items are shown by default when matches exist.
+
 ## Extensions
 
 Extensions with an **Admin** capability appear under the Extensions group. The **Extensions** registry under System controls process lifecycle (start, stop, restart).

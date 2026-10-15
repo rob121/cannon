@@ -1,12 +1,98 @@
 package admin
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/database"
+	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
+
+func TestCategoryFormSavesRelatedItemDisplay(t *testing.T) {
+	site := &config.SiteConfig{ID: t.Name(), Database: config.DatabaseConfig{Type: "sqlite", DSN: t.TempDir() + "/site.db"}}
+	if err := database.Migrate(site); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Get(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := groups.EnsureDefaults(db); err != nil {
+		t.Fatal(err)
+	}
+	publicID, err := groups.PublicGroupID(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := sites.WithContext(context.Background(), site)
+	var id uint
+	for _, mode := range []string{"no", "yes", "inherit"} {
+		values := url.Values{"name": {"News"}, "slug": {"news"}, "status": {"active"}, "item_related_display": {mode}, "group_ids": {strconv.FormatUint(uint64(publicID), 10)}}
+		req := httptest.NewRequest(http.MethodPost, "/admin/categories/new", strings.NewReader(values.Encode())).WithContext(ctx)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		(&Handler{}).categoryForm(rec, req, id)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("save %q: status %d, body %s", mode, rec.Code, rec.Body.String())
+		}
+		var cat models.Category
+		if err := db.Where("slug = ?", "news").First(&cat).Error; err != nil {
+			t.Fatal(err)
+		}
+		if cat.ItemRelatedDisplay != mode {
+			t.Fatalf("saved mode = %q, want %q", cat.ItemRelatedDisplay, mode)
+		}
+		id = cat.CategoryID
+	}
+}
+
+func TestCategoryFormSavesCategoryNameDisplay(t *testing.T) {
+	site := &config.SiteConfig{ID: t.Name(), Database: config.DatabaseConfig{Type: "sqlite", DSN: t.TempDir() + "/site.db"}}
+	if err := database.Migrate(site); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Get(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := groups.EnsureDefaults(db); err != nil {
+		t.Fatal(err)
+	}
+	publicID, err := groups.PublicGroupID(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := sites.WithContext(context.Background(), site)
+	var id uint
+	for _, mode := range []string{"no", "yes", "inherit"} {
+		values := url.Values{"name": {"News"}, "slug": {"news"}, "status": {"active"}, "item_category_display": {mode}, "group_ids": {strconv.FormatUint(uint64(publicID), 10)}}
+		req := httptest.NewRequest(http.MethodPost, "/admin/categories/new", strings.NewReader(values.Encode())).WithContext(ctx)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		rec := httptest.NewRecorder()
+		(&Handler{}).categoryForm(rec, req, id)
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("save %q: status %d, body %s", mode, rec.Code, rec.Body.String())
+		}
+		var cat models.Category
+		if err := db.Where("slug = ?", "news").First(&cat).Error; err != nil {
+			t.Fatal(err)
+		}
+		if cat.ItemCategoryDisplay != mode {
+			t.Fatalf("saved mode = %q, want %q", cat.ItemCategoryDisplay, mode)
+		}
+		id = cat.CategoryID
+	}
+}
 
 func TestCategoryReorderWithinParent(t *testing.T) {
 	db := testCategoryDB(t)

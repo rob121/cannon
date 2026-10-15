@@ -3,6 +3,7 @@
 {{$display := .ItemDisplay}}
 {{$showTitle := or (not $display) $display.ShowTitle}}
 {{$showAuthor := or (not $display) $display.ShowAuthor}}
+{{$showCategory := or (not $display) $display.ShowCategoryName}}
 {{$showDate := or (not $display) $display.ShowPublishedDate}}
 <article class="site-search-result">
   <div class="site-search-result__body">
@@ -10,13 +11,13 @@
       {{if $showTitle}}
       <h3 class="site-search-result__title"><a href="{{itemURL $item.Slug}}">{{$item.Title}}</a></h3>
       {{end}}
-      {{if or $item.Category (and $showAuthor $item.Author) (and $showDate (itemHasDate $item))}}
+      {{if or (and $showCategory $item.Category) (and $showAuthor $item.Author) (and $showDate (itemHasDate $item))}}
       <p class="site-search-result__meta">
-        {{if $item.Category}}<a class="site-search-result__category" href="{{categoryURL $item.Category.Slug}}">{{$item.Category.Name}}</a>{{end}}
-        {{if and $item.Category $showAuthor $item.Author}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
+        {{if and $showCategory $item.Category}}<a class="site-search-result__category" href="{{categoryURL $item.Category.Slug}}">{{$item.Category.Name}}</a>{{end}}
+        {{if and $showCategory $item.Category $showAuthor $item.Author}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
         {{if and $showAuthor $item.Author}}<span class="site-search-result__author">{{lang "content.by"}} <a href="{{authorURL $item.Author.Username}}">{{userName $item.Author}}</a></span>{{end}}
         {{if and $showDate (itemHasDate $item)}}
-        {{if or $item.Category (and $showAuthor $item.Author)}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
+        {{if or (and $showCategory $item.Category) (and $showAuthor $item.Author)}}<span class="site-search-result__sep" aria-hidden="true">·</span>{{end}}
         <time datetime="{{itemDateISO $item}}">{{itemDate $item "January 2, 2006"}}</time>
         {{end}}
       </p>

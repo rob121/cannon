@@ -75,6 +75,15 @@ func addRouteToMenu(db *gorm.DB, route models.Route, menuID uint, parentID *uint
 	if err := db.Create(&item).Error; err != nil {
 		return false, err
 	}
+	var routeGroups []models.Group
+	if err := db.Model(&route).Association("Groups").Find(&routeGroups); err != nil {
+		return false, err
+	}
+	if len(routeGroups) > 0 {
+		if err := db.Model(&item).Association("Groups").Replace(routeGroups); err != nil {
+			return false, err
+		}
+	}
 	return true, nil
 }
 

@@ -14,7 +14,7 @@ func openAdminTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.AutoMigrate(&models.Menu{}, &models.MenuItem{}, &models.Route{}); err != nil {
+	if err := db.AutoMigrate(&models.Menu{}, &models.MenuItem{}, &models.Route{}, &models.Group{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -24,11 +24,22 @@ func TestAddRouteToMenuCreatesItem(t *testing.T) {
 	db := openAdminTestDB(t)
 
 	menu := models.Menu{MenuName: "main", Status: models.StatusActive}
+	public := models.Group{Name: "Public", Kind: models.GroupKindFrontend, Status: models.StatusActive}
+	registered := models.Group{Name: "Registered", Kind: models.GroupKindFrontend, Status: models.StatusActive}
 	route := models.Route{Name: "Contact", Path: "/contact", Type: models.RouteTypeController, Status: models.StatusActive, Controller: "content", ControllerAction: "index"}
 	if err := db.Create(&menu).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := db.Create(&public).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&registered).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Create(&route).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&route).Association("Groups").Replace([]models.Group{public, registered}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -41,7 +52,7 @@ func TestAddRouteToMenuCreatesItem(t *testing.T) {
 	}
 
 	var item models.MenuItem
-	if err := db.Where("menu_id = ? AND route_id = ?", menu.MenuID, route.RouteID).First(&item).Error; err != nil {
+	if err := db.Preload("Groups").Where("menu_id = ? AND route_id = ?", menu.MenuID, route.RouteID).First(&item).Error; err != nil {
 		t.Fatal(err)
 	}
 	if item.Name != "Contact Us" {
@@ -49,6 +60,16 @@ func TestAddRouteToMenuCreatesItem(t *testing.T) {
 	}
 	if item.RouteID == nil || *item.RouteID != route.RouteID {
 		t.Fatalf("route_id = %v", item.RouteID)
+	}
+	if len(item.Groups) != 2 {
+		t.Fatalf("menu item groups = %d, want 2 (same as route)", len(item.Groups))
+	}
+	got := map[uint]bool{}
+	for _, g := range item.Groups {
+		got[g.GroupID] = true
+	}
+	if !got[public.GroupID] || !got[registered.GroupID] {
+		t.Fatalf("menu item groups = %#v, want Public+Registered", item.Groups)
 	}
 
 	addedAgain, err := addRouteToMenu(db, route, menu.MenuID, nil, "Duplicate")

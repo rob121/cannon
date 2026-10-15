@@ -138,6 +138,15 @@
               <p class="admin-form-help mb-0">Controls author bylines for items in this category.</p>
             </div>
             <div class="admin-sidebar-field">
+              <label class="admin-form-label">Show Category Name</label>
+              <select class="admin-form-control" name="item_category_display">
+                <option value="inherit" {{if or (eq .Row.ItemCategoryDisplay "") (eq .Row.ItemCategoryDisplay "inherit")}}selected{{end}}>Inherit</option>
+                <option value="yes" {{if eq .Row.ItemCategoryDisplay "yes"}}selected{{end}}>Yes</option>
+                <option value="no" {{if eq .Row.ItemCategoryDisplay "no"}}selected{{end}}>No</option>
+              </select>
+              <p class="admin-form-help mb-0">Controls the category name badge on item lists and item pages in this category.</p>
+            </div>
+            <div class="admin-sidebar-field">
               <label class="admin-form-label">Show Item Date</label>
               <select class="admin-form-control" name="item_date_display">
                 <option value="inherit" {{if or (eq .Row.ItemDateDisplay "") (eq .Row.ItemDateDisplay "inherit")}}selected{{end}}>Inherit</option>
@@ -145,6 +154,15 @@
                 <option value="no" {{if eq .Row.ItemDateDisplay "no"}}selected{{end}}>No</option>
               </select>
               <p class="admin-form-help mb-0">Controls publish dates for items in this category.</p>
+            </div>
+            <div class="admin-sidebar-field">
+              <label class="admin-form-label" for="item-related-display">Show Related Items</label>
+              <select class="admin-form-control" id="item-related-display" name="item_related_display">
+                <option value="inherit" {{if or (eq .Row.ItemRelatedDisplay "") (eq .Row.ItemRelatedDisplay "inherit")}}selected{{end}}>Inherit</option>
+                <option value="yes" {{if eq .Row.ItemRelatedDisplay "yes"}}selected{{end}}>Yes</option>
+                <option value="no" {{if eq .Row.ItemRelatedDisplay "no"}}selected{{end}}>No</option>
+              </select>
+              <p class="admin-form-help mb-0">Controls the Related section on item pages. Inherit uses the global Content setting. When Inherit Settings is enabled, the parent category&rsquo;s display settings apply.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label">Leading Articles</label>

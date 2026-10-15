@@ -146,55 +146,57 @@ func TestResolveItemDisplaySettingsUsesCategoryItemDisplaySetting(t *testing.T) 
 	ctx, db := categorySettingsTestContext(t)
 
 	cat := models.Category{
-		Name:              "News",
-		Slug:              "news-item-display",
-		ItemTitleDisplay:  content.DisplayYes,
-		ItemAuthorDisplay: content.DisplayNo,
-		ItemDateDisplay:   content.DisplayYes,
-		InheritSettings:   false,
-		Status:            models.StatusActive,
+		Name:                "News",
+		Slug:                "news-item-display",
+		ItemTitleDisplay:    content.DisplayYes,
+		ItemAuthorDisplay:   content.DisplayNo,
+		ItemCategoryDisplay: content.DisplayNo,
+		ItemDateDisplay:     content.DisplayYes,
+		InheritSettings:     false,
+		Status:              models.StatusActive,
 	}
 	if err := db.Create(&cat).Error; err != nil {
 		t.Fatal(err)
 	}
 	item := models.Item{Title: "Story", Slug: "story", Category: &cat}
 
-	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: false, ShowAuthor: true, ShowPublishedDate: false})
+	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: false, ShowAuthor: true, ShowCategoryName: true, ShowPublishedDate: false})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.ShowTitle || got.ShowAuthor || !got.ShowPublishedDate {
-		t.Fatalf("item display = title:%v author:%v date:%v, want true/false/true from category", got.ShowTitle, got.ShowAuthor, got.ShowPublishedDate)
+	if !got.ShowTitle || got.ShowAuthor || got.ShowCategoryName || !got.ShowPublishedDate {
+		t.Fatalf("item display = title:%v author:%v category:%v date:%v, want true/false/false/true from category", got.ShowTitle, got.ShowAuthor, got.ShowCategoryName, got.ShowPublishedDate)
 	}
 }
 
 func TestResolveItemDisplaySettingsInheritsCategoryItemDisplaySetting(t *testing.T) {
 	ctx, db := categorySettingsTestContext(t)
 
-	parent := models.Category{Name: "Parent", Slug: "parent-item-display", ItemTitleDisplay: content.DisplayNo, ItemAuthorDisplay: content.DisplayNo, ItemDateDisplay: content.DisplayNo, InheritSettings: false, Status: models.StatusActive}
+	parent := models.Category{Name: "Parent", Slug: "parent-item-display", ItemTitleDisplay: content.DisplayNo, ItemAuthorDisplay: content.DisplayNo, ItemCategoryDisplay: content.DisplayNo, ItemDateDisplay: content.DisplayNo, InheritSettings: false, Status: models.StatusActive}
 	if err := db.Create(&parent).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Model(&parent).Updates(map[string]any{
-		"item_title_display":  content.DisplayNo,
-		"item_author_display": content.DisplayNo,
-		"item_date_display":   content.DisplayNo,
-		"inherit_settings":    false,
+		"item_title_display":    content.DisplayNo,
+		"item_author_display":   content.DisplayNo,
+		"item_category_display": content.DisplayNo,
+		"item_date_display":     content.DisplayNo,
+		"inherit_settings":      false,
 	}).Error; err != nil {
 		t.Fatal(err)
 	}
-	child := models.Category{Name: "Child", Slug: "child-item-display", ParentID: &parent.CategoryID, ItemTitleDisplay: content.DisplayYes, ItemAuthorDisplay: content.DisplayYes, ItemDateDisplay: content.DisplayYes, InheritSettings: true, Status: models.StatusActive}
+	child := models.Category{Name: "Child", Slug: "child-item-display", ParentID: &parent.CategoryID, ItemTitleDisplay: content.DisplayYes, ItemAuthorDisplay: content.DisplayYes, ItemCategoryDisplay: content.DisplayYes, ItemDateDisplay: content.DisplayYes, InheritSettings: true, Status: models.StatusActive}
 	if err := db.Create(&child).Error; err != nil {
 		t.Fatal(err)
 	}
 	item := models.Item{Title: "Story", Slug: "story", Category: &child}
 
-	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: true, ShowAuthor: true, ShowPublishedDate: true})
+	got, err := content.ResolveItemDisplaySettings(ctx, &item, content.Settings{ShowTitle: true, ShowAuthor: true, ShowCategoryName: true, ShowPublishedDate: true})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ShowTitle || got.ShowAuthor || got.ShowPublishedDate {
-		t.Fatalf("item display = title:%v author:%v date:%v, want inherited parent false values", got.ShowTitle, got.ShowAuthor, got.ShowPublishedDate)
+	if got.ShowTitle || got.ShowAuthor || got.ShowCategoryName || got.ShowPublishedDate {
+		t.Fatalf("item display = title:%v author:%v category:%v date:%v, want inherited parent false values", got.ShowTitle, got.ShowAuthor, got.ShowCategoryName, got.ShowPublishedDate)
 	}
 }
 
@@ -212,7 +214,9 @@ func TestFeaturedCategorySettingsRoundTrip(t *testing.T) {
 	row.ShowReadMore = true
 	row.ItemTitleDisplay = content.DisplayNo
 	row.ItemAuthorDisplay = content.DisplayYes
+	row.ItemCategoryDisplay = content.DisplayNo
 	row.ItemDateDisplay = content.DisplayNo
+	row.ItemRelatedDisplay = content.DisplayNo
 	row.LeadingArticles = 3
 	row.ListColumns = 2
 	row.ListPagination = false
@@ -228,7 +232,7 @@ func TestFeaturedCategorySettingsRoundTrip(t *testing.T) {
 	if got.Name != "Featured Picks" || got.Slug != "featured" || got.Description != "<p>Curated work</p>" || got.Image != "/media/featured.jpg" || got.Template != "custom/featured.html" {
 		t.Fatalf("featured category identity = %+v, want saved display fields with virtual slug", got)
 	}
-	if got.InheritSettings || got.ShowTitle || got.ShowDescription || !got.ShowReadMore || got.ItemTitleDisplay != content.DisplayNo || got.ItemAuthorDisplay != content.DisplayYes || got.ItemDateDisplay != content.DisplayNo || got.LeadingArticles != 3 || got.ListColumns != 2 || got.ListPagination || got.ListPageSize != 12 {
+	if got.InheritSettings || got.ShowTitle || got.ShowDescription || !got.ShowReadMore || got.ItemTitleDisplay != content.DisplayNo || got.ItemAuthorDisplay != content.DisplayYes || got.ItemCategoryDisplay != content.DisplayNo || got.ItemDateDisplay != content.DisplayNo || got.ItemRelatedDisplay != content.DisplayNo || got.LeadingArticles != 3 || got.ListColumns != 2 || got.ListPagination || got.ListPageSize != 12 {
 		t.Fatalf("featured category settings = %+v, want saved custom settings", got)
 	}
 
@@ -242,6 +246,40 @@ func TestFeaturedCategorySettingsRoundTrip(t *testing.T) {
 	itemDisplay := content.ResolveFeaturedItemDisplaySettings(ctx, got, content.Settings{ShowTitle: true, ShowAuthor: false, ShowPublishedDate: true})
 	if itemDisplay.ShowTitle || !itemDisplay.ShowAuthor || itemDisplay.ShowPublishedDate {
 		t.Fatalf("featured item display = %+v, want false/true/false", itemDisplay)
+	}
+}
+
+func TestRelatedItemsCategoryInheritance(t *testing.T) {
+	ctx, db := categorySettingsTestContext(t)
+	parent := models.Category{Name: "Parent", Slug: "parent-related", ItemRelatedDisplay: content.DisplayNo}
+	if err := db.Create(&parent).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		cat    *models.Category
+		global bool
+		want   bool
+	}{
+		{"uncategorized", nil, true, true},
+		{"uncategorized hidden", nil, false, false},
+		{"inherit shown", &models.Category{ItemRelatedDisplay: content.DisplayInherit}, true, true},
+		{"inherit hidden", &models.Category{ItemRelatedDisplay: content.DisplayInherit}, false, false},
+		{"legacy empty", &models.Category{}, true, true},
+		{"category hides", &models.Category{ItemRelatedDisplay: content.DisplayNo}, true, false},
+		{"category shows", &models.Category{ItemRelatedDisplay: content.DisplayYes}, false, true},
+		{"parent hides", &models.Category{ParentID: &parent.CategoryID, InheritSettings: true, ItemRelatedDisplay: content.DisplayYes}, true, false},
+		{"child overrides", &models.Category{ParentID: &parent.CategoryID, InheritSettings: false, ItemRelatedDisplay: content.DisplayYes}, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := content.ResolveItemDisplaySettings(ctx, &models.Item{Category: tc.cat}, content.Settings{ShowRelatedItems: tc.global})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.ShowRelatedItems != tc.want {
+				t.Fatalf("ShowRelatedItems = %v, want %v", got.ShowRelatedItems, tc.want)
+			}
+		})
 	}
 }
 

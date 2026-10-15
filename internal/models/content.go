@@ -29,9 +29,11 @@ type Category struct {
 	ShowTitle          bool   `gorm:"not null;default:true"`
 	ShowDescription    bool   `gorm:"not null;default:true"`
 	ShowReadMore       bool   `gorm:"not null;default:false"`
-	ItemTitleDisplay   string `gorm:"size:16;not null;default:inherit"`
-	ItemAuthorDisplay  string `gorm:"size:16;not null;default:inherit"`
-	ItemDateDisplay    string `gorm:"size:16;not null;default:inherit"`
+	ItemTitleDisplay    string `gorm:"size:16;not null;default:inherit"`
+	ItemAuthorDisplay   string `gorm:"size:16;not null;default:inherit"`
+	ItemCategoryDisplay string `gorm:"size:16;not null;default:inherit"`
+	ItemDateDisplay     string `gorm:"size:16;not null;default:inherit"`
+	ItemRelatedDisplay  string `gorm:"size:16;not null;default:inherit"`
 	LeadingArticles    int    `gorm:"not null;default:0"`
 	ListColumns        int    `gorm:"not null;default:3"`
 	ListPagination     bool   `gorm:"not null;default:true"`

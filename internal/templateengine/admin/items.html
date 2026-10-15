@@ -46,7 +46,7 @@
     </form>
   {{template "list_toolbar_close" .}}
 
-  <form method="post" action="{{.BasePath}}/bulk{{.ListQuery}}" class="admin-bulk-form">
+  <form method="post" action="{{.BasePath}}/bulk{{.ListQuery}}" class="admin-bulk-form" id="items-bulk-form">
     {{csrfField}}
   {{template "list_toolbar_open" (dict "Secondary" true)}}
       <div class="admin-bulk-toolbar">
@@ -76,11 +76,12 @@
         <button type="submit" class="btn-admin-outline btn-admin-sm" onclick="return confirm('Apply bulk action to selected items?')">Apply</button>
       </div>
   {{template "list_toolbar_close" .}}
+  </form>
     <div class="admin-table-scroll">
       <table class="admin-table">
         <thead>
           <tr>
-            <th class="admin-col-check"><input type="checkbox" data-select-all aria-label="Select all items"></th>
+            <th class="admin-col-check"><input type="checkbox" form="items-bulk-form" data-select-all aria-label="Select all items"></th>
             {{template "sort_th" (dict "Root" $ "Key" "title" "Label" "Title")}}
             {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
             <th>Category</th>
@@ -94,7 +95,7 @@
         <tbody>
           {{range .Rows}}
           <tr>
-            <td><input type="checkbox" name="item_ids" value="{{.ItemID}}"></td>
+            <td><input type="checkbox" name="item_ids" value="{{.ItemID}}" form="items-bulk-form" aria-label="Select {{.Title}}"></td>
             <td>
               {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ItemID "ListQuery" $.ListQuery "Label" .Title)}}
               <div class="admin-cell-muted">/{{.Slug}}</div>
@@ -113,6 +114,5 @@
         </tbody>
       </table>
     </div>
-  </form>
   {{template "pagination" .}}
 </div>

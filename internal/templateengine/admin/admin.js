@@ -2388,6 +2388,29 @@
 
     actionSelect.addEventListener('change', syncBulkFields);
     syncBulkFields();
+
+    var form = actionSelect.form;
+    if (!form) return;
+    // The table is outside the bulk form so row-action forms are not nested.
+    // form.elements includes its explicitly associated selection checkboxes.
+    var controls = Array.prototype.slice.call(form.elements);
+    var selectAll = controls.find(function (input) { return input.hasAttribute('data-select-all'); });
+    var items = controls.filter(function (input) { return input.name === 'item_ids' && !input.disabled; });
+    if (!selectAll) return;
+
+    function syncSelection() {
+      var selected = items.filter(function (input) { return input.checked; }).length;
+      selectAll.checked = items.length > 0 && selected === items.length;
+      selectAll.indeterminate = selected > 0 && selected < items.length;
+      selectAll.disabled = items.length === 0;
+    }
+
+    selectAll.addEventListener('change', function () {
+      items.forEach(function (input) { input.checked = selectAll.checked; });
+      syncSelection();
+    });
+    items.forEach(function (input) { input.addEventListener('change', syncSelection); });
+    syncSelection();
   }
 
   function initMediaFolders() {

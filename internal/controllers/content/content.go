@@ -239,7 +239,14 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 			commentCount, _ = cms.CommentCount(ctx.GoContext(), item.ItemID)
 		}
 	}
-	related, _ := cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
+	displaySettings, err := cms.ResolveItemDisplaySettings(ctx.GoContext(), item, settings)
+	if err != nil {
+		return controllers.Error(http.StatusInternalServerError, err.Error())
+	}
+	var related []models.Item
+	if displaySettings.ShowRelatedItems {
+		related, _ = cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
+	}
 	bodyHTML, _ := cms.RichTextToHTML(item.Body)
 	introHTML, _ := cms.RichTextToHTML(item.Intro)
 	gallery := cms.ParseGalleryJSON(item.GalleryJSON)
@@ -264,10 +271,6 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 	}
 	if settings.ShowAuthorBio && item.AuthorID != nil {
 		authorProfile, _ = cms.LoadAuthorProfile(ctx.GoContext(), *item.AuthorID)
-	}
-	displaySettings, err := cms.ResolveItemDisplaySettings(ctx.GoContext(), item, settings)
-	if err != nil {
-		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
 	data := map[string]any{
 		"Item":            item,

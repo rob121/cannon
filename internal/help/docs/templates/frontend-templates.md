@@ -197,7 +197,19 @@ Named regions in templates for extension blocks:
 {{if gt (lenspace "header") 0}}<div>{{space "header"}}</div>{{end}}
 ```
 
+Content item detail pages also expose per-item spaces derived from the item slug:
+
+| Space | Placement |
+|-------|-----------|
+| `content-{slug}-start` | Before the intro |
+| `content-{slug}-middle` | Between intro and body |
+| `content-{slug}-end` | After the body |
+
+Example for an item with slug `important-dates`: assign blocks to `content-important-dates-start`, `content-important-dates-middle`, or `content-important-dates-end`.
+
 Enable **Debug Template Spaces** under Configuration → General, then append `?tp=1` to public URLs. The same `?tp=1` query also appends each `{{lang "key"}}` lookup key in parentheses (e.g. `Sign in (nav.sign_in)`) to help when editing locale files.
+
+Space preview shows a labeled red dashed outline even for empty spaces. During preview, `lenspace` counts an empty space's outline as one placeholder and `hasSpace` returns true, so conditional space wrappers remain visible. Fallback content in the corresponding `else` branch is replaced by the space outline. Outside preview these helpers report only active blocks. Other conditions, such as homepage-only sections, still apply.
 
 ---
 

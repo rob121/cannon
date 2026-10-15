@@ -46,8 +46,12 @@
           <label class="admin-form-label">Route</label>
           <select class="admin-form-control" name="route_id">
             <option value="">— None —</option>
-            {{range .Routes}}
-            <option value="{{.RouteID}}" {{if uintPtrEq $.Row.RouteID .RouteID}}selected{{end}}>{{.Name}} ({{.Path}})</option>
+            {{range .RouteGroups}}
+            <optgroup label="{{.Label}}">
+              {{range .Routes}}
+              <option value="{{.RouteID}}" {{if uintPtrEq $.Row.RouteID .RouteID}}selected{{end}}>{{.Name}} ({{.Path}})</option>
+              {{end}}
+            </optgroup>
             {{end}}
           </select>
         </div>

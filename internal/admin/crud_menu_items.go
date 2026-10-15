@@ -224,7 +224,7 @@ func (h *Handler) renderMenuItemForm(w http.ResponseWriter, r *http.Request, row
 		"BasePath":      menuItemsBase,
 		"FormAction":    menuItemFormAction(row, isNew, r),
 		"Subtitle":      subtitle,
-		"Routes":        h.loadRoutes(r),
+		"RouteGroups":   buildBlockRouteSections(h.loadRoutes(r)),
 		"AllMenus":      h.loadMenus(r),
 		"AllGroups":     allGroups,
 		"SelectedIDs":   defaultGroupSelectedIDs(db, row.Groups, isNew),

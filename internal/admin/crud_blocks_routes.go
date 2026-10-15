@@ -18,6 +18,7 @@ type blockRouteSection struct {
 func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 	var (
 		defaultRoutes []models.Route
+		contentItems  []models.Route
 		sitePages     []models.Route
 		content       []models.Route
 		authAccount   []models.Route
@@ -40,6 +41,8 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 				} else {
 					content = append(content, route)
 				}
+			} else if isContentItemRoute(route) {
+				contentItems = append(contentItems, route)
 			} else {
 				sitePages = append(sitePages, route)
 			}
@@ -49,6 +52,7 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 	}
 
 	sortBlockRoutes(defaultRoutes)
+	sortBlockRoutes(contentItems)
 	sortBlockRoutes(sitePages)
 	sortBlockRoutes(content)
 	sortBlockRoutes(authAccount)
@@ -56,7 +60,7 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 	sortBlockRoutes(urlsFiles)
 	sortBlockRoutes(other)
 
-	sections := make([]blockRouteSection, 0, 7)
+	sections := make([]blockRouteSection, 0, 8)
 	if len(defaultRoutes) > 0 {
 		sections = append(sections, blockRouteSection{
 			Key:    "default",
@@ -65,18 +69,26 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 			Routes: defaultRoutes,
 		})
 	}
+	if len(contentItems) > 0 {
+		sections = append(sections, blockRouteSection{
+			Key:    "content-items",
+			Label:  "Content Items",
+			Desc:   "Custom paths that render a content item (controller action item).",
+			Routes: contentItems,
+		})
+	}
 	if len(sitePages) > 0 {
 		sections = append(sections, blockRouteSection{
 			Key:    "site",
 			Label:  "Site Pages",
-			Desc:   "Custom controller routes you added under Routes, such as a home page or landing page.",
+			Desc:   "Custom controller routes you added under Routes, such as a category or landing page.",
 			Routes: sitePages,
 		})
 	}
 	if len(content) > 0 {
 		sections = append(sections, blockRouteSection{
 			Key:    "content",
-			Label:  "Content Routes",
+			Label:  "Built-in Content",
 			Desc:   "Built-in content controller paths for categories, items, search, and feeds.",
 			Routes: content,
 		})
@@ -115,9 +127,17 @@ func buildBlockRouteSections(routes []models.Route) []blockRouteSection {
 	return sections
 }
 
+func isContentItemRoute(route models.Route) bool {
+	return route.Type == models.RouteTypeController &&
+		route.Controller == "content" &&
+		route.ControllerAction == "item" &&
+		!router.IsBuiltinControllerRoute(route)
+}
+
 func isAuthAccountRoute(route models.Route) bool {
 	path := strings.TrimSpace(route.Path)
-	return strings.HasPrefix(path, "/auth/") || strings.HasPrefix(path, "/account/")
+	return strings.HasPrefix(path, "/auth/") || path == "/auth" ||
+		strings.HasPrefix(path, "/account/") || path == "/account"
 }
 
 func sortBlockRoutes(routes []models.Route) {

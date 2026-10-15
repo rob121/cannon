@@ -37,9 +37,11 @@ func FeaturedCategoryDefaults(ctx context.Context) models.Category {
 		ShowTitle:          true,
 		ShowDescription:    true,
 		ShowReadMore:       false,
-		ItemTitleDisplay:   DisplayInherit,
-		ItemAuthorDisplay:  DisplayInherit,
-		ItemDateDisplay:    DisplayInherit,
+		ItemTitleDisplay:    DisplayInherit,
+		ItemAuthorDisplay:   DisplayInherit,
+		ItemCategoryDisplay: DisplayInherit,
+		ItemDateDisplay:     DisplayInherit,
+		ItemRelatedDisplay:  DisplayInherit,
 		LeadingArticles:    0,
 		ListColumns:        DefaultCategoryListColumns,
 		ListPagination:     true,
@@ -68,7 +70,9 @@ func FeaturedCategorySettings(ctx context.Context) (models.Category, error) {
 	row.ShowReadMore = settingsBool(data, "show_read_more", row.ShowReadMore)
 	row.ItemTitleDisplay = settingsDisplayMode(data, "item_title_display", row.ItemTitleDisplay)
 	row.ItemAuthorDisplay = settingsDisplayMode(data, "item_author_display", row.ItemAuthorDisplay)
+	row.ItemCategoryDisplay = settingsDisplayMode(data, "item_category_display", row.ItemCategoryDisplay)
 	row.ItemDateDisplay = settingsDisplayMode(data, "item_date_display", row.ItemDateDisplay)
+	row.ItemRelatedDisplay = settingsDisplayMode(data, "item_related_display", row.ItemRelatedDisplay)
 	row.LeadingArticles = NormalizeCategoryLeadingArticles(settingsInt(data, "leading_articles", row.LeadingArticles))
 	row.ListColumns = NormalizeCategoryListColumns(settingsInt(data, "list_columns", row.ListColumns))
 	row.ListPagination = settingsBool(data, "list_pagination", row.ListPagination)
@@ -82,21 +86,23 @@ func SaveFeaturedCategorySettings(ctx context.Context, row models.Category) erro
 		row.Name = "Featured"
 	}
 	data := map[string]any{
-		"name":                row.Name,
-		"description":         row.Description,
-		"image":               row.Image,
-		"template":            row.Template,
-		"inherit_settings":    row.InheritSettings,
-		"show_title":          row.ShowTitle,
-		"show_description":    row.ShowDescription,
-		"show_read_more":      row.ShowReadMore,
-		"item_title_display":  NormalizeDisplayMode(row.ItemTitleDisplay),
-		"item_author_display": NormalizeDisplayMode(row.ItemAuthorDisplay),
-		"item_date_display":   NormalizeDisplayMode(row.ItemDateDisplay),
-		"leading_articles":    NormalizeCategoryLeadingArticles(row.LeadingArticles),
-		"list_columns":        NormalizeCategoryListColumns(row.ListColumns),
-		"list_pagination":     row.ListPagination,
-		"list_page_size":      NormalizeCategoryListPageSize(row.ListPageSize),
+		"name":                 row.Name,
+		"description":          row.Description,
+		"image":                row.Image,
+		"template":             row.Template,
+		"inherit_settings":     row.InheritSettings,
+		"show_title":           row.ShowTitle,
+		"show_description":     row.ShowDescription,
+		"show_read_more":       row.ShowReadMore,
+		"item_title_display":    NormalizeDisplayMode(row.ItemTitleDisplay),
+		"item_author_display":   NormalizeDisplayMode(row.ItemAuthorDisplay),
+		"item_category_display": NormalizeDisplayMode(row.ItemCategoryDisplay),
+		"item_date_display":     NormalizeDisplayMode(row.ItemDateDisplay),
+		"item_related_display":  NormalizeDisplayMode(row.ItemRelatedDisplay),
+		"leading_articles":     NormalizeCategoryLeadingArticles(row.LeadingArticles),
+		"list_columns":         NormalizeCategoryListColumns(row.ListColumns),
+		"list_pagination":      row.ListPagination,
+		"list_page_size":       NormalizeCategoryListPageSize(row.ListPageSize),
 	}
 	return settings.NewStore().Save(ctx, settings.ScopeGlobal, FeaturedCategorySettingsSection, data)
 }
@@ -127,7 +133,9 @@ func ResolveFeaturedItemDisplaySettings(ctx context.Context, cat models.Category
 	return ItemDisplaySettings{
 		ShowTitle:         ResolveDisplayMode(cat.ItemTitleDisplay, base.ShowTitle),
 		ShowAuthor:        ResolveDisplayMode(cat.ItemAuthorDisplay, base.ShowAuthor),
+		ShowCategoryName:  ResolveDisplayMode(cat.ItemCategoryDisplay, base.ShowCategoryName),
 		ShowPublishedDate: ResolveDisplayMode(cat.ItemDateDisplay, base.ShowPublishedDate),
+		ShowRelatedItems:  ResolveDisplayMode(cat.ItemRelatedDisplay, base.ShowRelatedItems),
 	}
 }
 
@@ -215,7 +223,9 @@ func ResolveCategoryItemDisplaySettings(ctx context.Context, cat *models.Categor
 	return ItemDisplaySettings{
 		ShowTitle:         ResolveDisplayMode(resolved.ItemTitleDisplay, base.ShowTitle),
 		ShowAuthor:        ResolveDisplayMode(resolved.ItemAuthorDisplay, base.ShowAuthor),
+		ShowCategoryName:  ResolveDisplayMode(resolved.ItemCategoryDisplay, base.ShowCategoryName),
 		ShowPublishedDate: ResolveDisplayMode(resolved.ItemDateDisplay, base.ShowPublishedDate),
+		ShowRelatedItems:  ResolveDisplayMode(resolved.ItemRelatedDisplay, base.ShowRelatedItems),
 	}, nil
 }
 

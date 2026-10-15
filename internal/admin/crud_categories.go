@@ -145,7 +145,9 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.ShowDescription = true
 		row.ItemTitleDisplay = content.DisplayInherit
 		row.ItemAuthorDisplay = content.DisplayInherit
+		row.ItemCategoryDisplay = content.DisplayInherit
 		row.ItemDateDisplay = content.DisplayInherit
+		row.ItemRelatedDisplay = content.DisplayInherit
 		row.ListColumns = content.DefaultCategoryListColumns
 		row.ListPagination = true
 		row.ListPageSize = content.DefaultCategoryListPageSize
@@ -185,7 +187,9 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.ShowReadMore = formBool(r, "show_read_more")
 		row.ItemTitleDisplay = content.NormalizeDisplayMode(formString(r, "item_title_display"))
 		row.ItemAuthorDisplay = content.NormalizeDisplayMode(formString(r, "item_author_display"))
+		row.ItemCategoryDisplay = content.NormalizeDisplayMode(formString(r, "item_category_display"))
 		row.ItemDateDisplay = content.NormalizeDisplayMode(formString(r, "item_date_display"))
+		row.ItemRelatedDisplay = content.NormalizeDisplayMode(formString(r, "item_related_display"))
 		row.LeadingArticles = content.NormalizeCategoryLeadingArticles(formInt(r, "leading_articles", 0))
 		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
 		row.ListPagination = formBool(r, "list_pagination")
@@ -204,7 +208,7 @@ func (h *Handler) categoryForm(w http.ResponseWriter, r *http.Request, id uint) 
 		if isNew {
 			saveErr = db.Select(
 				"ParentID", "Locale", "Name", "Slug", "Description", "Image", "Template",
-				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ShowReadMore", "ItemTitleDisplay", "ItemAuthorDisplay", "ItemDateDisplay", "LeadingArticles", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
+				"FieldGroupID", "InheritSettings", "InheritPermissions", "ShowTitle", "ShowDescription", "ShowReadMore", "ItemTitleDisplay", "ItemAuthorDisplay", "ItemCategoryDisplay", "ItemDateDisplay", "ItemRelatedDisplay", "LeadingArticles", "ListColumns", "ListPagination", "ListPageSize", "Sort", "Status",
 			).Create(&row).Error
 		} else {
 			saveErr = db.Save(&row).Error
@@ -251,7 +255,9 @@ func (h *Handler) featuredCategoryForm(w http.ResponseWriter, r *http.Request) {
 		row.ShowReadMore = formBool(r, "show_read_more")
 		row.ItemTitleDisplay = content.NormalizeDisplayMode(formString(r, "item_title_display"))
 		row.ItemAuthorDisplay = content.NormalizeDisplayMode(formString(r, "item_author_display"))
+		row.ItemCategoryDisplay = content.NormalizeDisplayMode(formString(r, "item_category_display"))
 		row.ItemDateDisplay = content.NormalizeDisplayMode(formString(r, "item_date_display"))
+		row.ItemRelatedDisplay = content.NormalizeDisplayMode(formString(r, "item_related_display"))
 		row.LeadingArticles = content.NormalizeCategoryLeadingArticles(formInt(r, "leading_articles", 0))
 		row.ListColumns = content.NormalizeCategoryListColumns(formInt(r, "list_columns", content.DefaultCategoryListColumns))
 		row.ListPagination = formBool(r, "list_pagination")
