@@ -18,7 +18,10 @@ func TestCategoryRelatedItemsControl(t *testing.T) {
 	}
 	for _, mode := range []string{"", "inherit", "yes", "no"} {
 		var out strings.Builder
-		if err := tmpl.Execute(&out, map[string]any{"Row": models.Category{ItemRelatedDisplay: mode}}); err != nil {
+		if err := tmpl.Execute(&out, map[string]any{
+			"Row":            models.Category{ItemRelatedDisplay: mode},
+			"ContentLocales": []string{"en-US"},
+		}); err != nil {
 			t.Fatal(err)
 		}
 		_, control, found := strings.Cut(out.String(), `name="item_related_display">`)

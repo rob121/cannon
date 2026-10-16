@@ -34,16 +34,16 @@
               <label class="admin-form-label" for="item-slug">Slug</label>
               <input class="admin-form-control" id="item-slug" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
             </div>
-            {{if gt (len .ContentLocales) 1}}
+            {{with .ContentLocales}}{{if gt (len .) 1}}
             <div class="col-md-4">
               <label class="admin-form-label" for="item-locale">Locale</label>
               <select class="admin-form-control" id="item-locale" name="locale">
-                {{range .ContentLocales}}
+                {{range .}}
                 <option value="{{.}}" {{if eq $.Row.Locale .}}selected{{end}}>{{.}}</option>
                 {{end}}
               </select>
             </div>
-            {{end}}
+            {{end}}{{end}}
             <div class="col-12">
               <label class="admin-form-label">Featured Image</label>
               {{template "media_field_input" (dict "ID" "item-image" "Name" "image" "Value" .Row.Image "Label" "Featured image" "Help" "Pick from the library or paste a URL.")}}
@@ -251,20 +251,20 @@
               <button type="submit" formaction="{{.BasePath}}/{{.Row.ItemID}}/preview-token" class="btn-admin-outline btn-admin-sm">{{if .PreviewURL}}Refresh Link{{else}}Generate Preview Link{{end}}</button>
               </div>
             </details>
-            {{if gt (len .ContentLocales) 1}}
+            {{with .ContentLocales}}{{if gt (len .) 1}}
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="item-translation-of">Link Translation</label>
               <input class="admin-form-control" id="item-translation-of" name="translation_of_item_id" type="number" min="1" placeholder="Item ID to link">
               <p class="admin-form-help mb-0">Optional. Enter another item&rsquo;s ID to group translations.</p>
-              {{if .Translations}}
+              {{if $.Translations}}
               <ul class="admin-form-help mb-0 mt-2">
-                {{range .Translations}}
+                {{range $.Translations}}
                 <li><a href="{{$.BasePath}}/{{.ItemID}}" data-turbo-frame="_top">{{.Locale}} — {{.Title}}</a></li>
                 {{end}}
               </ul>
               {{end}}
             </div>
-            {{end}}
+            {{end}}{{end}}
             <div class="admin-sidebar-field admin-sidebar-field-divider">
               <span class="admin-form-label">Editorial</span>
               <div class="admin-editorial-actions" role="group" aria-label="Editorial actions">

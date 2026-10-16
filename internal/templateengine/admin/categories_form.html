@@ -23,16 +23,16 @@
               <label class="admin-form-label">Slug</label>
               <input class="admin-form-control" name="slug" value="{{.Row.Slug}}" placeholder="auto-generated">
             </div>
-            {{if gt (len .ContentLocales) 1}}
+            {{with .ContentLocales}}{{if gt (len .) 1}}
             <div class="col-md-6">
               <label class="admin-form-label">Locale</label>
               <select class="admin-form-control" name="locale">
-                {{range .ContentLocales}}
+                {{range .}}
                 <option value="{{.}}" {{if eq $.Row.Locale .}}selected{{end}}>{{.}}</option>
                 {{end}}
               </select>
             </div>
-            {{end}}
+            {{end}}{{end}}
             <div class="col-md-6">
               <label class="admin-form-label">Parent Category</label>
               <select class="admin-form-control" name="parent_id">
