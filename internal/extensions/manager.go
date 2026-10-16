@@ -154,7 +154,8 @@ func (m *Manager) syncDirectory(db *gorm.DB) error {
 			}
 		} else if err != nil {
 			return err
-		} else if row.Socket == "" {
+		} else if row.Socket != socket {
+			// Reconcile when sockets_dir / site layout changes (e.g. Mac path → server path).
 			row.Socket = socket
 			if err := db.Save(&row).Error; err != nil {
 				return err

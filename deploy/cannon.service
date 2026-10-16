@@ -1,0 +1,38 @@
+[Unit]
+Description=Cannon multisite CMS
+Documentation=https://github.com/rob121/cannon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cannon
+Group=cannon
+
+# Config search order also includes ./sites.json, $HOME/.cannon/sites.json, and /etc/cannon/sites.json.
+Environment=CANNON_CONFIG=/etc/cannon/sites.json
+WorkingDirectory=/var/lib/cannon
+
+ExecStart=/usr/local/bin/cannon --port 8001
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/cannon /etc/cannon
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
