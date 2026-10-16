@@ -9,12 +9,26 @@ func TestProviderConfigured(t *testing.T) {
 	if ProviderConfigured("github", `{}`) {
 		t.Fatal("github should require credentials")
 	}
-	cfg := `{"client_key":"id","secret":"sec","callback_url":"https://example.com/callback"}`
+	cfg := `{"client_key":"id","secret":"sec"}`
 	if !ProviderConfigured("github", cfg) {
-		t.Fatal("github should be configured with standard oauth fields")
+		t.Fatal("github should be configured with client key and secret (callback is optional)")
+	}
+	if !ProviderConfigured("google", cfg) {
+		t.Fatal("google should be configured without callback_url")
 	}
 	if ProviderConfigured("github", `{"client_key":"id"}`) {
-		t.Fatal("github should require secret and callback")
+		t.Fatal("github should require secret")
+	}
+}
+
+func TestSuggestedCallbackURL(t *testing.T) {
+	got := SuggestedCallbackURL("https://floridarangers.com", "google")
+	want := "https://floridarangers.com/auth/oauth/google/callback"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if SuggestedCallbackURL("", "google") != "/auth/oauth/google/callback" {
+		t.Fatalf("path-only fallback = %q", SuggestedCallbackURL("", "google"))
 	}
 }
 

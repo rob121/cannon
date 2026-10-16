@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/paths"
 	"github.com/rob121/cannon/internal/routepath"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
@@ -23,16 +25,16 @@ import (
 const ControllerID = "auth"
 
 const (
-	ActionLogin         = "login"
-	ActionLogout        = "logout"
-	ActionOAuth         = "oauth"
-	ActionVerify        = "verify"
-	ActionVerifyResend  = "verify-resend"
-	ActionResetRequest  = "reset-request"
-	ActionResetSubmit   = "reset-submit"
-	ActionMFAChallenge  = "mfa-challenge"
-	ActionSecurity      = "security"
-	ActionSecurityTOTP  = "security-totp"
+	ActionLogin           = "login"
+	ActionLogout          = "logout"
+	ActionOAuth           = "oauth"
+	ActionVerify          = "verify"
+	ActionVerifyResend    = "verify-resend"
+	ActionResetRequest    = "reset-request"
+	ActionResetSubmit     = "reset-submit"
+	ActionMFAChallenge    = "mfa-challenge"
+	ActionSecurity        = "security"
+	ActionSecurityTOTP    = "security-totp"
 	ActionSecurityPasskey = "security-passkey"
 	ActionPasskeyLogin    = "passkey-login"
 	ActionProfile         = "profile"
@@ -181,6 +183,9 @@ func (c *Controller) login(ctx *controllers.Context) controllers.Result {
 
 func loginError(ctx *controllers.Context, message string) controllers.Result {
 	r := ctx.Request
+	if strings.HasPrefix(r.URL.Path, "/auth/oauth/") {
+		return oauthFailureRedirect(ctx, message)
+	}
 	encoded := strings.TrimSpace(r.FormValue("return"))
 	if encoded == "" {
 		encoded = strings.TrimSpace(r.URL.Query().Get("return"))
@@ -193,12 +198,57 @@ func loginError(ctx *controllers.Context, message string) controllers.Result {
 	return renderLoginPage(ctx, message, r.URL.Query().Get("verified"))
 }
 
+func oauthFailureRedirect(ctx *controllers.Context, message string) controllers.Result {
+	if isAdminReturnPath(oauthReturnPath(ctx)) {
+		return controllers.Redirect(http.StatusSeeOther, "/admin/login?login_error="+url.QueryEscape(message))
+	}
+	loginURL := routepath.Controller(ctx.GoContext(), "auth", ActionLogin)
+	return controllers.Redirect(http.StatusSeeOther, appendQueryParam(loginURL, "login_error", message))
+}
+
+// oauthReturnPath prefers the pending OAuth session return, then the signed return query param.
+func oauthReturnPath(ctx *controllers.Context) string {
+	if path := auth.PeekOAuthReturn(ctx.User); path != "" {
+		return path
+	}
+	if encoded := strings.TrimSpace(ctx.Request.URL.Query().Get("return")); encoded != "" {
+		if path, err := controllers.DecodeReturn(ctx.Site, encoded); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+func oauthFailureMessage(providerName string, err error) string {
+	label := auth.ProviderDisplayName(providerName)
+	base := "Sign in with " + label + " failed. Try again or use local sign-in."
+	if err == nil {
+		return base
+	}
+	msg := strings.TrimSpace(err.Error())
+	switch {
+	case msg == "":
+		return base
+	case strings.Contains(msg, "oauth session expired"), strings.Contains(msg, "invalid oauth state"):
+		return "Sign in with " + label + " expired. Please try again."
+	case strings.Contains(msg, "provider not available"):
+		return label + " sign-in is not available on this site."
+	default:
+		// Keep detail short for the login banner; full error is in the server log.
+		if len(msg) > 160 {
+			msg = msg[:160] + "…"
+		}
+		return base + " (" + msg + ")"
+	}
+}
+
 func renderLoginPage(ctx *controllers.Context, message, verified string) controllers.Result {
 	data, err := auth.BuildLoginFormData(ctx.GoContext(), ctx.Request, auth.LoginFormOptions{Error: message})
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
 	}
-	return controllers.HTML("Sign In", map[string]any{
+	// Always use login.html — HTML() would pick the current action (e.g. oauth) as the template.
+	return controllers.HTMLPage("Sign In", "default/controllers/auth/login.html", map[string]any{
 		"Login":    data,
 		"Verified": verified,
 	})
@@ -218,14 +268,17 @@ func (c *Controller) oauth(ctx *controllers.Context) controllers.Result {
 	if len(parts) > 1 {
 		return controllers.Error(http.StatusNotFound, "unknown oauth path")
 	}
-	allowed, err := settings.AllowLogin(ctx.GoContext())
-	if err != nil {
-		return controllers.Error(http.StatusInternalServerError, err.Error())
-	}
-	if !allowed {
-		return loginError(ctx, "Sign in is currently disabled on this site.")
-	}
 	returnPath := returnPathFromRequest(ctx, ctx.Request)
+	// allow_login gates public/frontend sign-in only; admin OAuth stays available.
+	if !isAdminReturnPath(returnPath) {
+		allowed, err := settings.AllowLogin(ctx.GoContext())
+		if err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		}
+		if !allowed {
+			return loginError(ctx, "Sign in is currently disabled on this site.")
+		}
+	}
 	authURL, err := auth.BeginOAuth(ctx.GoContext(), ctx.Request, ctx.User, providerName, returnPath)
 	if err != nil {
 		return loginError(ctx, "Could not start sign in with "+auth.ProviderDisplayName(providerName)+".")
@@ -236,7 +289,8 @@ func (c *Controller) oauth(ctx *controllers.Context) controllers.Result {
 func (c *Controller) oauthCallback(ctx *controllers.Context, providerName string) controllers.Result {
 	u, returnPath, err := auth.CompleteOAuth(ctx.GoContext(), ctx.Request, ctx.User, providerName)
 	if err != nil {
-		return loginError(ctx, "Sign in with "+auth.ProviderDisplayName(providerName)+" failed. Try again or use local sign-in.")
+		log.Printf("oauth callback %s failed: %v", providerName, err)
+		return oauthFailureRedirect(ctx, oauthFailureMessage(providerName, err))
 	}
 	if u.Locked {
 		return loginError(ctx, "This account is locked.")
@@ -248,6 +302,25 @@ func (c *Controller) oauthCallback(ctx *controllers.Context, providerName string
 	if dest == "" {
 		dest = sites.DefaultRoutePath(ctx.GoContext())
 	}
+	loginContext := "frontend"
+	if isAdminReturnPath(dest) {
+		loginContext = "admin"
+		allowed, err := security.Can(ctx.GoContext(), u.UserID, security.PermAdminAccess)
+		if err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		}
+		if !allowed {
+			return controllers.Redirect(http.StatusSeeOther, "/admin/login?login_error="+url.QueryEscape("Your account does not have permission to access the admin panel."))
+		}
+	} else {
+		allowed, err := settings.AllowLogin(ctx.GoContext())
+		if err != nil {
+			return controllers.Error(http.StatusInternalServerError, err.Error())
+		}
+		if !allowed {
+			return loginError(ctx, "Sign in is currently disabled on this site.")
+		}
+	}
 	needsMFA, err := mfa.UserRequiresMFA(ctx.GoContext(), u.UserID)
 	if err != nil {
 		return controllers.Error(http.StatusInternalServerError, err.Error())
@@ -255,17 +328,22 @@ func (c *Controller) oauthCallback(ctx *controllers.Context, providerName string
 	if needsMFA {
 		if err := mfa.SetPendingMFA(ctx.User, mfa.PendingMFA{
 			UserID:  u.UserID,
-			Context: "frontend",
+			Context: loginContext,
 			Return:  dest,
 		}); err != nil {
 			return controllers.Error(http.StatusInternalServerError, "could not start MFA session")
 		}
 		return controllers.Redirect(http.StatusSeeOther, routepath.Controller(ctx.GoContext(), "auth", ActionMFAChallenge))
 	}
-	if err := completeFrontendLogin(ctx, u.UserID, "frontend"); err != nil {
+	if err := completeFrontendLogin(ctx, u.UserID, loginContext); err != nil {
 		return controllers.Error(http.StatusInternalServerError, "could not start session")
 	}
 	return controllers.Redirect(http.StatusSeeOther, dest)
+}
+
+func isAdminReturnPath(path string) bool {
+	path = strings.TrimSpace(path)
+	return path == "/admin" || strings.HasPrefix(path, "/admin/")
 }
 
 func appendQueryParam(path, key, value string) string {

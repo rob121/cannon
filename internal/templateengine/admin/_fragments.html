@@ -10,6 +10,18 @@
   <h3 class="admin-form-section-title">Configuration</h3>
   <p class="admin-form-section-desc">Values map to <code>github.com/markbates/goth</code> provider constructor parameters.</p>
 </div>
+{{if .SuggestedCallback}}
+<div class="col-12">
+  <div class="admin-alert admin-alert-info" style="margin-bottom:0;">
+    <strong>Register this redirect URI</strong> with the OAuth provider
+    (path is fixed{{if .CallbackPath}}: <code>{{.CallbackPath}}</code>{{end}}):
+    <div style="margin-top:0.5rem;">
+      <code style="word-break:break-all;">{{.SuggestedCallback}}</code>
+    </div>
+    <p class="admin-form-help" style="margin:0.5rem 0 0;">Cannon uses this automatically when Callback URL override is blank.</p>
+  </div>
+</div>
+{{end}}
 {{range .ConfigFields}}
 <div class="col-md-6">
   <label class="admin-form-label">{{.Label}}</label>
@@ -17,9 +29,9 @@
   <input class="admin-form-control" value="{{.Value}}" disabled>
   <input type="hidden" name="cfg_{{.Key}}" value="{{.Value}}">
   {{else if .Secret}}
-  <input class="admin-form-control" type="password" name="cfg_{{.Key}}" value="{{.Value}}" autocomplete="off">
+  <input class="admin-form-control" type="password" name="cfg_{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" autocomplete="off">
   {{else}}
-  <input class="admin-form-control" name="cfg_{{.Key}}" value="{{.Value}}">
+  <input class="admin-form-control" name="cfg_{{.Key}}" value="{{.Value}}" placeholder="{{.Placeholder}}" autocomplete="off">
   {{end}}
   {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
 </div>

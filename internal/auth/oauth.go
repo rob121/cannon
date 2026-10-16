@@ -174,6 +174,43 @@ func OAuthCallbackPath(providerName string) string {
 	return OAuthBeginPath(providerName) + "/callback"
 }
 
+// PeekOAuthReturn returns the pending post-login return path from the OAuth session, if any.
+func PeekOAuthReturn(svc *user.Service) string {
+	if svc == nil {
+		return ""
+	}
+	if v, ok := svc.SessionValue(oauthReturnKey); ok && v != nil {
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+	return ""
+}
+
+// SuggestedCallbackURL returns the absolute redirect URI to register with the OAuth provider.
+// siteHost should be the site's configured host (e.g. https://example.com). When blank or
+// relative, only the path is returned.
+func SuggestedCallbackURL(siteHost, providerName string) string {
+	path := OAuthCallbackPath(providerName)
+	if path == "" {
+		return ""
+	}
+	host := strings.TrimSpace(siteHost)
+	if host == "" {
+		return path
+	}
+	if !strings.Contains(host, "://") {
+		host = "https://" + host
+	}
+	base, err := url.Parse(host)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return path
+	}
+	rel, err := url.Parse(path)
+	if err != nil {
+		return path
+	}
+	return base.ResolveReference(rel).String()
+}
+
 func buildGothProvider(name, configuration, callbackURL string) (goth.Provider, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	cfg := MergedConfig(name, configuration)
@@ -181,7 +218,7 @@ func buildGothProvider(name, configuration, callbackURL string) (goth.Provider, 
 	switch name {
 	case "google":
 		if scopes == nil {
-			scopes = []string{"email", "profile"}
+			scopes = []string{"openid", "email", "profile"}
 		}
 		return google.New(cfg["client_key"], cfg["secret"], callbackURL, scopes...), nil
 	case "github":
@@ -277,12 +314,17 @@ func findOrCreateOAuthUser(ctx context.Context, authRow models.Authenticator, gu
 	err = db.Where("provider = ? AND provider_user_id = ?", authRow.Name, providerUserID).First(&identity).Error
 	if err == nil {
 		var u models.User
-		if err := db.First(&u, identity.UserID).Error; err != nil {
+		if err := db.First(&u, identity.UserID).Error; err == nil {
+			return &u, updateOAuthUserProfile(db, &u, gu)
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, err
 		}
-		return &u, updateOAuthUserProfile(db, &u, gu)
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// User was deleted but the OAuth link remained; drop the orphan and continue.
+		if err := db.Delete(&identity).Error; err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 

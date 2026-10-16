@@ -250,6 +250,14 @@ func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request, idStr strin
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := db.Exec("DELETE FROM user_roles WHERE user_user_id = ?", id).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := db.Where("user_id = ?", id).Delete(&models.UserOAuthIdentity{}).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := db.Delete(&models.User{}, id).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

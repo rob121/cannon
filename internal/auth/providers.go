@@ -47,29 +47,31 @@ func ProviderConfigured(name, configuration string) bool {
 		return true
 	}
 	cfg := MergedConfig(name, configuration)
+	// callback_url is optional: Cannon derives /auth/oauth/{provider}/callback from the request
+	// (or site host) when the field is blank.
 	switch name {
 	case "apple":
-		return cfg["client_id"] != "" && cfg["secret"] != "" && cfg["callback_url"] != ""
+		return cfg["client_id"] != "" && cfg["secret"] != ""
 	case "auth0":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != "" && cfg["domain"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["domain"] != ""
 	case "azureadv2", "microsoftonline":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != ""
 	case "okta":
 		return cfg["client_id"] != "" && cfg["secret"] != "" && cfg["org_url"] != ""
 	case "openid":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != "" && cfg["discovery_url"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["discovery_url"] != ""
 	case "steam":
-		return cfg["api_key"] != "" && cfg["callback_url"] != ""
+		return cfg["api_key"] != ""
 	case "vk":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != "" && cfg["api_version"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["api_version"] != ""
 	case "wecom":
-		return cfg["corp_id"] != "" && cfg["secret"] != "" && cfg["agent_id"] != "" && cfg["callback_url"] != ""
+		return cfg["corp_id"] != "" && cfg["secret"] != "" && cfg["agent_id"] != ""
 	case "shopify":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != "" && cfg["shop_name"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["shop_name"] != ""
 	case "gitea", "gitlab", "mastodon", "nextcloud":
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != "" && cfg["auth_url"] != "" && cfg["token_url"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["auth_url"] != "" && cfg["token_url"] != ""
 	default:
-		return cfg["client_key"] != "" && cfg["secret"] != "" && cfg["callback_url"] != ""
+		return cfg["client_key"] != "" && cfg["secret"] != ""
 	}
 }
 

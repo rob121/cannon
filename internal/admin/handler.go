@@ -10,10 +10,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/auth/mfa"
 	"github.com/rob121/cannon/internal/captcha"
-	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/content"
+	"github.com/rob121/cannon/internal/controllers"
+	"github.com/rob121/cannon/internal/csrf"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/help"
 	"github.com/rob121/cannon/internal/hooks"
@@ -21,9 +23,9 @@ import (
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
-	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/realtime"
+	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 	"github.com/rob121/cannon/internal/themes"
@@ -127,98 +129,98 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 		templateengine.CSRFFuncs(r),
 		lang.FuncMap(middleware.LocaleFromContext(r.Context()), lang.TranslationPreviewActive(r)),
 		template.FuncMap{
-		"dict": func(values ...any) (map[string]any, error) {
-			if len(values)%2 != 0 {
-				return nil, fmt.Errorf("dict: odd number of arguments")
-			}
-			m := make(map[string]any, len(values)/2)
-			for i := 0; i < len(values); i += 2 {
-				key, ok := values[i].(string)
-				if !ok {
-					return nil, fmt.Errorf("dict: key must be string")
+			"dict": func(values ...any) (map[string]any, error) {
+				if len(values)%2 != 0 {
+					return nil, fmt.Errorf("dict: odd number of arguments")
 				}
-				m[key] = values[i+1]
-			}
-			return m, nil
-		},
-		"initials": func(parts ...string) string {
-			var out string
-			for _, p := range parts {
-				p = strings.TrimSpace(p)
-				if p != "" {
-					out += strings.ToUpper(p[:1])
+				m := make(map[string]any, len(values)/2)
+				for i := 0; i < len(values); i += 2 {
+					key, ok := values[i].(string)
+					if !ok {
+						return nil, fmt.Errorf("dict: key must be string")
+					}
+					m[key] = values[i+1]
 				}
-			}
-			if out == "" {
-				return "?"
-			}
-			if len(out) > 2 {
-				return out[:2]
-			}
-			return out
-		},
-		"queryEscape": url.QueryEscape,
-		"sortLink": func(basePath string, page int, currentSort, currentDir, col string) string {
-			return sortLinkExtra(basePath, page, currentSort, currentDir, col, listExtra)
-		},
-		"sortLinkRoot": func(root map[string]any, col string) string {
-			basePath, _ := root["BasePath"].(string)
-			page, _ := root["Page"].(int)
-			sort, _ := root["Sort"].(string)
-			dir, _ := root["Dir"].(string)
-			return sortLinkExtra(basePath, page, sort, dir, col, listExtraFromData(root))
-		},
-		"listQueryFromData": listQueryFromData,
-		"pageSizeLinkRoot":  pageSizeLinkFromData,
-		"listQuery": func(page int, sort, dir string) string {
-			return listQueryExtra(page, sort, dir, listExtra)
-		},
-		"listQueryAmp": func(page int, sort, dir string) string {
-			return listQueryAmpExtra(page, sort, dir, listExtra)
-		},
-		"internalHelpURL": func(folder, slug string) string {
-			return help.ArticleURL(folder, slug)
-		},
-		"helpURL": func(extensionName, articlePath string) string {
-			return extensions.HelpArticleURL(extensionName, articlePath)
-		},
-		"containsUint":   containsUint,
-		"containsString": containsString,
-		"fieldOptions": func(raw string) []content.FieldOption {
-			return content.ParseFieldConfig(raw).Options
-		},
-		"fieldValueContains": content.FieldValueContains,
-		"providerName":       displayProviderName,
-		"uintPtrEq":     uintPtrEq,
-		"siteURL":       siteFrontendURL,
-		"siteAdminURL":  siteAdminURL,
-		"siteHostLabel": siteHostLabel,
-		"joinRoleNames": func(roles []models.Role) string {
-			names := make([]string, 0, len(roles))
-			for _, role := range roles {
-				names = append(names, RoleDisplayName(role.Name))
-			}
-			return strings.Join(names, ", ")
-		},
-		"joinGroupNames": func(groups []models.Group) string {
-			names := make([]string, 0, len(groups))
-			for _, group := range groups {
-				names = append(names, GroupDisplayName(group.Name))
-			}
-			return strings.Join(names, ", ")
-		},
-		"inString": func(list []string, v string) bool {
-			for _, item := range list {
-				if item == v {
-					return true
+				return m, nil
+			},
+			"initials": func(parts ...string) string {
+				var out string
+				for _, p := range parts {
+					p = strings.TrimSpace(p)
+					if p != "" {
+						out += strings.ToUpper(p[:1])
+					}
 				}
-			}
-			return false
-		},
-		"groupName": GroupDisplayName,
-		"roleName":  RoleDisplayName,
-		"formatBytes": formatBytes,
-	})), nil
+				if out == "" {
+					return "?"
+				}
+				if len(out) > 2 {
+					return out[:2]
+				}
+				return out
+			},
+			"queryEscape": url.QueryEscape,
+			"sortLink": func(basePath string, page int, currentSort, currentDir, col string) string {
+				return sortLinkExtra(basePath, page, currentSort, currentDir, col, listExtra)
+			},
+			"sortLinkRoot": func(root map[string]any, col string) string {
+				basePath, _ := root["BasePath"].(string)
+				page, _ := root["Page"].(int)
+				sort, _ := root["Sort"].(string)
+				dir, _ := root["Dir"].(string)
+				return sortLinkExtra(basePath, page, sort, dir, col, listExtraFromData(root))
+			},
+			"listQueryFromData": listQueryFromData,
+			"pageSizeLinkRoot":  pageSizeLinkFromData,
+			"listQuery": func(page int, sort, dir string) string {
+				return listQueryExtra(page, sort, dir, listExtra)
+			},
+			"listQueryAmp": func(page int, sort, dir string) string {
+				return listQueryAmpExtra(page, sort, dir, listExtra)
+			},
+			"internalHelpURL": func(folder, slug string) string {
+				return help.ArticleURL(folder, slug)
+			},
+			"helpURL": func(extensionName, articlePath string) string {
+				return extensions.HelpArticleURL(extensionName, articlePath)
+			},
+			"containsUint":   containsUint,
+			"containsString": containsString,
+			"fieldOptions": func(raw string) []content.FieldOption {
+				return content.ParseFieldConfig(raw).Options
+			},
+			"fieldValueContains": content.FieldValueContains,
+			"providerName":       displayProviderName,
+			"uintPtrEq":          uintPtrEq,
+			"siteURL":            siteFrontendURL,
+			"siteAdminURL":       siteAdminURL,
+			"siteHostLabel":      siteHostLabel,
+			"joinRoleNames": func(roles []models.Role) string {
+				names := make([]string, 0, len(roles))
+				for _, role := range roles {
+					names = append(names, RoleDisplayName(role.Name))
+				}
+				return strings.Join(names, ", ")
+			},
+			"joinGroupNames": func(groups []models.Group) string {
+				names := make([]string, 0, len(groups))
+				for _, group := range groups {
+					names = append(names, GroupDisplayName(group.Name))
+				}
+				return strings.Join(names, ", ")
+			},
+			"inString": func(list []string, v string) bool {
+				for _, item := range list {
+					if item == v {
+						return true
+					}
+				}
+				return false
+			},
+			"groupName":   GroupDisplayName,
+			"roleName":    RoleDisplayName,
+			"formatBytes": formatBytes,
+		})), nil
 }
 
 func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
@@ -342,12 +344,12 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		loginArgs["username"] = username
 		loginArgs["context"] = "admin"
 		if _, err := hooks.Fire(r.Context(), hooks.OnUserBeforeLogin, loginArgs); err != nil {
-		if errors.Is(err, hooks.ErrAborted) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			token, _ := csrfToken(r)
-			fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, ""))
-			return
-		}
+			if errors.Is(err, hooks.ErrAborted) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				token, _ := csrfToken(r)
+				fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, ""))
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -395,15 +397,50 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	token, _ := csrfToken(r)
-	fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, ""))
+	errMsg := strings.TrimSpace(r.URL.Query().Get("login_error"))
+	fmt.Fprint(w, renderLoginPageHTML(r.Context(), token, errMsg))
 }
 
 func renderLoginPageHTML(ctx context.Context, token, errMsg string) string {
-	html := loginHTML(token, errMsg)
+	html := loginHTML(ctx, token, errMsg)
 	if expanded, err := captcha.ExpandHTML(ctx, html); err == nil {
 		html = expanded
 	}
 	return html
+}
+
+func adminOAuthProviderButtons(ctx context.Context) string {
+	providers, err := auth.LoginProviders(ctx)
+	if err != nil {
+		return ""
+	}
+	oauth := auth.OAuthProviders(providers)
+	if len(oauth) == 0 {
+		return ""
+	}
+	site, _ := sites.FromContext(ctx)
+	var b strings.Builder
+	b.WriteString(`<div class="admin-login-oauth">`)
+	b.WriteString(`<div class="admin-login-oauth-divider"><span>Or continue with</span></div>`)
+	b.WriteString(`<div class="admin-login-oauth-actions">`)
+	for _, provider := range oauth {
+		begin := auth.OAuthBeginPath(provider.Name)
+		if begin == "" {
+			continue
+		}
+		href := begin
+		if site != nil {
+			if withReturn, err := controllers.AppendReturn(site, begin, "/admin"); err == nil {
+				href = withReturn
+			}
+		}
+		label := template.HTMLEscapeString(provider.Label)
+		b.WriteString(`<a class="btn-admin-outline w-100" href="` + template.HTMLEscapeString(href) + `">`)
+		b.WriteString(`<i class="bi bi-box-arrow-up-right"></i> Sign in with ` + label)
+		b.WriteString(`</a>`)
+	}
+	b.WriteString(`</div></div>`)
+	return b.String()
 }
 
 func csrfToken(r *http.Request) (string, error) {
@@ -414,11 +451,30 @@ func csrfToken(r *http.Request) (string, error) {
 	return svc.EnsureCSRFToken()
 }
 
-func loginHTML(token, errMsg string) string {
+func loginHTML(ctx context.Context, token, errMsg string) string {
 	csrfField := string(csrf.HiddenField(token))
 	alert := ""
 	if strings.TrimSpace(errMsg) != "" {
 		alert = `<div class="alert alert-danger" role="alert">` + template.HTMLEscapeString(errMsg) + `</div>`
+	}
+	oauthButtons := adminOAuthProviderButtons(ctx)
+	localForm := ""
+	providers, _ := auth.LoginProviders(ctx)
+	if auth.LocalLoginEnabled(providers) || len(auth.OAuthProviders(providers)) == 0 {
+		localForm = `
+        <form method="post">
+          ` + csrfField + `
+          <div class="mb-3">
+            <label class="admin-form-label">Username</label>
+            <input class="admin-form-control" name="username" required autofocus autocomplete="username">
+          </div>
+          <div class="mb-3">
+            <label class="admin-form-label">Password</label>
+            <input class="admin-form-control" type="password" name="password" required autocomplete="current-password">
+          </div>
+          <div class="mb-4">` + captcha.PlaceholderMarkup(captcha.CaptchaContextLogin, captcha.ProviderAny) + `</div>
+          <button type="submit" class="btn-admin-primary w-100">Sign In</button>
+        </form>`
 	}
 	return `<!doctype html>
 <html lang="en">
@@ -431,30 +487,32 @@ func loginHTML(token, errMsg string) string {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="/admin/assets/admin.css?v=6" rel="stylesheet">
+  <style>
+    .admin-login-oauth { margin-top: 1.25rem; }
+    .admin-login-oauth-divider {
+      display: flex; align-items: center; gap: 0.75rem;
+      margin-bottom: 1rem; color: var(--admin-muted-fg, #71717a);
+      font-size: 0.8125rem; font-weight: 600;
+    }
+    .admin-login-oauth-divider::before,
+    .admin-login-oauth-divider::after {
+      content: ""; flex: 1; height: 1px; background: var(--admin-border, #e4e4e7);
+    }
+    .admin-login-oauth-actions { display: grid; gap: 0.5rem; }
+  </style>
 </head>
 <body class="admin-login-page">
   <div class="admin-install-wrap" style="max-width:420px">
     <div class="admin-install-brand">
       <div class="admin-brand-icon"><img class="admin-cannon-icon" src="/admin/assets/cannon-icon.svg?v=4" alt="" width="32" height="32"></div>
       <h1>Sign In</h1>
-      <p>Enter your credentials to access the admin panel.</p>
+      <p>Sign in to access the admin panel.</p>
     </div>
     <div class="admin-form-card admin-install-card">
       <div class="admin-form-card-body">
         ` + alert + `
-        <form method="post">
-          ` + csrfField + `
-          <div class="mb-3">
-            <label class="admin-form-label">Username</label>
-            <input class="admin-form-control" name="username" required autofocus>
-          </div>
-          <div class="mb-3">
-            <label class="admin-form-label">Password</label>
-            <input class="admin-form-control" type="password" name="password" required>
-          </div>
-          <div class="mb-4">` + captcha.PlaceholderMarkup(captcha.CaptchaContextLogin, captcha.ProviderAny) + `</div>
-          <button type="submit" class="btn-admin-primary w-100">Sign In</button>
-        </form>
+        ` + localForm + `
+        ` + oauthButtons + `
       </div>
     </div>
   </div>

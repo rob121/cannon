@@ -12,7 +12,7 @@
         "type": "boolean",
         "title": "Allow Login",
         "default": true,
-        "description": "When disabled, public sign-in is unavailable and login routes return a notice."
+        "description": "When disabled, public/frontend sign-in is unavailable. Admin login (including admin OAuth) stays available."
       },
       "allow_signup": {
         "type": "boolean",

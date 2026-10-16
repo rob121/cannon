@@ -6,12 +6,13 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=cannon
-Group=cannon
+# Runs as root. For a dedicated user instead:
+#   useradd --system --home /opt --shell /usr/sbin/nologin cannon
+#   chown -R cannon:cannon /opt/ranger-sites-data
+# then set User=cannon and Group=cannon below.
 
-# Config search order also includes ./sites.json, $HOME/.cannon/sites.json, and /etc/cannon/sites.json.
 Environment=CANNON_CONFIG=/etc/cannon/sites.json
-WorkingDirectory=/var/lib/cannon
+WorkingDirectory=/opt
 
 ExecStart=/usr/local/bin/cannon --port 8001
 ExecReload=/bin/kill -HUP $MAINPID
@@ -19,13 +20,15 @@ ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=30
+KillMode=mixed
 
-# Hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/cannon /etc/cannon
+# Cover every writable path from sites.json (data_root, extensions, sockets, site DBs).
+# Logs showed /opt/cannon/sockets — without it, ProtectSystem=strict blocks bind and extensions auto-disable.
+ReadWritePaths=/opt/ranger-sites-data /opt/cannon /etc/cannon
 CapabilityBoundingSet=
 AmbientCapabilities=
 LockPersonality=true

@@ -9,27 +9,44 @@ import (
 
 // ConfigField describes one Goth provider setting for the admin form.
 type ConfigField struct {
-	Key      string
-	Label    string
-	Help     string
-	Value    string
-	Secret   bool
-	Readonly bool
+	Key         string
+	Label       string
+	Help        string
+	Value       string
+	Placeholder string
+	Secret      bool
+	Readonly    bool
 }
 
 type fieldSpec struct {
-	key      string
-	label    string
-	help     string
-	secret   bool
-	readonly bool
+	key         string
+	label       string
+	help        string
+	placeholder string
+	secret      bool
+	readonly    bool
 }
 
 var (
 	oauthClientKey = fieldSpec{key: "client_key", label: "Client Key", help: "OAuth client ID / application key (goth ClientKey)."}
 	oauthSecret    = fieldSpec{key: "secret", label: "Client Secret", help: "OAuth client secret.", secret: true}
-	oauthCallback  = fieldSpec{key: "callback_url", label: "Callback URL", help: "Redirect URI registered with the provider (goth CallbackURL)."}
-	oauthScopes    = fieldSpec{key: "scopes", label: "Scopes", help: "Optional OAuth scopes, space or comma separated."}
+	oauthCallback  = fieldSpec{
+		key:   "callback_url",
+		label: "Callback URL override",
+		help:  "Optional. Leave blank to use the automatic callback URL shown above. Only set this if the provider requires a different absolute redirect URI.",
+	}
+	oauthScopes = fieldSpec{
+		key:         "scopes",
+		label:       "Scopes",
+		help:        "Optional OAuth scopes, space or comma separated.",
+		placeholder: "email profile",
+	}
+	googleScopes = fieldSpec{
+		key:         "scopes",
+		label:       "Scopes",
+		help:        "Optional. Defaults to email and profile when blank. openid email profile is recommended.",
+		placeholder: "openid email profile",
+	}
 
 	selfHostedAuth    = fieldSpec{key: "auth_url", label: "Auth URL", help: "OAuth authorize endpoint for self-hosted instances (optional)."}
 	selfHostedToken   = fieldSpec{key: "token_url", label: "Token URL", help: "OAuth token endpoint for self-hosted instances (optional)."}
@@ -105,7 +122,12 @@ var providerSchemas = map[string][]fieldSpec{
 	"gitlab":    oauthSelfHosted(),
 	"mastodon":  oauthSelfHosted(),
 	"nextcloud": oauthSelfHosted(),
-	"google":    oauthStandard(),
+	"google": {
+		oauthClientKey,
+		oauthSecret,
+		oauthCallback,
+		googleScopes,
+	},
 
 	"lastfm":  oauthNoScopes(),
 	"twitter": oauthNoScopes(),
@@ -223,12 +245,13 @@ func ConfigFormFields(providerName, stored string) []ConfigField {
 	fields := make([]ConfigField, 0, len(specs))
 	for _, spec := range specs {
 		fields = append(fields, ConfigField{
-			Key:      spec.key,
-			Label:    spec.label,
-			Help:     spec.help,
-			Value:    values[spec.key],
-			Secret:   spec.secret,
-			Readonly: spec.readonly,
+			Key:         spec.key,
+			Label:       spec.label,
+			Help:        spec.help,
+			Value:       values[spec.key],
+			Placeholder: spec.placeholder,
+			Secret:      spec.secret,
+			Readonly:    spec.readonly,
 		})
 	}
 	return fields

@@ -76,12 +76,22 @@ func (h *Handler) authenticatorForm(w http.ResponseWriter, r *http.Request, id u
 
 func (h *Handler) renderAuthenticatorForm(w http.ResponseWriter, r *http.Request, row models.Authenticator, errMsg string) {
 	title := authenticatorTitle(row.Name)
+	siteHost := ""
+	if site, err := sites.FromContext(r.Context()); err == nil && site != nil {
+		siteHost = site.Host
+	}
+	suggestedCallback := ""
+	if row.Name != "local" {
+		suggestedCallback = auth.SuggestedCallbackURL(siteHost, row.Name)
+	}
 	data := formData(map[string]any{
-		"ActiveNav":     "authenticators",
-		"Row":           row,
-		"BasePath":      authenticatorsBase,
-		"ConfigFields":  auth.ConfigFormFields(row.Name, row.Configuration),
-		"ProviderLabel": displayProviderName(row.Name),
+		"ActiveNav":         "authenticators",
+		"Row":               row,
+		"BasePath":          authenticatorsBase,
+		"ConfigFields":      auth.ConfigFormFields(row.Name, row.Configuration),
+		"ProviderLabel":     displayProviderName(row.Name),
+		"SuggestedCallback": suggestedCallback,
+		"CallbackPath":      auth.OAuthCallbackPath(row.Name),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
