@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+
+	"github.com/rob121/cannon/internal/lrucache"
 )
 
 type siteSettingsCache struct {
-	mu       sync.RWMutex
-	sections map[string]map[string]map[string]any // scope -> section -> data
+	mu       sync.Mutex
+	sections *lrucache.LRU[string, map[string]any] // key: scope\x00section
 }
 
 var (
@@ -28,9 +30,13 @@ func settingsCacheFor(siteID string) *siteSettingsCache {
 	if c, ok = settingsBySite[siteID]; ok {
 		return c
 	}
-	c = &siteSettingsCache{sections: map[string]map[string]map[string]any{}}
+	c = &siteSettingsCache{sections: lrucache.New[string, map[string]any](MaxSettingsEntriesPerSite)}
 	settingsBySite[siteID] = c
 	return c
+}
+
+func settingsEntryKey(scope, section string) string {
+	return scope + "\x00" + section
 }
 
 // SettingsKey identifies one settings section cache entry.
@@ -50,13 +56,9 @@ func GetSettings(ctx context.Context, scope, section string) (map[string]any, bo
 		return nil, false
 	}
 	c := settingsCacheFor(siteID)
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	scopeMap, ok := c.sections[scope]
-	if !ok {
-		return nil, false
-	}
-	data, ok := scopeMap[section]
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	data, ok := c.sections.Get(settingsEntryKey(scope, section))
 	if !ok {
 		return nil, false
 	}
@@ -75,12 +77,7 @@ func SetSettings(ctx context.Context, scope, section string, data map[string]any
 	c := settingsCacheFor(siteID)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	scopeMap, ok := c.sections[scope]
-	if !ok {
-		scopeMap = map[string]map[string]any{}
-		c.sections[scope] = scopeMap
-	}
-	scopeMap[section] = cloneMap(data)
+	c.sections.Set(settingsEntryKey(scope, section), cloneMap(data))
 }
 
 // InvalidateSettings drops one or all settings sections for a site.
@@ -92,18 +89,19 @@ func InvalidateSettings(siteID, scope, section string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if scope == "" {
-		c.sections = map[string]map[string]map[string]any{}
-		return
-	}
-	scopeMap, ok := c.sections[scope]
-	if !ok {
+		c.sections.Clear()
 		return
 	}
 	if section == "" {
-		delete(c.sections, scope)
+		prefix := scope + "\x00"
+		for _, key := range c.sections.Keys() {
+			if len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+				c.sections.Delete(key)
+			}
+		}
 		return
 	}
-	delete(scopeMap, section)
+	c.sections.Delete(settingsEntryKey(scope, section))
 }
 
 func invalidateSettings(siteID string) {

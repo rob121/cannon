@@ -4,15 +4,16 @@ import (
 	"context"
 	"sync"
 
+	"github.com/rob121/cannon/internal/lrucache"
 	"github.com/rob121/cannon/internal/models"
 	"gorm.io/gorm"
 )
 
 type siteGroupsCache struct {
-	mu            sync.RWMutex
+	mu            sync.Mutex
 	publicGroupID uint
 	publicKnown   bool
-	viewerGroups  map[uint][]uint
+	viewerGroups  *lrucache.LRU[uint, []uint]
 }
 
 var (
@@ -32,7 +33,7 @@ func groupsCacheFor(siteID string) *siteGroupsCache {
 	if c, ok = groupsBySite[siteID]; ok {
 		return c
 	}
-	c = &siteGroupsCache{viewerGroups: map[uint][]uint{}}
+	c = &siteGroupsCache{viewerGroups: lrucache.New[uint, []uint](MaxViewerGroupsPerSite)}
 	groupsBySite[siteID] = c
 	return c
 }
@@ -42,13 +43,13 @@ func PublicGroupID(ctx context.Context, db *gorm.DB) (uint, error) {
 	siteID := SiteIDFromContext(ctx)
 	if siteID != "" && Enabled(ctx) {
 		c := groupsCacheFor(siteID)
-		c.mu.RLock()
+		c.mu.Lock()
 		if c.publicKnown {
 			id := c.publicGroupID
-			c.mu.RUnlock()
+			c.mu.Unlock()
 			return id, nil
 		}
-		c.mu.RUnlock()
+		c.mu.Unlock()
 	}
 
 	id, err := loadPublicGroupID(db)
@@ -78,12 +79,12 @@ func ViewerGroupIDs(ctx context.Context, db *gorm.DB, userID uint, load func(*go
 	siteID := SiteIDFromContext(ctx)
 	if siteID != "" && Enabled(ctx) {
 		c := groupsCacheFor(siteID)
-		c.mu.RLock()
-		if ids, ok := c.viewerGroups[userID]; ok {
-			c.mu.RUnlock()
+		c.mu.Lock()
+		if ids, ok := c.viewerGroups.Get(userID); ok {
+			c.mu.Unlock()
 			return cloneUints(ids), nil
 		}
-		c.mu.RUnlock()
+		c.mu.Unlock()
 	}
 
 	ids, err := load(db, userID)
@@ -95,7 +96,7 @@ func ViewerGroupIDs(ctx context.Context, db *gorm.DB, userID uint, load func(*go
 	if siteID != "" && Enabled(ctx) {
 		c := groupsCacheFor(siteID)
 		c.mu.Lock()
-		c.viewerGroups[userID] = cloneUints(ids)
+		c.viewerGroups.Set(userID, cloneUints(ids))
 		c.mu.Unlock()
 	}
 	return cloneUints(ids), nil
@@ -110,7 +111,7 @@ func InvalidateGroups(siteID string) {
 	c.mu.Lock()
 	c.publicKnown = false
 	c.publicGroupID = 0
-	c.viewerGroups = map[uint][]uint{}
+	c.viewerGroups.Clear()
 	c.mu.Unlock()
 }
 
@@ -121,7 +122,7 @@ func InvalidateViewerGroups(siteID string, userID uint) {
 	}
 	c := groupsCacheFor(siteID)
 	c.mu.Lock()
-	delete(c.viewerGroups, userID)
+	c.viewerGroups.Delete(userID)
 	c.mu.Unlock()
 }
 

@@ -5,14 +5,15 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/rob121/cannon/internal/lrucache"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
 
 type siteBlocksCache struct {
-	mu     sync.RWMutex
-	spaces map[string][]models.Block
+	mu     sync.Mutex
+	spaces *lrucache.LRU[string, []models.Block]
 }
 
 var (
@@ -32,7 +33,7 @@ func blocksCacheFor(siteID string) *siteBlocksCache {
 	if c, ok = blocksBySite[siteID]; ok {
 		return c
 	}
-	c = &siteBlocksCache{spaces: map[string][]models.Block{}}
+	c = &siteBlocksCache{spaces: lrucache.New[string, []models.Block](MaxBlockSpacesPerSite)}
 	blocksBySite[siteID] = c
 	return c
 }
@@ -50,24 +51,21 @@ func BlocksForSpace(ctx context.Context, db *gorm.DB, space string) ([]models.Bl
 	}
 
 	c := blocksCacheFor(siteID)
-	c.mu.RLock()
-	rows, ok := c.spaces[space]
-	c.mu.RUnlock()
-	if ok {
-		return cloneBlocks(rows), nil
-	}
-
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if rows, ok = c.spaces[space]; ok {
+	if rows, ok := c.spaces.Get(space); ok {
+		c.mu.Unlock()
 		return cloneBlocks(rows), nil
 	}
+	c.mu.Unlock()
 
 	rows, err := loadBlocksForSpace(db, space)
 	if err != nil {
 		return nil, err
 	}
-	c.spaces[space] = cloneBlocks(rows)
+
+	c.mu.Lock()
+	c.spaces.Set(space, cloneBlocks(rows))
+	c.mu.Unlock()
 	return rows, nil
 }
 
@@ -89,7 +87,7 @@ func InvalidateBlocks(siteID string) {
 	}
 	c := blocksCacheFor(siteID)
 	c.mu.Lock()
-	c.spaces = map[string][]models.Block{}
+	c.spaces.Clear()
 	c.mu.Unlock()
 }
 

@@ -95,7 +95,7 @@
         "type": "boolean",
         "title": "Enable In-Memory Data Cache",
         "default": true,
-        "description": "Cache frequently read site data (settings, routes, blocks, groups) in process memory. Disable for debugging or when running multiple Cannon processes against one database."
+        "description": "Cache frequently read site data (settings, routes, blocks, groups) in process memory with bounded LRU eviction (safe for small VPS). Disable for debugging or when running multiple Cannon processes against one database."
       },
       "debug_template_spaces": {
         "type": "boolean",

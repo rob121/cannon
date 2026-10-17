@@ -4,11 +4,15 @@ import (
 	"sync"
 
 	"github.com/rob121/cannon/internal/cache"
+	"github.com/rob121/cannon/internal/lrucache"
 )
 
+// MaxCachedUsersPerSite caps permission sets retained per site (small-VPS bound).
+var MaxCachedUsersPerSite = 512
+
 type siteCache struct {
-	mu    sync.RWMutex
-	users map[uint]EffectivePermissions
+	mu    sync.Mutex
+	users *lrucache.LRU[uint, EffectivePermissions]
 }
 
 var cacheMu sync.RWMutex
@@ -26,16 +30,16 @@ func siteCacheFor(siteID string) *siteCache {
 	if c, ok = siteCaches[siteID]; ok {
 		return c
 	}
-	c = &siteCache{users: map[uint]EffectivePermissions{}}
+	c = &siteCache{users: lrucache.New[uint, EffectivePermissions](MaxCachedUsersPerSite)}
 	siteCaches[siteID] = c
 	return c
 }
 
 func cacheGet(siteID string, userID uint) (EffectivePermissions, bool) {
 	c := siteCacheFor(siteID)
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	perms, ok := c.users[userID]
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	perms, ok := c.users.Get(userID)
 	if !ok {
 		return EffectivePermissions{}, false
 	}
@@ -46,7 +50,7 @@ func cacheSet(siteID string, userID uint, perms EffectivePermissions) {
 	c := siteCacheFor(siteID)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.users[userID] = cloneEffective(perms)
+	c.users.Set(userID, cloneEffective(perms))
 }
 
 func cloneEffective(perms EffectivePermissions) EffectivePermissions {
@@ -65,7 +69,7 @@ func InvalidateUser(siteID string, userID uint) {
 	c := siteCacheFor(siteID)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.users, userID)
+	c.users.Delete(userID)
 	cache.InvalidateViewerGroups(siteID, userID)
 }
 

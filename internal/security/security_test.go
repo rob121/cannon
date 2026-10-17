@@ -262,3 +262,27 @@ func TestResolveEffectivePopulatesCache(t *testing.T) {
 		t.Fatal("expected cache populated after first resolve")
 	}
 }
+
+func TestPermissionCacheLRUEvicts(t *testing.T) {
+	prev := MaxCachedUsersPerSite
+	MaxCachedUsersPerSite = 2
+	defer func() {
+		MaxCachedUsersPerSite = prev
+		InvalidateAll()
+	}()
+	InvalidateAll()
+
+	siteID := "lru-site"
+	cacheSet(siteID, 1, NewEffectivePermissions())
+	cacheSet(siteID, 2, NewEffectivePermissions())
+	cacheSet(siteID, 3, NewEffectivePermissions())
+	if _, ok := cacheGet(siteID, 1); ok {
+		t.Fatal("expected user 1 evicted")
+	}
+	if _, ok := cacheGet(siteID, 2); !ok {
+		t.Fatal("expected user 2 retained")
+	}
+	if _, ok := cacheGet(siteID, 3); !ok {
+		t.Fatal("expected user 3 retained")
+	}
+}

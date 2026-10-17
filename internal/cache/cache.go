@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 
+	"github.com/rob121/cannon/internal/lrucache"
 	"github.com/rob121/cannon/internal/sites"
 )
 
@@ -27,7 +28,7 @@ func InvalidateAll() {
 	settingsMu.Unlock()
 
 	routesMu.Lock()
-	routesBySite = map[string][]cachedRoute{}
+	routesBySite = lrucache.New[string, []cachedRoute](MaxRoutesSites)
 	routesMu.Unlock()
 
 	groupsMu.Lock()

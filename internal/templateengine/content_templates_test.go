@@ -57,6 +57,34 @@ func TestItemTemplateContentSlugSpaces(t *testing.T) {
 	}
 }
 
+func TestItemTemplateHidesEmptyBody(t *testing.T) {
+	funcs := testFrontendFuncs()
+	funcs["safeHTML"] = func(value string) template.HTML { return template.HTML(value) }
+	funcs["csrfField"] = func() template.HTML { return "" }
+	funcs["space"] = func(name string) (template.HTML, error) { return "", nil }
+	e := New(nil, themes.Selection{}, nil, nil, funcs)
+	tmpl, err := e.parse("default/controllers/content/item.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := tmpl.Execute(&out, map[string]any{
+		"Item":            models.Item{Title: "Camp Workday", Slug: "camp-workday"},
+		"IntroHTML":       template.HTML("<p>Intro only</p>"),
+		"BodyHTML":        template.HTML(""),
+		"ContentSettings": content.Settings{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	html := out.String()
+	if !strings.Contains(html, "Intro only") {
+		t.Fatal("expected intro rendered")
+	}
+	if strings.Contains(html, "site-item-detail__body") {
+		t.Fatalf("empty body should not render body wrapper:\n%s", html)
+	}
+}
+
 func TestItemTemplateRelatedVisibility(t *testing.T) {
 	funcs := testFrontendFuncs()
 	funcs["safeHTML"] = func(value string) template.HTML { return template.HTML(value) }

@@ -159,3 +159,95 @@ func TestActiveRoutesCache(t *testing.T) {
 		}
 	}
 }
+
+func TestViewerGroupsLRUEvicts(t *testing.T) {
+	cache.InvalidateAll()
+	prev := cache.MaxViewerGroupsPerSite
+	cache.MaxViewerGroupsPerSite = 2
+	defer func() {
+		cache.MaxViewerGroupsPerSite = prev
+		cache.InvalidateAll()
+	}()
+
+	_, ctx, db := testSite(t)
+	cache.SetToggle(cache.SiteIDFromContext(ctx), true)
+
+	if err := db.Where("name = ?", "public").
+		FirstOrCreate(&models.Group{Name: "public", Kind: models.GroupKindFrontend, Status: models.StatusActive}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	loadCalls := map[uint]int{}
+	load := func(_ *gorm.DB, userID uint) ([]uint, error) {
+		loadCalls[userID]++
+		return []uint{userID}, nil
+	}
+
+	for _, uid := range []uint{1, 2, 3} {
+		if _, err := cache.ViewerGroupIDs(ctx, db, uid, load); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// User 1 should have been evicted; next access reloads.
+	if _, err := cache.ViewerGroupIDs(ctx, db, 1, load); err != nil {
+		t.Fatal(err)
+	}
+	if loadCalls[1] < 2 {
+		t.Fatalf("expected user 1 reloaded after LRU eviction, calls=%v", loadCalls)
+	}
+	if loadCalls[2] != 1 || loadCalls[3] != 1 {
+		t.Fatalf("unexpected load counts: %v", loadCalls)
+	}
+}
+
+func TestBlockSpacesLRUEvicts(t *testing.T) {
+	cache.InvalidateAll()
+	prev := cache.MaxBlockSpacesPerSite
+	cache.MaxBlockSpacesPerSite = 2
+	defer func() {
+		cache.MaxBlockSpacesPerSite = prev
+		cache.InvalidateAll()
+	}()
+
+	_, ctx, db := testSite(t)
+	cache.SetToggle(cache.SiteIDFromContext(ctx), true)
+
+	for i, space := range []string{"a", "b", "c"} {
+		if err := db.Create(&models.Block{
+			Name:   space,
+			Type:   models.BlockTypeHTML,
+			Space:  space,
+			Status: models.StatusActive,
+			Sort:   i,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, space := range []string{"a", "b", "c"} {
+		if _, err := cache.BlocksForSpace(ctx, db, space); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Evict "a", delete it from DB, then "b"/"c" should still be served from cache
+	// while "a" reloads empty.
+	if err := db.Where("space = ?", "a").Delete(&models.Block{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Where("space = ?", "b").Delete(&models.Block{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	bRows, err := cache.BlocksForSpace(ctx, db, "b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bRows) != 1 {
+		t.Fatalf("expected cached space b, got %d", len(bRows))
+	}
+	aRows, err := cache.BlocksForSpace(ctx, db, "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(aRows) != 0 {
+		t.Fatalf("expected evicted space a to reload empty, got %d", len(aRows))
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/rob121/cannon/internal/lrucache"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
@@ -14,9 +15,16 @@ type cachedRoute struct {
 }
 
 var (
-	routesMu     sync.RWMutex
-	routesBySite = map[string][]cachedRoute{}
+	routesMu     sync.Mutex
+	routesBySite *lrucache.LRU[string, []cachedRoute]
 )
+
+func routesCache() *lrucache.LRU[string, []cachedRoute] {
+	if routesBySite == nil {
+		routesBySite = lrucache.New[string, []cachedRoute](MaxRoutesSites)
+	}
+	return routesBySite
+}
 
 // ActiveRoutes returns active routes with groups, using the site cache when enabled.
 func ActiveRoutes(ctx context.Context, db *gorm.DB) ([]models.Route, error) {
@@ -25,16 +33,10 @@ func ActiveRoutes(ctx context.Context, db *gorm.DB) ([]models.Route, error) {
 		return loadActiveRoutes(db)
 	}
 
-	routesMu.RLock()
-	cached, ok := routesBySite[siteID]
-	routesMu.RUnlock()
-	if ok {
-		return cloneRoutes(cached), nil
-	}
-
 	routesMu.Lock()
-	defer routesMu.Unlock()
-	if cached, ok = routesBySite[siteID]; ok {
+	cached, ok := routesCache().Get(siteID)
+	routesMu.Unlock()
+	if ok {
 		return cloneRoutes(cached), nil
 	}
 
@@ -46,7 +48,10 @@ func ActiveRoutes(ctx context.Context, db *gorm.DB) ([]models.Route, error) {
 	for i, route := range routes {
 		stored[i] = cachedRoute{Route: route}
 	}
-	routesBySite[siteID] = stored
+
+	routesMu.Lock()
+	routesCache().Set(siteID, stored)
+	routesMu.Unlock()
 	return routes, nil
 }
 
@@ -64,7 +69,7 @@ func InvalidateRoutes(siteID string) {
 		return
 	}
 	routesMu.Lock()
-	delete(routesBySite, siteID)
+	routesCache().Delete(siteID)
 	routesMu.Unlock()
 }
 

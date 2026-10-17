@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	globalSettingsScope   = "global"
+	globalSettingsScope    = "global"
 	generalSettingsSection = "general"
 )
 

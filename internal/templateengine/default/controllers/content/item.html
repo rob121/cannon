@@ -38,7 +38,7 @@
   {{if .IntroHTML}}<div class="site-item-detail__intro lead">{{.IntroHTML}}</div>{{end}}
   {{space (printf "content-%s-middle" .Item.Slug)}}
   {{template "itemMedia" .}}
-  <div class="site-content site-item-detail__body">{{.BodyHTML}}</div>
+  {{if .BodyHTML}}<div class="site-content site-item-detail__body">{{.BodyHTML}}</div>{{end}}
   {{space (printf "content-%s-end" .Item.Slug)}}
 
   {{if and .ContentSettings.ShowAuthorBio .Item.Author}}
