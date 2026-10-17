@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"html/template"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -45,7 +46,10 @@ func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, 
 	for _, row := range rows {
 		html, err := renderOne(ctx, extMgr, row, space, r, userCtx, render)
 		if err != nil {
-			return "", err
+			// Skip a broken block instead of taking down the whole page.
+			log.Printf("blocks: space %q block_id=%d type=%s extension=%q: %v",
+				space, row.BlockID, row.Type, row.ExtensionName, err)
+			continue
 		}
 		if strings.TrimSpace(html) != "" {
 			parts = append(parts, html)

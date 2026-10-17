@@ -1,36 +1,48 @@
 <article class="mb-4 site-item-detail">
   {{if .PreviewMode}}
-  <div class="alert alert-warning mb-4" role="status">Preview mode — this unpublished item is visible only through this secret link.</div>
+  <div class="alert alert-warning site-item-detail__preview" role="status">Preview mode — this unpublished item is visible only through this secret link.</div>
   {{end}}
-  {{if .ContentSettings.ShowTitle}}
-  {{template "pageHeader" (dict "Title" .Item.Title)}}
-  {{end}}
-
-  {{if or .ContentSettings.ShowAuthor .ContentSettings.ShowPublishedDate}}
-  <p class="text-muted small mb-3">
-    {{if and .ContentSettings.ShowAuthor .Item.Author}}
-    <span>By <a href="{{authorURL .Item.Author.Username}}">{{userName .Item.Author}}</a></span>
+  {{if or .ContentSettings.ShowTitle .ContentSettings.ShowAuthor .ContentSettings.ShowPublishedDate (and .ContentSettings.ShowCategoryName .Item.Category) .CanEdit}}
+  <header class="site-item-detail__header">
+    <div class="site-item-detail__title-row">
+      {{if .ContentSettings.ShowTitle}}
+      <h1 class="site-item-detail__title h2">{{.Item.Title}}</h1>
+      {{end}}
+      {{if or (and .ContentSettings.ShowCategoryName .Item.Category) .CanEdit}}
+      <div class="site-item-detail__actions">
+        {{if and .ContentSettings.ShowCategoryName .Item.Category}}
+        <a class="site-item-detail__category" href="{{categoryURL .Item.Category.Slug}}">{{.Item.Category.Name}}</a>
+        {{end}}
+        {{if .CanEdit}}
+        <a class="btn btn-sm btn-outline-secondary site-item-detail__edit" href="/content/edit/{{.Item.Slug}}">Edit</a>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+    {{if or .ContentSettings.ShowAuthor .ContentSettings.ShowPublishedDate}}
+    <p class="site-item-detail__byline">
+      {{if and .ContentSettings.ShowAuthor .Item.Author}}
+      <span>By <a href="{{authorURL .Item.Author.Username}}">{{userName .Item.Author}}</a></span>
+      {{end}}
+      {{if and .ContentSettings.ShowPublishedDate (itemHasDate .Item)}}
+      {{if and .ContentSettings.ShowAuthor .Item.Author}} · {{end}}
+      <time datetime="{{itemDateISO .Item}}">{{itemDate .Item "January 2, 2006"}}</time>
+      {{end}}
+    </p>
     {{end}}
-    {{if and .ContentSettings.ShowPublishedDate (itemHasDate .Item)}}
-    {{if and .ContentSettings.ShowAuthor .Item.Author}} · {{end}}
-    <time datetime="{{itemDateISO .Item}}">{{itemDate .Item "January 2, 2006"}}</time>
-    {{end}}
-  </p>
+  </header>
   {{end}}
 
-  {{if and .ContentSettings.ShowCategoryName .Item.Category}}<p class="mb-3"><a class="badge text-bg-light border text-decoration-none" href="{{categoryURL .Item.Category.Slug}}">{{.Item.Category.Name}}</a></p>{{end}}
-  {{if .CanEdit}}<p class="mb-3"><a class="btn btn-sm btn-outline-secondary" href="/content/edit/{{.Item.Slug}}">Edit this item</a></p>{{end}}
-
-  {{if .Item.Image}}<figure class="figure mb-4"><img class="figure-img img-fluid rounded" src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
+  {{if .Item.Image}}<figure class="site-item-detail__image figure"><img class="figure-img img-fluid rounded" src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
   {{space (printf "content-%s-start" .Item.Slug)}}
-  {{if .IntroHTML}}<div class="lead mb-4">{{.IntroHTML}}</div>{{end}}
+  {{if .IntroHTML}}<div class="site-item-detail__intro lead">{{.IntroHTML}}</div>{{end}}
   {{space (printf "content-%s-middle" .Item.Slug)}}
   {{template "itemMedia" .}}
-  <div class="site-content mb-4">{{.BodyHTML}}</div>
+  <div class="site-content site-item-detail__body">{{.BodyHTML}}</div>
   {{space (printf "content-%s-end" .Item.Slug)}}
 
   {{if and .ContentSettings.ShowAuthorBio .Item.Author}}
-  <section class="card shadow-sm mb-4">
+  <section class="card shadow-sm site-item-detail__author">
     <div class="card-body">
       <h2 class="h5 card-title">About the author</h2>
       <p class="mb-3"><a href="{{authorURL .Item.Author.Username}}">{{userName .Item.Author .AuthorProfile.DisplayName}}</a></p>
@@ -47,8 +59,8 @@
   {{end}}
 
   {{if .FieldDisplays}}
-  <section class="site-item-fields mb-4" aria-labelledby="item-fields-heading">
-    <h2 id="item-fields-heading" class="h5 mb-3">Details</h2>
+  <section class="site-item-fields" aria-labelledby="item-fields-heading">
+    <h2 id="item-fields-heading" class="h5 site-item-fields__title">Details</h2>
     <dl class="row mb-0 site-item-fields__list">
       {{range .FieldDisplays}}
       <dt class="col-sm-3">{{.Label}}</dt><dd class="col-sm-9">{{safeHTML .HTML}}</dd>
@@ -58,11 +70,16 @@
   {{end}}
 
   {{if and .ContentSettings.ShowRelatedItems .Related}}
-  <section class="mb-4">
-    <h2 class="h5 mb-3">Related</h2>
-    <ul class="list-group list-group-flush">
+  <section class="site-item-related" aria-labelledby="item-related-heading">
+    <h2 id="item-related-heading" class="h5 site-item-related__title">Related</h2>
+    <ul class="site-item-related__list">
       {{range .Related}}
-      <li class="list-group-item px-0"><a href="{{itemURL .Slug}}">{{.Title}}</a></li>
+      <li>
+        <a class="site-item-related__link" href="{{itemURL .Slug}}">
+          <span class="site-item-related__link-text">{{.Title}}</span>
+          <span class="site-item-related__chevron" aria-hidden="true"></span>
+        </a>
+      </li>
       {{end}}
     </ul>
   </section>

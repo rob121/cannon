@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/sites"
 )
 
 const ExtensionDataPrefix = "/ext/"
@@ -54,17 +55,47 @@ func (m *Manager) RuntimeByRouteHash(hash string) (*Runtime, bool) {
 		if strings.EqualFold(RouteHashFromSocket(rt.Model.Socket), hash) {
 			return rt, true
 		}
-		if strings.EqualFold(routeHashHex(rt.Model.Name, m.site.ID), hash) {
+		if m.site != nil && strings.EqualFold(routeHashHex(rt.Model.Name, m.site.ID), hash) {
 			return rt, true
 		}
 	}
 	return nil, false
 }
 
+// ensureActiveRuntimeByRouteHash starts an active extension matching the public
+// route hash when it is not already running.
+func (m *Manager) ensureActiveRuntimeByRouteHash(ctx context.Context, hash string) (*Runtime, error) {
+	hash = strings.ToLower(strings.TrimSpace(hash))
+	if hash == "" {
+		return nil, fmt.Errorf("route hash is required")
+	}
+	if rt, ok := m.RuntimeByRouteHash(hash); ok {
+		return rt, nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var rows []models.Extension
+	if err := db.Where("status = ?", models.StatusActive).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		if strings.EqualFold(RouteHashFromSocket(row.Socket), hash) ||
+			(m.site != nil && strings.EqualFold(routeHashHex(row.Name, m.site.ID), hash)) {
+			return m.ensureActiveRuntime(ctx, row.Name)
+		}
+	}
+	return nil, fmt.Errorf("extension for route hash %s not found", hash)
+}
+
 // InvokeData POSTs to an extension data handler and returns the full wire response.
 func (m *Manager) InvokeData(ctx context.Context, extensionName, dataPath string, r *http.Request, userCtx map[string]any) (WireResponse, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || rt.Capabilities.Data == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return WireResponse{}, err
+	}
+	if rt.Capabilities.Data == "" {
 		return WireResponse{}, fmt.Errorf("extension %s has no data capability", extensionName)
 	}
 	dataPath = strings.Trim(dataPath, "/")
@@ -97,8 +128,8 @@ func (m *Manager) ServeExtensionData(ctx context.Context, w http.ResponseWriter,
 	if !ok {
 		return false, nil
 	}
-	rt, ok := m.RuntimeByRouteHash(hash)
-	if !ok || rt.Capabilities.Data == "" {
+	rt, err := m.ensureActiveRuntimeByRouteHash(ctx, hash)
+	if err != nil || rt.Capabilities.Data == "" {
 		http.NotFound(w, r)
 		return true, nil
 	}

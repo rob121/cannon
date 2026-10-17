@@ -1,5 +1,6 @@
 # Local site configuration (paths, database DSNs)
 sites.json
+email.json
 
 # Built binary
 /cannon

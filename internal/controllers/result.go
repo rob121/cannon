@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/httpx"
@@ -108,12 +107,9 @@ func Error(code int, message string) Result {
 }
 
 func (r errorResult) Write(w http.ResponseWriter, req *http.Request, ctx *Context) error {
+	message := templateengine.PublicErrorMessage(r.Code, r.Message)
 	if ctx != nil && ctx.Template != nil {
 		homeURL := sites.DefaultRoutePath(req.Context())
-		message := strings.TrimSpace(r.Message)
-		if message == "" {
-			message = templateengine.DefaultErrorMessage(r.Code)
-		}
 		ctx.Template.SetHookContext(req.Context())
 		defer ctx.Template.SetHookContext(nil)
 		return ctx.Template.RenderError(w, r.Code, map[string]any{
@@ -123,7 +119,7 @@ func (r errorResult) Write(w http.ResponseWriter, req *http.Request, ctx *Contex
 			"HomeURL":      homeURL,
 		})
 	}
-	http.Error(w, r.Message, r.Code)
+	http.Error(w, message, r.Code)
 	return nil
 }
 

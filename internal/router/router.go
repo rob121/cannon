@@ -6,18 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/rob121/cannon/internal/auth"
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/controllers"
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/hooks"
-	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/paths"
 	"github.com/rob121/cannon/internal/routemeta"
@@ -154,7 +155,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		d.tpl.SetHookContext(ctx)
 		if err := d.tpl.Render(w, "default/layout.html", "default/page.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			d.renderFrontendError(w, r, http.StatusInternalServerError, err.Error())
 		}
 		d.tpl.SetHookContext(nil)
 	case models.RouteTypeExtension:
@@ -206,7 +207,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		data := map[string]any{"Title": title, "Content": template.HTML(html)}
 		d.tpl.SetHookContext(ctx)
 		if err := d.tpl.Render(w, "default/layout.html", "default/page.html", data); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			d.renderFrontendError(w, r, http.StatusInternalServerError, err.Error())
 		}
 		d.tpl.SetHookContext(nil)
 	case models.RouteTypeExtensionEndpoint:
@@ -355,15 +356,18 @@ func (d *Dispatcher) renderOffline(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Dispatcher) renderFrontendError(w http.ResponseWriter, r *http.Request, code int, message string) {
-	if d.tpl == nil {
-		if strings.TrimSpace(message) == "" {
-			message = templateengine.DefaultErrorMessage(code)
+	technical := strings.TrimSpace(message)
+	if technical != "" && (code >= 500 || templateengine.PublicErrorMessage(code, technical) != technical) {
+		path := ""
+		if r != nil && r.URL != nil {
+			path = r.URL.Path
 		}
+		log.Printf("frontend error %d %s: %s", code, path, technical)
+	}
+	message = templateengine.PublicErrorMessage(code, technical)
+	if d.tpl == nil {
 		http.Error(w, message, code)
 		return
-	}
-	if strings.TrimSpace(message) == "" {
-		message = templateengine.DefaultErrorMessage(code)
 	}
 	d.tpl.SetHookContext(r.Context())
 	defer d.tpl.SetHookContext(nil)

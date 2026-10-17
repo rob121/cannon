@@ -84,8 +84,11 @@ func (m *Manager) EndpointRuntimes() []*Runtime {
 
 // InvokeEndpoint POSTs to an extension endpoint handler and returns the full wire response.
 func (m *Manager) InvokeEndpoint(ctx context.Context, extensionName, item string, r *http.Request, userCtx, endpointData map[string]any) (WireResponse, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || rt.Capabilities.Endpoint == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return WireResponse{}, err
+	}
+	if rt.Capabilities.Endpoint == "" {
 		return WireResponse{}, fmt.Errorf("extension %s has no endpoint capability", extensionName)
 	}
 	item = strings.TrimSpace(item)

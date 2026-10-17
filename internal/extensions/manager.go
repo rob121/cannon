@@ -186,14 +186,14 @@ func (m *Manager) deactivateMissingBinaries(db *gorm.DB) error {
 }
 
 func (m *Manager) disableFailedExtension(ctx context.Context, name string, startErr error) {
+	// Keep DB status as-is: active/inactive is an admin intent separate from process liveness.
+	// Suppress bootstrap auto-start for this process lifetime; on-demand ensureActiveRuntime can retry.
 	m.cleanupRuntime(name)
 	m.mu.Lock()
 	m.suppressed[name] = true
 	m.mu.Unlock()
-	if db, err := sites.DB(ctx); err == nil {
-		_ = db.Model(&models.Extension{}).Where("name = ?", name).Update("status", models.StatusInactive).Error
-	}
-	log.Printf("extension %s auto-disabled: %v", name, startErr)
+	log.Printf("extension %s start failed (status unchanged): %v", name, startErr)
+	_ = ctx
 }
 
 func (m *Manager) cleanupRuntime(name string) {
@@ -427,8 +427,11 @@ func (m *Manager) RenderPage(ctx context.Context, extensionName, item string, r 
 
 // InvokePage POSTs to an extension page handler with optional route metadata.
 func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r *http.Request, userCtx, pageData map[string]any) (string, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || rt.Capabilities.Page == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return "", err
+	}
+	if rt.Capabilities.Page == "" {
 		return "", fmt.Errorf("extension %s has no page capability", extensionName)
 	}
 	item = strings.TrimSpace(item)
@@ -460,8 +463,11 @@ func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r 
 
 // InvokeBlock POSTs to an extension block handler with optional placement metadata.
 func (m *Manager) InvokeBlock(ctx context.Context, extensionName, item, space string, r *http.Request, userCtx, blockData map[string]any) (string, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || rt.Capabilities.Block == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return "", err
+	}
+	if rt.Capabilities.Block == "" {
 		return "", fmt.Errorf("extension %s has no block capability", extensionName)
 	}
 	item = strings.TrimSpace(item)
@@ -545,6 +551,44 @@ func (m *Manager) runtime(name string) (*Runtime, bool) {
 	return rt, ok
 }
 
+// ensureActiveRuntime loads the extension row and, when status is active, starts
+// the process if it is not already running. Inactive extensions are skipped.
+func (m *Manager) ensureActiveRuntime(ctx context.Context, name string) (*Runtime, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, fmt.Errorf("extension name is required")
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var row models.Extension
+	if err := db.Where("name = ?", name).First(&row).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("extension %s not found", name)
+		}
+		return nil, err
+	}
+	if row.Status != models.StatusActive {
+		return nil, fmt.Errorf("extension %s is inactive", name)
+	}
+	wantSocket := m.socketPath(name)
+	if strings.TrimSpace(row.Socket) != wantSocket {
+		row.Socket = wantSocket
+		_ = db.Model(&models.Extension{}).Where("extension_id = ?", row.ExtensionID).Update("socket", wantSocket).Error
+	}
+	if !m.IsRunning(name) {
+		if err := m.Start(ctx, row); err != nil {
+			return nil, err
+		}
+	}
+	rt, ok := m.runtime(name)
+	if !ok {
+		return nil, fmt.Errorf("extension %s is not running", name)
+	}
+	return rt, nil
+}
+
 // IsRunning reports whether an extension process is currently running.
 func (m *Manager) IsRunning(name string) bool {
 	m.mu.RLock()
@@ -572,8 +616,11 @@ func (m *Manager) AdminRuntimes() []*Runtime {
 
 // RenderAdmin proxies an admin-area request to an extension admin handler.
 func (m *Manager) RenderAdmin(ctx context.Context, extensionName, suffixPath string, r *http.Request, userCtx map[string]any) (WireResponse, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || rt.Capabilities.Admin == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return WireResponse{}, err
+	}
+	if rt.Capabilities.Admin == "" {
 		return WireResponse{}, fmt.Errorf("extension %s has no admin capability", extensionName)
 	}
 	adminPath := "/" + strings.TrimPrefix(rt.Capabilities.Admin, "/")

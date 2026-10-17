@@ -3,15 +3,17 @@ package templateengine
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
 
 const (
-	errorPagePartial    = "default/partials/error-page.html"
-	errorFallbackPage   = "default/error.html"
-	adminErrorPartial   = "admin/error/_page.html"
-	adminErrorFallback  = "admin/error.html"
+	errorPagePartial      = "default/partials/error-page.html"
+	errorFallbackPage     = "default/error.html"
+	errorStandalonePage   = "default/error-standalone.html"
+	adminErrorPartial     = "admin/error/_page.html"
+	adminErrorFallback    = "admin/error.html"
 )
 
 // ErrorTitle returns a human-friendly title for an HTTP status code.
@@ -87,6 +89,8 @@ func (e *Engine) ResolveAdminErrorTemplate(code int) string {
 }
 
 // RenderError renders a frontend error page inside the site layout.
+// If the site layout itself fails (for example a broken {{space}} block), it
+// falls back to a standalone error document that does not depend on spaces.
 func (e *Engine) RenderError(w io.Writer, code int, data map[string]any) error {
 	if data == nil {
 		data = map[string]any{}
@@ -101,7 +105,54 @@ func (e *Engine) RenderError(w io.Writer, code int, data map[string]any) error {
 		data["ErrorMessage"] = DefaultErrorMessage(code)
 	}
 	page := e.ResolveErrorTemplate(code)
-	return e.render(w, "default/layout.html", page, data, code)
+	if err := e.render(w, "default/layout.html", page, data, code); err != nil {
+		log.Printf("template: error page layout failed (%v); using standalone fallback", err)
+		return e.renderStandaloneError(w, code, data)
+	}
+	return nil
+}
+
+// renderStandaloneError writes a self-contained error page without the site layout.
+func (e *Engine) renderStandaloneError(w io.Writer, code int, data map[string]any) error {
+	if rw, ok := w.(interface{ Header() http.Header }); ok {
+		if rw.Header().Get("Content-Type") == "" {
+			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+		}
+	}
+	writeResponseStatus(w, code)
+	if err := e.RenderFragment(w, errorStandalonePage, data); err != nil {
+		// Last resort: plain text so the client still gets a useful response.
+		if rw, ok := w.(http.ResponseWriter); ok {
+			http.Error(rw, DefaultErrorMessage(code), code)
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// PublicErrorMessage returns a visitor-safe message. Technical template/extension
+// details are logged by callers and replaced with a generic 5xx message.
+func PublicErrorMessage(code int, technical string) string {
+	technical = strings.TrimSpace(technical)
+	if code >= 500 || isInternalRenderError(technical) {
+		return DefaultErrorMessage(code)
+	}
+	if technical == "" {
+		return DefaultErrorMessage(code)
+	}
+	return technical
+}
+
+func isInternalRenderError(msg string) bool {
+	if msg == "" {
+		return false
+	}
+	lower := strings.ToLower(msg)
+	return strings.Contains(lower, "error calling ") ||
+		strings.Contains(lower, "has no block capability") ||
+		strings.Contains(lower, "template:") ||
+		strings.Contains(lower, "executing ")
 }
 
 // RenderAdminError renders an admin error page inside the admin layout.

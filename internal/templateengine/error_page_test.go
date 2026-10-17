@@ -1,6 +1,8 @@
 package templateengine
 
 import (
+	"fmt"
+	"html/template"
 	"strings"
 	"testing"
 
@@ -101,5 +103,42 @@ func TestDefaultErrorTemplateFallback(t *testing.T) {
 func TestDefaultErrorMessage(t *testing.T) {
 	if DefaultErrorMessage(404) == "" || DefaultErrorMessage(500) == "" {
 		t.Fatal("expected default messages")
+	}
+}
+
+func TestPublicErrorMessageHidesTemplateInternals(t *testing.T) {
+	raw := `template: layout.html:103:20: executing "layout.html" at <space "sidebar">: error calling space: extension cannon-ext-contact has no block capability`
+	if got := PublicErrorMessage(500, raw); got != DefaultErrorMessage(500) {
+		t.Fatalf("got %q", got)
+	}
+	if got := PublicErrorMessage(404, "item not found"); got != "item not found" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestRenderErrorFallsBackWhenLayoutFails(t *testing.T) {
+	e := New(nil, themes.Selection{}, func(string) (template.HTML, error) {
+		return "", fmt.Errorf("extension cannon-ext-contact has no block capability")
+	}, nil, testFrontendFuncs())
+	var buf strings.Builder
+	// default/layout.html calls {{space "sidebar"}}, so layout render fails and
+	// RenderError must fall back to the standalone document.
+	err := e.RenderError(&buf, 500, map[string]any{
+		"Title":        "Server Error",
+		"ErrorCode":    500,
+		"ErrorMessage": DefaultErrorMessage(500),
+		"HomeURL":      "/",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Server Error", "Return Home", DefaultErrorMessage(500), "<!doctype html>"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in standalone error: %s", want, out)
+		}
+	}
+	if strings.Contains(out, "cannon-ext-contact") {
+		t.Fatalf("standalone page leaked technical detail: %s", out)
 	}
 }

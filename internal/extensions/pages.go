@@ -12,6 +12,7 @@ import (
 
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/sites"
 )
 
 func (m *Manager) fetchPages(socketPath, pageBase string) ([]extension.PageDefinition, error) {
@@ -56,6 +57,15 @@ func (m *Manager) loadPages(socketPath, pageBase string) []extension.PageDefinit
 
 // EnsurePageDefinitions reloads page lists for admin UI.
 func (m *Manager) EnsurePageDefinitions(ctx context.Context) {
+	// Start any active-but-stopped page extensions so admin route pickers see them.
+	if db, err := sites.DB(ctx); err == nil {
+		var rows []models.Extension
+		if err := db.Where("status = ?", models.StatusActive).Find(&rows).Error; err == nil {
+			for _, row := range rows {
+				_, _ = m.ensureActiveRuntime(ctx, row.Name)
+			}
+		}
+	}
 	for _, rt := range m.PageRuntimes() {
 		m.mu.RLock()
 		socket := rt.Model.Socket
@@ -66,7 +76,6 @@ func (m *Manager) EnsurePageDefinitions(ctx context.Context) {
 		rt.Pages = pages
 		m.mu.Unlock()
 	}
-	_ = ctx
 }
 
 // RuntimePages returns page definitions for admin UI, with a safe default fallback.

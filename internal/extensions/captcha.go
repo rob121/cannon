@@ -16,8 +16,11 @@ import (
 
 // InvokeCaptchaInfo performs GET /captcha on an extension.
 func (m *Manager) InvokeCaptchaInfo(ctx context.Context, extensionName string, r *http.Request, userCtx map[string]any) (extension.CaptchaProviderInfo, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || strings.TrimSpace(rt.Capabilities.Captcha) == "" {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return extension.CaptchaProviderInfo{}, err
+	}
+	if strings.TrimSpace(rt.Capabilities.Captcha) == "" {
 		return extension.CaptchaProviderInfo{}, fmt.Errorf("extension %s has no captcha capability", extensionName)
 	}
 	path := "/" + strings.TrimPrefix(strings.TrimSpace(rt.Capabilities.Captcha), "/")
@@ -39,12 +42,12 @@ func (m *Manager) InvokeCaptchaInfo(ctx context.Context, extensionName string, r
 
 // InvokeCaptchaRender performs POST /captcha/render.
 func (m *Manager) InvokeCaptchaRender(ctx context.Context, extensionName, captchaContext, captchaAction string, r *http.Request, userCtx map[string]any) (extension.CaptchaRenderResult, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || strings.TrimSpace(rt.Capabilities.Captcha) == "" {
-		return extension.CaptchaRenderResult{}, fmt.Errorf("extension %s has no captcha capability", extensionName)
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return extension.CaptchaRenderResult{}, err
 	}
-	if !m.IsRunning(extensionName) {
-		return extension.CaptchaRenderResult{}, fmt.Errorf("extension %s is not running", extensionName)
+	if strings.TrimSpace(rt.Capabilities.Captcha) == "" {
+		return extension.CaptchaRenderResult{}, fmt.Errorf("extension %s has no captcha capability", extensionName)
 	}
 	wire, err := m.buildWireRequest(r, userCtx)
 	if err != nil {
@@ -75,12 +78,12 @@ func (m *Manager) InvokeCaptchaRender(ctx context.Context, extensionName, captch
 
 // InvokeCaptchaVerify performs POST /captcha/verify.
 func (m *Manager) InvokeCaptchaVerify(ctx context.Context, extensionName, captchaContext, token, remoteIP string, r *http.Request, userCtx map[string]any) (extension.CaptchaVerifyResult, error) {
-	rt, ok := m.runtime(extensionName)
-	if !ok || strings.TrimSpace(rt.Capabilities.Captcha) == "" {
-		return extension.CaptchaVerifyResult{}, fmt.Errorf("extension %s has no captcha capability", extensionName)
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return extension.CaptchaVerifyResult{}, err
 	}
-	if !m.IsRunning(extensionName) {
-		return extension.CaptchaVerifyResult{}, fmt.Errorf("extension %s is not running", extensionName)
+	if strings.TrimSpace(rt.Capabilities.Captcha) == "" {
+		return extension.CaptchaVerifyResult{}, fmt.Errorf("extension %s has no captcha capability", extensionName)
 	}
 	wire, err := m.buildWireRequest(r, userCtx)
 	if err != nil {

@@ -79,9 +79,30 @@
             {{$pageID := .ID}}
             {{range .Fields}}
             {{$fieldName := .Name}}
-            <div class="col-md-6 route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
+            <div class="{{if eq .Type "textarea"}}col-12{{else}}col-md-6{{end}} route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
               <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
-              {{if eq .Type "select"}}
+              {{if eq .Type "item"}}
+              <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select item</option>
+                {{range $.Items}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Title}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "category"}}
+              <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select category</option>
+                {{range $.Categories}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Label}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "tag"}}
+              <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
+                <option value="">Select tag</option>
+                {{range $.Tags}}
+                <option value="{{.Slug}}" {{if eq (index $.PageData $fieldName) .Slug}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+              </select>
+              {{else if eq .Type "select"}}
               <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
                 <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
                 {{range .Options}}
@@ -90,6 +111,8 @@
               </select>
               {{else if eq .Type "number"}}
               <input class="admin-form-control" name="page_data_{{.Name}}" type="number" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
+              {{else if eq .Type "textarea"}}
+              <textarea class="admin-form-control" name="page_data_{{.Name}}" rows="4" {{if .Required}}required{{end}}>{{index $.PageData .Name}}</textarea>
               {{else}}
               <input class="admin-form-control" name="page_data_{{.Name}}" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
               {{end}}
