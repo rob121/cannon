@@ -7,6 +7,18 @@ import (
 	"github.com/rob121/cannon/extension"
 )
 
+func TestDevelopmentMode(t *testing.T) {
+	if extension.DevelopmentMode(extension.WireRequest{}) {
+		t.Fatal("expected false when unset")
+	}
+	if !extension.DevelopmentMode(extension.WireRequest{Settings: map[string]string{extension.SettingDevelopmentMode: "true"}}) {
+		t.Fatal("expected true")
+	}
+	if extension.DevelopmentMode(extension.WireRequest{Settings: map[string]string{extension.SettingDevelopmentMode: "false"}}) {
+		t.Fatal("expected false")
+	}
+}
+
 func TestFormatDateUsesWireSettings(t *testing.T) {
 	req := extension.WireRequest{
 		Settings: map[string]string{

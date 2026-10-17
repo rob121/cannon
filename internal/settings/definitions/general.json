@@ -97,6 +97,12 @@
         "default": true,
         "description": "Cache frequently read site data (settings, routes, blocks, groups) in process memory with bounded LRU eviction (safe for small VPS). Disable for debugging or when running multiple Cannon processes against one database."
       },
+      "development_mode": {
+        "type": "boolean",
+        "title": "Development Mode",
+        "default": false,
+        "description": "When enabled, Cannon signals extensions that this site is in development. Captcha providers (e.g. Turnstile) use test keys instead of live keys."
+      },
       "debug_template_spaces": {
         "type": "boolean",
         "title": "Debug Template Spaces",
@@ -160,7 +166,14 @@
       {"type": "Control", "scope": "#/properties/default_list_limit"},
       {"type": "Control", "scope": "#/properties/log_level"},
       {"type": "Control", "scope": "#/properties/memory_cache_enabled"},
-      {"type": "Control", "scope": "#/properties/debug_template_spaces"},
+      {
+        "type": "Group",
+        "label": "Development",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/development_mode"},
+          {"type": "Control", "scope": "#/properties/debug_template_spaces"}
+        ]
+      },
       {"type": "Control", "scope": "#/properties/frontend_theme"},
       {"type": "Control", "scope": "#/properties/admin_theme"},
       {

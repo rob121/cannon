@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -799,6 +800,11 @@ func extensionWireSettings(ctx context.Context) map[string]string {
 		layout = settings.DefaultDateFormat
 	}
 	out[extension.SettingDateFormat] = layout
+	dev, err := settings.GlobalBool(ctx, settings.SectionGeneral, "development_mode")
+	if err != nil {
+		dev = false
+	}
+	out[extension.SettingDevelopmentMode] = strconv.FormatBool(dev)
 	return out
 }
 

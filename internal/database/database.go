@@ -12,15 +12,28 @@ import (
 	"gorm.io/gorm"
 )
 
+type poolEntry struct {
+	db  *gorm.DB
+	key string // type + DSN; invalidate when site DB path changes
+}
+
 var (
 	mu    sync.RWMutex
-	pools = map[string]*gorm.DB{}
+	pools = map[string]poolEntry{}
 )
 
 // Connect opens a GORM connection for a site and caches it.
+// Callers must not Close the returned handle; use CloseAll on process shutdown.
+// If the site DSN/type changes (e.g. tests), the prior cached handle is replaced.
 func Connect(site *config.SiteConfig) (*gorm.DB, error) {
+	if site == nil {
+		return nil, fmt.Errorf("site is required")
+	}
+	wantKey := poolKey(site)
+
 	mu.RLock()
-	if db, ok := pools[site.ID]; ok {
+	if entry, ok := pools[site.ID]; ok && entry.key == wantKey {
+		db := entry.db
 		mu.RUnlock()
 		return db, nil
 	}
@@ -32,21 +45,37 @@ func Connect(site *config.SiteConfig) (*gorm.DB, error) {
 	}
 
 	mu.Lock()
-	pools[site.ID] = db
+	if entry, ok := pools[site.ID]; ok && entry.key == wantKey {
+		mu.Unlock()
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+		return entry.db, nil
+	}
+	if entry, ok := pools[site.ID]; ok {
+		if sqlDB, err := entry.db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	}
+	pools[site.ID] = poolEntry{db: db, key: wantKey}
 	mu.Unlock()
 
 	return db, nil
+}
+
+func poolKey(site *config.SiteConfig) string {
+	return site.Database.Type + "\x00" + site.Database.DSN
 }
 
 // Get returns a cached connection for a site id.
 func Get(siteID string) (*gorm.DB, error) {
 	mu.RLock()
 	defer mu.RUnlock()
-	db, ok := pools[siteID]
+	entry, ok := pools[siteID]
 	if !ok {
 		return nil, fmt.Errorf("database not connected for site %s", siteID)
 	}
-	return db, nil
+	return entry.db, nil
 }
 
 // Migrate runs GORM auto-migration for a site database.
@@ -79,8 +108,8 @@ func Migrate(site *config.SiteConfig) error {
 func CloseAll() {
 	mu.Lock()
 	defer mu.Unlock()
-	for id, db := range pools {
-		if sqlDB, err := db.DB(); err == nil {
+	for id, entry := range pools {
+		if sqlDB, err := entry.db.DB(); err == nil {
 			_ = sqlDB.Close()
 		}
 		delete(pools, id)

@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// OpenDB opens the current site database using Cannon connection rules.
+// OpenDB returns the process-cached site database (do not Close the handle).
 // Requires --site= and CANNON_CONFIG (set automatically when Cannon starts the extension).
 func OpenDB() (*gorm.DB, *config.SiteConfig, error) {
 	return extdb.OpenFromFlags()

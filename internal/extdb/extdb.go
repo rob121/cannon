@@ -13,13 +13,14 @@ import (
 
 const configEnv = "CANNON_CONFIG"
 
-// OpenSite loads sites.json, finds the site, and opens its database using Cannon's connection rules.
+// OpenSite loads sites.json, finds the site, and returns a process-cached DB handle
+// (database.Connect). Callers must not Close the returned *gorm.DB.
 func OpenSite(siteID string) (*gorm.DB, *config.SiteConfig, error) {
 	site, err := SiteConfig(siteID)
 	if err != nil {
 		return nil, nil, err
 	}
-	db, err := database.OpenSite(site)
+	db, err := database.Connect(site)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,14 +1,16 @@
 package extension
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
 
 // Common settings keys passed on WireRequest.Settings.
 const (
-	SettingDateFormat = "date_format"
-	SettingSiteName   = "site_name"
+	SettingDateFormat      = "date_format"
+	SettingSiteName        = "site_name"
+	SettingDevelopmentMode = "development_mode"
 )
 
 // DefaultDateFormat is the Go layout used when date_format is unset.
@@ -20,6 +22,19 @@ func Setting(req WireRequest, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(req.Settings[strings.TrimSpace(key)])
+}
+
+// DevelopmentMode reports whether the site has development_mode enabled.
+func DevelopmentMode(req WireRequest) bool {
+	raw := Setting(req, SettingDevelopmentMode)
+	if raw == "" {
+		return false
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return strings.EqualFold(raw, "on") || strings.EqualFold(raw, "yes")
+	}
+	return v
 }
 
 // DateFormat returns the site's Go date layout from wire settings.

@@ -37,6 +37,7 @@ func TestOpenSiteSQLiteUsesSharedRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(database.CloseAll)
 	if site.ID != "example" {
 		t.Fatalf("unexpected site: %#v", site)
 	}
@@ -49,6 +50,17 @@ func TestOpenSiteSQLiteUsesSharedRules(t *testing.T) {
 	}
 	if !database.IsSQLite(site.Database.Type) {
 		t.Fatal("expected sqlite site")
+	}
+	db2, _, err := OpenSite("example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB2, err := db2.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sqlDB != sqlDB2 {
+		t.Fatal("expected OpenSite to return the same cached *sql.DB")
 	}
 }
 
