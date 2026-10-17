@@ -133,7 +133,7 @@ func (h *Handler) roleToggleStatus(w http.ResponseWriter, r *http.Request, idStr
 }
 
 func (h *Handler) menuToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Menu{}, menusBase, nil)
+	h.postToggleModel(w, r, idStr, &models.Menu{}, menusBase, invalidateMenusDataCache)
 }
 
 func (h *Handler) authenticatorToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {

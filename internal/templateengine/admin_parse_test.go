@@ -11,7 +11,8 @@ import (
 )
 
 func TestCategoryRelatedItemsControl(t *testing.T) {
-	e := New(&config.SiteConfig{}, themes.Selection{}, nil, nil, testAdminFuncs())
+	InvalidateAll()
+	e := New(&config.SiteConfig{ID: t.Name()}, themes.Selection{}, nil, nil, testAdminFuncs())
 	tmpl, err := e.parse("admin/categories_form.html")
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +74,8 @@ func testAdminFuncs() map[string]any {
 }
 
 func TestAdminTemplateLookup(t *testing.T) {
-	e := New(&config.SiteConfig{}, themes.Selection{}, nil, nil, testAdminFuncs())
+	InvalidateAll()
+	e := New(&config.SiteConfig{ID: t.Name()}, themes.Selection{}, nil, nil, testAdminFuncs())
 	for _, name := range []string{
 		"admin/layout.html",
 		"admin/dashboard.html",

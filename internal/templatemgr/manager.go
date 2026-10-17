@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/rob121/cannon/internal/templateengine"
 )
 
 const (
@@ -126,6 +128,7 @@ func Save(root, relPath string, content []byte) error {
 	if err := os.WriteFile(target, content, 0644); err != nil {
 		return fmt.Errorf("write template: %w", err)
 	}
+	templateengine.InvalidateAll()
 	return nil
 }
 

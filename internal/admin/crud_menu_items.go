@@ -191,6 +191,7 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 			h.renderMenuItemForm(w, r, row, allGroups, isNew, err.Error())
 			return
 		}
+		invalidateMenusDataCache(r.Context())
 		redirectList(w, r, menuItemsBase+menuItemListQuery(r))
 		return
 	}
@@ -278,6 +279,7 @@ func (h *Handler) menuItemDelete(w http.ResponseWriter, r *http.Request, idStr s
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateMenusDataCache(r.Context())
 	redirectList(w, r, menuItemsBase)
 }
 
@@ -300,6 +302,7 @@ func (h *Handler) menuItemToggleStatus(w http.ResponseWriter, r *http.Request, i
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateMenusDataCache(r.Context())
 	if returnTo := menuItemToggleReturnTo(r); returnTo != "" {
 		http.Redirect(w, r, returnTo, http.StatusSeeOther)
 		return
@@ -572,6 +575,7 @@ func (h *Handler) menuItemMoveSort(w http.ResponseWriter, r *http.Request, idStr
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateMenusDataCache(r.Context())
 	redirectList(w, r, menuItemsBase+listRedirectQuery(r))
 }
 

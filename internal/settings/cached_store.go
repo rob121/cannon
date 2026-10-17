@@ -44,6 +44,18 @@ func (c cachedStore) Save(ctx context.Context, scope, section string, data map[s
 			cache.InvalidateSite(siteID)
 		}
 		cache.SetToggle(siteID, enabled)
+		if onGeneralSaved != nil {
+			onGeneralSaved(ctx, siteID, data)
+		}
 	}
 	return nil
+}
+
+// onGeneralSaved is set by packages that must react to general settings saves
+// without creating an import cycle (e.g. template parse cache).
+var onGeneralSaved func(ctx context.Context, siteID string, data map[string]any)
+
+// SetOnGeneralSaved registers a hook invoked after global/general settings are saved.
+func SetOnGeneralSaved(fn func(ctx context.Context, siteID string, data map[string]any)) {
+	onGeneralSaved = fn
 }

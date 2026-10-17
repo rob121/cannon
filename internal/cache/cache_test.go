@@ -160,6 +160,49 @@ func TestActiveRoutesCache(t *testing.T) {
 	}
 }
 
+func TestActiveMenuItemsCache(t *testing.T) {
+	cache.InvalidateAll()
+	_, ctx, db := testSite(t)
+	siteID := cache.SiteIDFromContext(ctx)
+	cache.SetToggle(siteID, true)
+
+	menu := models.Menu{MenuName: "main", Status: models.StatusActive}
+	if err := db.Create(&menu).Error; err != nil {
+		t.Fatal(err)
+	}
+	route := models.Route{Name: "Home", Path: "/", Type: models.RouteTypeController, Status: models.StatusActive}
+	if err := db.Create(&route).Error; err != nil {
+		t.Fatal(err)
+	}
+	item := models.MenuItem{
+		MenuID: menu.MenuID, Name: "Home", RouteID: &route.RouteID,
+		Status: models.StatusActive, Sort: 1,
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := cache.ActiveMenuItems(ctx, db, "main")
+	if err != nil || len(first) != 1 {
+		t.Fatalf("first=%d err=%v", len(first), err)
+	}
+	if err := db.Where("menu_id = ?", menu.MenuID).Delete(&models.MenuItem{}).Error; err != nil {
+		t.Fatal(err)
+	}
+	cached, err := cache.ActiveMenuItems(ctx, db, "main")
+	if err != nil || len(cached) != 1 {
+		t.Fatalf("expected cached menu items, got %d err=%v", len(cached), err)
+	}
+	cache.InvalidateMenus(siteID)
+	fresh, err := cache.ActiveMenuItems(ctx, db, "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fresh) != 0 {
+		t.Fatalf("expected empty after invalidate, got %d", len(fresh))
+	}
+}
+
 func TestViewerGroupsLRUEvicts(t *testing.T) {
 	cache.InvalidateAll()
 	prev := cache.MaxViewerGroupsPerSite

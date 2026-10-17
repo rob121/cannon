@@ -16,4 +16,7 @@ var (
 
 	// MaxRoutesSites caps how many sites keep a full active-routes snapshot.
 	MaxRoutesSites = 32
+
+	// MaxMenusPerSite caps cached named menus (items+groups+route) per site.
+	MaxMenusPerSite = 32
 )

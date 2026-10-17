@@ -23,7 +23,7 @@ func (m *Manager) runInstall(ctx context.Context, socketPath string) error {
 		return err
 	}
 
-	resp, err := m.do(socketPath, http.MethodPost, "/install", bytes.NewReader(raw))
+	resp, err := m.doWithTimeout(socketPath, http.MethodPost, "/install", bytes.NewReader(raw), InstallIPCTimeout)
 	if err != nil {
 		return err
 	}

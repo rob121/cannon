@@ -1,7 +1,6 @@
 package extensions
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -73,6 +72,12 @@ type Runtime struct {
 	cmd                  *exec.Cmd
 }
 
+// DefaultIPCTimeout is the client timeout for request/block/hook unix IPC.
+const DefaultIPCTimeout = 3 * time.Second
+
+// InstallIPCTimeout is used for slower install/bootstrap calls.
+const InstallIPCTimeout = 30 * time.Second
+
 type Manager struct {
 	app          *config.App
 	site         *config.SiteConfig
@@ -80,6 +85,8 @@ type Manager struct {
 	suppressed   map[string]bool
 	updateClient *http.Client
 	updateOnce   sync.Once
+	clientsMu    sync.Mutex
+	clients      map[string]*http.Client // socket path -> pooled unix client
 	mu           sync.RWMutex
 }
 
@@ -90,6 +97,7 @@ func NewManager(app *config.App, site *config.SiteConfig) *Manager {
 		runtimes:     make(map[string]*Runtime),
 		suppressed:   make(map[string]bool),
 		updateClient: &http.Client{Timeout: 30 * time.Second},
+		clients:      make(map[string]*http.Client),
 	}
 }
 
@@ -396,15 +404,20 @@ func (m *Manager) HandleRequest(ctx context.Context, r *http.Request, userCtx ma
 	sort.Slice(runtimes, func(i, j int) bool { return runtimes[i].Model.Sort < runtimes[j].Model.Sort })
 
 	current := r
+	var wireRaw []byte
+	wireValid := false
 	for _, rt := range runtimes {
-		wire, err := m.buildWireRequest(current, userCtx)
-		if err != nil {
-			return current, nil, false, err
+		if !wireValid {
+			wire, err := m.buildWireRequest(current, userCtx)
+			if err != nil {
+				return current, nil, false, err
+			}
+			wireRaw, _ = json.Marshal(wire)
+			wireValid = true
 		}
-		raw, _ := json.Marshal(wire)
-		resp, err := m.do(rt.Model.Socket, http.MethodPost, "/"+strings.TrimPrefix(rt.Capabilities.Request, "/"), bytes.NewReader(raw))
+		resp, err := m.do(rt.Model.Socket, http.MethodPost, "/"+strings.TrimPrefix(rt.Capabilities.Request, "/"), bytes.NewReader(wireRaw))
 		if err != nil {
-			continue
+			continue // fail-open (dial/timeout/etc.)
 		}
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
@@ -414,6 +427,7 @@ func (m *Manager) HandleRequest(ctx context.Context, r *http.Request, userCtx ma
 		}
 		if out.Updated != nil {
 			current = m.applyWireRequest(current, out.Updated)
+			wireValid = false // rebuild wire for subsequent extensions
 		}
 		if out.Stop || out.StatusCode >= 300 {
 			return current, m.buildHTTPResponse(out), true, nil
@@ -703,29 +717,50 @@ func (m *Manager) Restart(ctx context.Context, row models.Extension) error {
 	return m.Start(ctx, row)
 }
 
-func (m *Manager) do(socketPath, method, path string, body io.Reader) (*http.Response, error) {
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return nil, err
+func (m *Manager) unixTransport(socketPath string) *http.Transport {
+	m.clientsMu.Lock()
+	defer m.clientsMu.Unlock()
+	if c, ok := m.clients[socketPath]; ok {
+		if tr, ok := c.Transport.(*http.Transport); ok {
+			return tr
+		}
 	}
-	req, err := http.NewRequest(method, "http://unix"+path, body)
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "unix", socketPath)
+		},
+		MaxIdleConns:        8,
+		MaxIdleConnsPerHost: 8,
+		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  true,
+	}
+	m.clients[socketPath] = &http.Client{Transport: transport, Timeout: DefaultIPCTimeout}
+	return transport
+}
+
+func (m *Manager) do(socketPath, method, path string, body io.Reader) (*http.Response, error) {
+	return m.doWithTimeout(socketPath, method, path, body, DefaultIPCTimeout)
+}
+
+func (m *Manager) doWithTimeout(socketPath, method, path string, body io.Reader, timeout time.Duration) (*http.Response, error) {
+	tr := m.unixTransport(socketPath)
+	client := &http.Client{Transport: tr, Timeout: timeout}
+	req, err := http.NewRequest(method, "http://localhost"+path, body)
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if err := req.Write(conn); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	return http.ReadResponse(bufio.NewReader(conn), req)
+	return client.Do(req)
 }
 
 func (m *Manager) buildWireRequest(r *http.Request, userCtx map[string]any) (*WireRequest, error) {
 	var body string
-	if r.Body != nil {
+	method := strings.ToUpper(r.Method)
+	skipBody := method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
+	if !skipBody && r.Body != nil {
 		raw, err := io.ReadAll(r.Body)
 		if err != nil {
 			return nil, err

@@ -80,6 +80,7 @@ func (s *Server) Activate(cfg *config.App) error {
 	s.chain = nil
 	s.mux = http.NewServeMux()
 	security.InvalidateAll()
+	templateengine.InvalidateAll()
 	return s.activate()
 }
 

@@ -472,6 +472,13 @@ func hookHeaderValues(raw any) map[string][]string {
 	return out
 }
 
+func (e *Engine) siteID() string {
+	if e == nil || e.site == nil {
+		return ""
+	}
+	return e.site.ID
+}
+
 func (e *Engine) parse(name string) (*template.Template, error) {
 	if strings.HasPrefix(name, "admin/") {
 		return e.parseAdmin(name)
@@ -490,21 +497,48 @@ func (e *Engine) parse(name string) (*template.Template, error) {
 		return tmpl, nil
 	}
 
-	content, src, err := e.readTemplate(name)
+	bundle, err := e.loadFrontendSources(name)
 	if err != nil {
 		return nil, err
 	}
 
 	base := template.New(filepath.Base(name)).Funcs(e.funcs)
-	if err := e.attachPartials(base, name); err != nil {
-		return nil, err
+	for _, p := range bundle.partials {
+		if _, err := base.Parse(p.content); err != nil {
+			return nil, fmt.Errorf("parse %s partial for %s: %w", p.name, name, err)
+		}
 	}
-	tmpl, err := base.Parse(content)
+	tmpl, err := base.Parse(bundle.main)
 	if err != nil {
-		return nil, fmt.Errorf("parse template %s (%s): %w", name, src, err)
+		return nil, fmt.Errorf("parse template %s (%s): %w", name, bundle.mainSrc, err)
 	}
 	e.parsed[name] = tmpl
 	return tmpl, nil
+}
+
+func (e *Engine) loadFrontendSources(name string) (*sourceBundle, error) {
+	cacheKey := frontendCacheKey(e.siteID(), e.themes.Frontend, name)
+	if bundle := getFrontendSources(cacheKey); bundle != nil {
+		return bundle, nil
+	}
+
+	content, src, err := e.readTemplate(name)
+	if err != nil {
+		return nil, err
+	}
+	parseCacheReads++
+
+	bundle := &sourceBundle{main: content, mainSrc: src}
+	for _, partial := range builtinPartialsFor(name) {
+		pc, _, err := e.readTemplate(partial)
+		if err != nil {
+			continue
+		}
+		parseCacheReads++
+		bundle.partials = append(bundle.partials, partialSource{name: partial, content: pc})
+	}
+	setFrontendSources(cacheKey, bundle)
+	return bundle, nil
 }
 
 func (e *Engine) parseAdmin(name string) (*template.Template, error) {
@@ -528,6 +562,20 @@ func (e *Engine) parseAdmin(name string) (*template.Template, error) {
 		return nil, fmt.Errorf("admin template not found: %s", name)
 	}
 
+	// Admin embeds are already in-process; Clone a shared parsed set and rebind Funcs.
+	cacheKey := adminCacheKey(e.siteID(), e.themes.Admin)
+	if shared := getAdminParsedSet(cacheKey); shared != nil {
+		cl, err := shared.Clone()
+		if err != nil {
+			return nil, err
+		}
+		e.adminSet = cl.Funcs(e.funcs)
+		if t := e.adminSet.Lookup(filepath.Base(name)); t != nil {
+			return t, nil
+		}
+		return nil, fmt.Errorf("admin template not found: %s", name)
+	}
+
 	set := template.New("admin").Funcs(e.funcs)
 	if err := e.parseAdminEmbed(set); err != nil {
 		return nil, err
@@ -537,9 +585,15 @@ func (e *Engine) parseAdmin(name string) (*template.Template, error) {
 			return nil, err
 		}
 	}
-	e.adminSet = set
+	setAdminParsedSet(cacheKey, set)
 
-	t := set.Lookup(filepath.Base(name))
+	cl, err := set.Clone()
+	if err != nil {
+		return nil, err
+	}
+	e.adminSet = cl.Funcs(e.funcs)
+
+	t := e.adminSet.Lookup(filepath.Base(name))
 	if t == nil {
 		return nil, fmt.Errorf("admin template not found: %s", name)
 	}

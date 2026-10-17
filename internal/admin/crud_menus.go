@@ -78,6 +78,7 @@ func (h *Handler) menuForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderMenuForm(w, r, row, isNew, err.Error())
 			return
 		}
+		invalidateMenusDataCache(r.Context())
 		redirectList(w, r, menusBase)
 		return
 	}
@@ -130,5 +131,6 @@ func (h *Handler) menuDelete(w http.ResponseWriter, r *http.Request, idStr strin
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	invalidateMenusDataCache(r.Context())
 	redirectList(w, r, menusBase)
 }

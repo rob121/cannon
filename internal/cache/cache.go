@@ -8,7 +8,7 @@ import (
 )
 
 // InvalidateSite drops all in-memory domain caches for one site.
-// This clears settings, routes, blocks, and group lookups — not permission caches
+// This clears settings, routes, blocks, menus, and group lookups — not permission caches
 // (see security.InvalidateSite).
 func InvalidateSite(siteID string) {
 	if siteID == "" {
@@ -18,6 +18,7 @@ func InvalidateSite(siteID string) {
 	invalidateRoutes(siteID)
 	invalidateGroups(siteID)
 	invalidateBlocks(siteID)
+	invalidateMenus(siteID)
 	invalidateToggle(siteID)
 }
 
@@ -38,6 +39,10 @@ func InvalidateAll() {
 	blocksMu.Lock()
 	blocksBySite = map[string]*siteBlocksCache{}
 	blocksMu.Unlock()
+
+	menusMu.Lock()
+	menusBySite = map[string]*siteMenusCache{}
+	menusMu.Unlock()
 
 	toggleMu.Lock()
 	toggles = map[string]bool{}

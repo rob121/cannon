@@ -8,7 +8,9 @@ import (
 )
 
 func invalidateRoutesDataCache(ctx context.Context) {
-	cache.InvalidateRoutes(cache.SiteIDFromContext(ctx))
+	siteID := cache.SiteIDFromContext(ctx)
+	cache.InvalidateRoutes(siteID)
+	cache.InvalidateMenus(siteID) // menu hrefs depend on route path/status
 }
 
 func invalidateBlocksDataCache(ctx context.Context) {
@@ -17,6 +19,10 @@ func invalidateBlocksDataCache(ctx context.Context) {
 
 func invalidateGroupsDataCache(ctx context.Context) {
 	cache.InvalidateGroups(cache.SiteIDFromContext(ctx))
+}
+
+func invalidateMenusDataCache(ctx context.Context) {
+	cache.InvalidateMenus(cache.SiteIDFromContext(ctx))
 }
 
 func invalidateSecuritySiteContext(ctx context.Context) {

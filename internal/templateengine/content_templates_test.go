@@ -11,6 +11,7 @@ import (
 )
 
 func TestItemTemplateContentSlugSpaces(t *testing.T) {
+	InvalidateAll()
 	var spaces []string
 	funcs := testFrontendFuncs()
 	funcs["safeHTML"] = func(value string) template.HTML { return template.HTML(value) }
@@ -58,6 +59,7 @@ func TestItemTemplateContentSlugSpaces(t *testing.T) {
 }
 
 func TestItemTemplateHidesEmptyBody(t *testing.T) {
+	InvalidateAll()
 	funcs := testFrontendFuncs()
 	funcs["safeHTML"] = func(value string) template.HTML { return template.HTML(value) }
 	funcs["csrfField"] = func() template.HTML { return "" }
@@ -86,6 +88,7 @@ func TestItemTemplateHidesEmptyBody(t *testing.T) {
 }
 
 func TestItemTemplateRelatedVisibility(t *testing.T) {
+	InvalidateAll()
 	funcs := testFrontendFuncs()
 	funcs["safeHTML"] = func(value string) template.HTML { return template.HTML(value) }
 	funcs["csrfField"] = func() template.HTML { return "" }

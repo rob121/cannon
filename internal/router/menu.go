@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
-	"gorm.io/gorm"
 )
 
 var errInvalidMenuItemParent = errors.New("invalid menu item parent")
@@ -103,25 +103,18 @@ func loadActiveMenuItemsForViewer(ctx context.Context, menuName string, viewerGr
 	}
 
 	menuName = strings.TrimSpace(menuName)
-	var menu models.Menu
-	if err := db.Preload("Items", func(db *gorm.DB) *gorm.DB {
-		return db.Order("sort asc, menu_item_id asc")
-	}).Preload("Items.Groups").Preload("Items.Route").
-		Where("LOWER(menu_name) = LOWER(?) AND status = ?", menuName, models.StatusActive).
-		First(&menu).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return []models.MenuItem{}, nil
-		}
+	items, err := cache.ActiveMenuItems(ctx, db, menuName)
+	if err != nil {
 		return nil, err
 	}
 
-	byID := make(map[uint]models.MenuItem, len(menu.Items))
-	for _, item := range menu.Items {
+	byID := make(map[uint]models.MenuItem, len(items))
+	for _, item := range items {
 		byID[item.MenuItemID] = item
 	}
 
-	viewable := make([]models.MenuItem, 0, len(menu.Items))
-	for _, item := range menu.Items {
+	viewable := make([]models.MenuItem, 0, len(items))
+	for _, item := range items {
 		if item.Status != models.StatusActive {
 			continue
 		}
