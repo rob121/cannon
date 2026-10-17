@@ -14,18 +14,20 @@ type WireRequest struct {
 	User   map[string]any      `json:"user,omitempty"` // signed-in user scope from Cannon session
 	CSRF   string              `json:"csrf,omitempty"` // session CSRF token for forms and mutating requests
 	SiteID string              `json:"site_id"`
-	BlockSpace string          `json:"block_space,omitempty"`
-	BlockItem  string          `json:"block_item,omitempty"`
-	BlockData  map[string]any  `json:"block_data,omitempty"`
-	PageItem   string          `json:"page_item,omitempty"`
-	PageData   map[string]any  `json:"page_data,omitempty"`
-	EndpointItem string        `json:"endpoint_item,omitempty"`
-	EndpointData map[string]any `json:"endpoint_data,omitempty"`
-	DataPath     string        `json:"data_path,omitempty"`
-	CaptchaContext string      `json:"captcha_context,omitempty"`
-	CaptchaAction  string      `json:"captcha_action,omitempty"`
-	CaptchaToken   string      `json:"captcha_token,omitempty"`
-	CaptchaRemoteIP string     `json:"captcha_remote_ip,omitempty"`
+	// Settings carries allowlisted site settings for extensions (e.g. date_format).
+	Settings     map[string]string `json:"settings,omitempty"`
+	BlockSpace   string            `json:"block_space,omitempty"`
+	BlockItem    string            `json:"block_item,omitempty"`
+	BlockData    map[string]any    `json:"block_data,omitempty"`
+	PageItem     string            `json:"page_item,omitempty"`
+	PageData     map[string]any    `json:"page_data,omitempty"`
+	EndpointItem string            `json:"endpoint_item,omitempty"`
+	EndpointData map[string]any    `json:"endpoint_data,omitempty"`
+	DataPath     string            `json:"data_path,omitempty"`
+	CaptchaContext string          `json:"captcha_context,omitempty"`
+	CaptchaAction  string          `json:"captcha_action,omitempty"`
+	CaptchaToken   string          `json:"captcha_token,omitempty"`
+	CaptchaRemoteIP string         `json:"captcha_remote_ip,omitempty"`
 }
 
 // WireResponse is the JSON payload capability handlers return to Cannon.

@@ -8,6 +8,22 @@
         "title": "Site Display Name",
         "description": "Shown in admin headers, page titles, and system emails."
       },
+      "date_format": {
+        "type": "string",
+        "title": "Date Format",
+        "default": "01/02/2006",
+        "enum": [
+          "01/02/2006",
+          "2006-01-02",
+          "02/01/2006",
+          "Jan 2, 2006",
+          "January 2, 2006",
+          "2 Jan 2006",
+          "2006/01/02",
+          "02-Jan-2006"
+        ],
+        "description": "Go time layout used when formatting dates site-wide and in extensions. Values are Go reference layouts (01/02/2006 = MM/DD/YYYY, 2006-01-02 = YYYY-MM-DD, 02/01/2006 = DD/MM/YYYY)."
+      },
       "allow_login": {
         "type": "boolean",
         "title": "Allow Login",
@@ -126,6 +142,7 @@
     "type": "VerticalLayout",
     "elements": [
       {"type": "Control", "scope": "#/properties/site_name"},
+      {"type": "Control", "scope": "#/properties/date_format"},
       {"type": "Control", "scope": "#/properties/allow_login"},
       {"type": "Control", "scope": "#/properties/allow_signup"},
       {"type": "Control", "scope": "#/properties/allow_mfa_totp"},

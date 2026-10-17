@@ -15,17 +15,17 @@
       {{end}}
       {{if and .PasskeysAllowed .PasskeyBeginURL}}
       {{if .TOTPAllowed}}<div class="text-center text-muted small my-3">{{lang "auth.or"}}</div>{{end}}
-      <button type="button" class="btn btn-outline-primary" id="mfa-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.use_passkey"}}</button>
+      <button type="button" class="btn btn-outline-primary" id="mfa-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}" data-csrf="{{csrfToken}}">{{lang "auth.use_passkey"}}</button>
       <div class="text-danger small mt-2 d-none" id="mfa-passkey-error"></div>
       {{end}}
     </div>
   </div>
 </article>
 {{if .PasskeysAllowed}}
-<script src="/theme/site-mfa.js?v=1"></script>
+<script src="/theme/site-mfa.js?v=2"></script>
 <script>
 document.getElementById('mfa-passkey-btn')?.addEventListener('click', function () {
-  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'mfa-passkey-error');
+  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'mfa-passkey-error', this.dataset.csrf);
 });
 </script>
 {{end}}

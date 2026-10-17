@@ -171,6 +171,10 @@ func (s *Server) registerRoutes() {
 	s.mux.Handle("/api/v1/", apiStack)
 	s.mux.Handle("/api/v1", apiStack)
 
+	// External webhook providers (e.g. Stripe) cannot supply session CSRF tokens.
+	webhookStack := s.chain.Site(s.chain.Session(s.chain.Locale(s.chain.ContentLocale(s.chain.Hooks(s.chain.ExtensionRequest(s.frontendHandler()))))))
+	s.mux.Handle("/webhooks/", webhookStack)
+
 	// Completed installs should not expose the installer again.
 	s.mux.HandleFunc("/install", func(w http.ResponseWriter, r *http.Request) {
 		httpx.Redirect(w, r, "/admin/login")

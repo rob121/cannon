@@ -15,8 +15,8 @@
   </div>
   {{end}}
 
-  <div class="row g-4 g-lg-5">
-    <div class="col-lg-4 col-xl-3">
+  <div class="row g-4 g-xl-5 site-profile-layout">
+    <div class="col-12 col-xl-3 site-profile-layout__nav">
       <aside class="site-profile-sidebar">
         <div class="site-profile-identity card shadow-sm">
           <div class="card-body text-center">
@@ -27,9 +27,11 @@
               <span class="site-profile-avatar-fallback rounded-circle" id="profile-avatar-preview">{{initials .Account.GivenName .Account.FamilyName .Account.Username}}</span>
               {{end}}
             </div>
-            <h2 class="h5 mb-1">{{.DisplayName}}</h2>
-            <p class="text-muted small mb-0">@{{.Account.Username}}</p>
-            {{if .Account.Email}}<p class="text-muted small mb-0 mt-1">{{.Account.Email}}</p>{{end}}
+            <div class="site-profile-identity__meta min-w-0">
+              <h2 class="h5 mb-1 text-truncate">{{.DisplayName}}</h2>
+              <p class="text-muted small mb-0 text-truncate">@{{.Account.Username}}</p>
+              {{if .Account.Email}}<p class="text-muted small mb-0 mt-1 text-truncate">{{.Account.Email}}</p>{{end}}
+            </div>
           </div>
         </div>
         <nav class="site-profile-nav card shadow-sm" aria-label="{{lang "profile.title"}}">
@@ -46,7 +48,7 @@
       </aside>
     </div>
 
-    <div class="col-lg-8 col-xl-9">
+    <div class="col-12 col-xl-9 site-profile-layout__main">
       <form method="post" enctype="multipart/form-data" class="site-profile-form">
         {{.CSRF}}
         <input type="hidden" name="form" value="profile">

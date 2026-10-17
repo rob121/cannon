@@ -182,6 +182,39 @@ func TestRenderFormTextareaFields(t *testing.T) {
 	}
 }
 
+func TestRenderFormDefaultPlaceholdersForIntegerAndTextarea(t *testing.T) {
+	schema := []byte(`{
+	  "type":"object",
+	  "properties":{
+	    "block_status":{"type":"integer","title":"Block HTTP Status","default":403},
+	    "ban_seconds":{"type":"integer","title":"Ban Duration","default":300},
+	    "block_message":{"type":"string","title":"Block Message","default":"Request blocked."}
+	  }
+	}`)
+	uiSchema := []byte(`{"type":"VerticalLayout","elements":[
+	  {"type":"Control","scope":"#/properties/block_status"},
+	  {"type":"Control","scope":"#/properties/ban_seconds"},
+	  {"type":"Control","scope":"#/properties/block_message","options":{"multi":true}}
+	]}`)
+	html, err := settings.RenderForm(extension.ConfigurationSection{
+		ID: "firewall", Title: "Firewall", Schema: schema, UISchema: uiSchema,
+	}, "/admin/configuration/extensions/demo", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		`name="#/properties/block_status"`,
+		`placeholder="403"`,
+		`name="#/properties/ban_seconds"`,
+		`placeholder="300"`,
+		`placeholder="Request blocked."`,
+	} {
+		if !strings.Contains(html, part) {
+			t.Fatalf("expected %q in form html:\n%s", part, html)
+		}
+	}
+}
+
 func TestFormDataFromRequestEnumFields(t *testing.T) {
 	def, ok, err := settings.GlobalDefinition("general")
 	if err != nil || !ok {

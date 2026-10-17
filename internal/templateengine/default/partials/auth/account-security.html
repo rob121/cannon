@@ -123,18 +123,18 @@
         <input class="form-control form-control-sm" id="passkey-name" placeholder="{{lang "security.passkey_name_placeholder"}}" value="Passkey">
       </div>
       <button type="button" class="btn btn-outline-primary btn-sm" id="passkey-register-btn"
-        data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "security.add_passkey"}}</button>
+        data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}" data-csrf="{{csrfToken}}">{{lang "security.add_passkey"}}</button>
     </div>
     <div class="text-danger small mt-2 d-none" id="passkey-register-error"></div>
     {{end}}
   </div>
 </section>
 {{if .PasskeysAllowed}}
-<script src="/theme/site-mfa.js?v=1"></script>
+<script src="/theme/site-mfa.js?v=2"></script>
 <script>
 document.getElementById('passkey-register-btn')?.addEventListener('click', function () {
   var name = document.getElementById('passkey-name')?.value || 'Passkey';
-  cannonPasskeyRegister(this.dataset.begin, this.dataset.finish, name, 'passkey-register-error');
+  cannonPasskeyRegister(this.dataset.begin, this.dataset.finish, name, 'passkey-register-error', this.dataset.csrf);
 });
 </script>
 {{end}}

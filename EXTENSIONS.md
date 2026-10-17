@@ -566,6 +566,10 @@ Capability handlers receive a POST with a JSON body:
   },
   "csrf": "64-char-hex-session-token",
   "site_id": "default",
+  "settings": {
+    "site_name": "Example Site",
+    "date_format": "01/02/2006"
+  },
   "page_item": "contact",
   "page_data": {"form_id": 42},
   "endpoint_item": "submit",
@@ -580,6 +584,8 @@ Capability handlers receive a POST with a JSON body:
   "captcha_remote_ip": "203.0.113.10"
 }
 ```
+
+`settings` carries allowlisted site configuration for extensions. Helpers: `extension.Setting`, `extension.DateFormat`, `extension.FormatDate`, `extension.FormatDatePtr`. Configure **Date Format** under Admin → Configuration → General (`date_format` is a Go reference layout such as `01/02/2006` for MM/DD/YYYY or `2006-01-02` for YYYY-MM-DD).
 
 Page handlers receive `page_item` (definition id) and optional `page_data` route metadata from the admin Routes UI (for example `form_id`).
 
@@ -641,6 +647,8 @@ field := extension.CSRFHiddenField(req) // `<input type="hidden" name="_csrf" ..
 ```
 
 Cannon validates the token on incoming browser POSTs to `/ext/{route_hash}/…` and extension endpoint routes before forwarding to your handler. Extension handlers do not need to re-validate unless they accept requests from other origins directly.
+
+Paths under `/webhooks/` are mounted **without** CSRF so external providers (for example Stripe) can POST signed payloads. Register an Extension Endpoint route such as `/webhooks/stripe` and verify the provider signature inside the handler.
 
 ### Event hooks
 

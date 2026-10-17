@@ -13,6 +13,8 @@ func testFrontendFuncs() map[string]any {
 	funcs := map[string]any{
 		"homeURL":       func() string { return "/" },
 		"controllerURL": func(string, string) string { return "/account/profile" },
+		"csrfToken":     func() string { return "test-csrf" },
+		"csrfField":     func() template.HTML { return template.HTML(`<input type="hidden" name="_csrf" value="test-csrf">`) },
 		"fieldOptions": func(string) []map[string]string {
 			return nil
 		},

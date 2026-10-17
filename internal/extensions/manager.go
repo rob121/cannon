@@ -24,6 +24,7 @@ import (
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/updater"
 	"github.com/rob121/cannon/internal/user"
@@ -739,14 +740,31 @@ func (m *Manager) buildWireRequest(r *http.Request, userCtx map[string]any) (*Wi
 		}
 	}
 	return &WireRequest{
-		Method: r.Method,
-		URL:    r.URL.String(),
-		Header: r.Header,
-		Body:   body,
-		User:   userCtx,
-		CSRF:   csrfToken,
-		SiteID: m.site.ID,
+		Method:   r.Method,
+		URL:      r.URL.String(),
+		Header:   r.Header,
+		Body:     body,
+		User:     userCtx,
+		CSRF:     csrfToken,
+		SiteID:   m.site.ID,
+		Settings: extensionWireSettings(r.Context()),
 	}, nil
+}
+
+// extensionWireSettings returns allowlisted site settings for extension handlers.
+func extensionWireSettings(ctx context.Context) map[string]string {
+	out := map[string]string{}
+	if name, err := settings.GlobalString(ctx, settings.SectionGeneral, "site_name"); err == nil {
+		if name = strings.TrimSpace(name); name != "" {
+			out[extension.SettingSiteName] = name
+		}
+	}
+	layout, err := settings.DateFormat(ctx)
+	if err != nil || strings.TrimSpace(layout) == "" {
+		layout = settings.DefaultDateFormat
+	}
+	out[extension.SettingDateFormat] = layout
+	return out
 }
 
 func (m *Manager) applyWireRequest(base *http.Request, wire *WireRequest) *http.Request {

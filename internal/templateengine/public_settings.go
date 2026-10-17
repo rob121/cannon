@@ -12,6 +12,7 @@ const sectionContent = "content"
 var publicTemplateSettings = map[string]map[string]struct{}{
 	settings.SectionGeneral: {
 		"site_name":              {},
+		"date_format":            {},
 		"frontend_theme":         {},
 		"allow_login":            {},
 		"allow_signup":           {},

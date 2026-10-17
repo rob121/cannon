@@ -40,7 +40,7 @@ Example textarea control (SEO section):
 }
 ```
 
-String properties may include a `"default"` value; Cannon uses it as the input placeholder when the saved value is empty.
+String, integer, and number properties may include a `"default"` value; Cannon uses it as the input placeholder when the saved value is empty (including empty textareas).
 
 ## Category dropdown
 

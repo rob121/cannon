@@ -37,7 +37,7 @@
 {{if or .LocalEnabled .PasskeysEnabled}}<div class="text-center text-muted small my-3">{{lang "auth.or_continue_with"}}</div>{{end}}
 <div class="d-grid gap-2">
   {{if .PasskeysEnabled}}
-  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.sign_in_passkey"}}</button>
+  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}" data-csrf="{{csrfToken}}">{{lang "auth.sign_in_passkey"}}</button>
   <div class="text-danger small d-none" id="login-passkey-error"></div>
   {{end}}
   {{range .Providers}}
@@ -46,15 +46,15 @@
 </div>
 {{else if .PasskeysEnabled}}
 <div class="d-grid gap-2 mt-3">
-  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}">{{lang "auth.sign_in_passkey"}}</button>
+  <button type="button" class="btn btn-outline-primary" id="login-passkey-btn" data-begin="{{.PasskeyBeginURL}}" data-finish="{{.PasskeyFinishURL}}" data-csrf="{{csrfToken}}">{{lang "auth.sign_in_passkey"}}</button>
   <div class="text-danger small d-none" id="login-passkey-error"></div>
 </div>
 {{end}}
 {{if .PasskeysEnabled}}
-<script src="/theme/site-mfa.js?v=1"></script>
+<script src="/theme/site-mfa.js?v=2"></script>
 <script>
 document.getElementById('login-passkey-btn')?.addEventListener('click', function () {
-  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'login-passkey-error');
+  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'login-passkey-error', this.dataset.csrf);
 });
 </script>
 {{end}}

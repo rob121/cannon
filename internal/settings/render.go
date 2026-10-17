@@ -151,11 +151,11 @@ func collectTextareaScopes(node map[string]any, scopes *[]string) {
 }
 
 func injectDefaultPlaceholders(formHTML string, schema json.RawMessage, data map[string]any) string {
-	defaults := stringDefaultPlaceholders(schema)
+	defaults := schemaDefaultPlaceholders(schema)
 	if len(defaults) == 0 {
 		return formHTML
 	}
-	return stringInputTagRE.ReplaceAllStringFunc(formHTML, func(match string) string {
+	formHTML = stringInputTagRE.ReplaceAllStringFunc(formHTML, func(match string) string {
 		parts := stringInputTagRE.FindStringSubmatch(match)
 		if len(parts) < 4 || parts[1] != parts[2] {
 			return match
@@ -171,13 +171,32 @@ func injectDefaultPlaceholders(formHTML string, schema json.RawMessage, data map
 		}
 		return fmt.Sprintf(`<input class="form-input admin-form-control" id="%s" name="%s"%s placeholder="%s"/>`, parts[1], parts[2], attrs, html.EscapeString(placeholder))
 	})
+	return textareaTagRE.ReplaceAllStringFunc(formHTML, func(match string) string {
+		parts := textareaTagRE.FindStringSubmatch(match)
+		if len(parts) < 5 || parts[1] != parts[2] {
+			return match
+		}
+		attrs := parts[3]
+		body := parts[4]
+		if strings.Contains(attrs, `placeholder="`) || strings.TrimSpace(body) != "" {
+			return match
+		}
+		key := propertyKey(parts[1])
+		placeholder, ok := defaults[key]
+		if !ok || formFieldValue(data, key) != "" {
+			return match
+		}
+		return fmt.Sprintf(`<textarea class="form-input admin-form-control admin-form-textarea" id="%s" name="%s"%s placeholder="%s"></textarea>`, parts[1], parts[2], attrs, html.EscapeString(placeholder))
+	})
 }
 
-func stringDefaultPlaceholders(schema json.RawMessage) map[string]string {
+var textareaTagRE = regexp.MustCompile(`(?s)<textarea class="form-input admin-form-control admin-form-textarea" id="(#[^"]+)" name="([^"]+)"([^>]*)>(.*?)</textarea>`)
+
+func schemaDefaultPlaceholders(schema json.RawMessage) map[string]string {
 	var doc struct {
 		Properties map[string]struct {
-			Type    string `json:"type"`
-			Default any    `json:"default"`
+			Type    any `json:"type"`
+			Default any `json:"default"`
 		} `json:"properties"`
 	}
 	if err := json.Unmarshal(schema, &doc); err != nil {
@@ -185,7 +204,7 @@ func stringDefaultPlaceholders(schema json.RawMessage) map[string]string {
 	}
 	out := make(map[string]string, len(doc.Properties))
 	for key, prop := range doc.Properties {
-		if prop.Type != "string" || prop.Default == nil {
+		if prop.Default == nil || !schemaTypeAllowsPlaceholder(prop.Type) {
 			continue
 		}
 		value := strings.TrimSpace(fmt.Sprint(prop.Default))
@@ -194,6 +213,26 @@ func stringDefaultPlaceholders(schema json.RawMessage) map[string]string {
 		}
 	}
 	return out
+}
+
+func schemaTypeAllowsPlaceholder(typeVal any) bool {
+	switch t := typeVal.(type) {
+	case string:
+		return t == "string" || t == "integer" || t == "number"
+	case []any:
+		for _, item := range t {
+			s, _ := item.(string)
+			if s == "string" || s == "integer" || s == "number" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// stringDefaultPlaceholders is kept for older call sites/tests; prefer schemaDefaultPlaceholders.
+func stringDefaultPlaceholders(schema json.RawMessage) map[string]string {
+	return schemaDefaultPlaceholders(schema)
 }
 
 func normalizeSelectFields(html string, data map[string]any) string {

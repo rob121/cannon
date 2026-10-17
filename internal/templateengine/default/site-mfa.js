@@ -46,11 +46,39 @@
     el.classList.remove('d-none');
   }
 
-  window.cannonPasskeyAuth = async function (beginURL, finishURL, errorID) {
+  function resolveCSRF(explicit) {
+    if (explicit) return explicit;
+    var el = document.querySelector('input[name="_csrf"]');
+    return el ? el.value : '';
+  }
+
+  function csrfHeaders(token, extra) {
+    var headers = Object.assign({}, extra || {});
+    if (token) headers['X-CSRF-Token'] = token;
+    return headers;
+  }
+
+  async function readJSON(response) {
+    var text = await response.text();
+    var trimmed = (text || '').trim();
+    if (!trimmed) return {};
     try {
-      var begin = await fetch(beginURL, { method: 'POST', credentials: 'same-origin' });
-      var payload = await begin.json();
-      if (!begin.ok) throw new Error(payload.error || 'Could not start passkey sign-in');
+      return JSON.parse(trimmed);
+    } catch (err) {
+      throw new Error(trimmed || ('HTTP ' + response.status));
+    }
+  }
+
+  window.cannonPasskeyAuth = async function (beginURL, finishURL, errorID, csrf) {
+    try {
+      var token = resolveCSRF(csrf);
+      var begin = await fetch(beginURL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: csrfHeaders(token)
+      });
+      var payload = await readJSON(begin);
+      if (!begin.ok) throw new Error(payload.error || trimmedError(payload) || 'Could not start passkey sign-in');
       var options = prepGetOptions(payload.publicKey);
       var cred = await navigator.credentials.get({ publicKey: options });
       var body = {
@@ -67,22 +95,27 @@
       var finish = await fetch(finishURL, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
+        headers: csrfHeaders(token, { 'Content-Type': 'application/json' }),
         body: JSON.stringify(body)
       });
-      var result = await finish.json();
-      if (!finish.ok) throw new Error(result.error || 'Passkey verification failed');
+      var result = await readJSON(finish);
+      if (!finish.ok) throw new Error(result.error || trimmedError(result) || 'Passkey verification failed');
       if (result.redirect) window.location.href = result.redirect;
     } catch (err) {
       showError(errorID, err.message || 'Passkey sign-in failed');
     }
   };
 
-  window.cannonPasskeyRegister = async function (beginURL, finishURL, name, errorID) {
+  window.cannonPasskeyRegister = async function (beginURL, finishURL, name, errorID, csrf) {
     try {
-      var begin = await fetch(beginURL, { method: 'POST', credentials: 'same-origin' });
-      var payload = await begin.json();
-      if (!begin.ok) throw new Error(payload.error || 'Could not start passkey registration');
+      var token = resolveCSRF(csrf);
+      var begin = await fetch(beginURL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: csrfHeaders(token)
+      });
+      var payload = await readJSON(begin);
+      if (!begin.ok) throw new Error(payload.error || trimmedError(payload) || 'Could not start passkey registration');
       var options = prepCreateOptions(payload.publicKey);
       var cred = await navigator.credentials.create({ publicKey: options });
       var body = {
@@ -97,14 +130,19 @@
       var finish = await fetch(finishURL, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Passkey-Name': name },
+        headers: csrfHeaders(token, { 'Content-Type': 'application/json', 'X-Passkey-Name': name }),
         body: JSON.stringify(body)
       });
-      var result = await finish.json();
-      if (!finish.ok) throw new Error(result.error || 'Passkey registration failed');
+      var result = await readJSON(finish);
+      if (!finish.ok) throw new Error(result.error || trimmedError(result) || 'Passkey registration failed');
       if (result.redirect) window.location.href = result.redirect;
     } catch (err) {
       showError(errorID, err.message || 'Passkey registration failed');
     }
   };
+
+  function trimmedError(payload) {
+    if (typeof payload === 'string') return payload;
+    return '';
+  }
 })();

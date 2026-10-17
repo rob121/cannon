@@ -600,8 +600,17 @@ img {
 
 /* ── Account profile page ── */
 .site-profile-page {
-  max-width: 56rem;
-  margin-inline: auto;
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.site-profile-layout {
+  --bs-gutter-x: 1.5rem;
+}
+
+.site-profile-layout__main {
+  min-width: 0;
 }
 
 .site-profile-sidebar {
@@ -610,10 +619,60 @@ img {
   gap: 1rem;
 }
 
-@media (min-width: 992px) {
+@media (min-width: 1200px) {
   .site-profile-sidebar {
     position: sticky;
     top: calc(var(--site-header-height) + 1.25rem);
+  }
+}
+
+/* Below xl: compact identity + horizontal section nav so forms keep width. */
+@media (max-width: 1199.98px) {
+  .site-profile-identity .card-body {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    text-align: left;
+  }
+
+  .site-profile-identity__meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .site-profile-identity__avatar {
+    margin: 0 !important;
+    flex: 0 0 auto;
+  }
+
+  .site-profile-identity__avatar .site-profile-avatar-image,
+  .site-profile-identity__avatar .site-profile-avatar-fallback {
+    width: 4.5rem;
+    height: 4.5rem;
+    font-size: 1.25rem;
+  }
+
+  .site-profile-nav__heading {
+    display: none;
+  }
+
+  .site-profile-nav__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.625rem;
+  }
+
+  .site-profile-nav__link {
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .site-profile-nav__link.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--site-primary);
   }
 }
 

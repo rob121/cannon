@@ -147,6 +147,34 @@ func CaptchaSkipAuthenticated(ctx context.Context) (bool, error) {
 	return GlobalBoolDefault(ctx, SectionGeneral, "captcha_skip_authenticated", true)
 }
 
+// DefaultDateFormat is the Go reference layout used when date_format is unset.
+const DefaultDateFormat = "01/02/2006"
+
+// DateFormat returns the configured Go time layout for displaying dates.
+// Falls back to DefaultDateFormat (MM/DD/YYYY).
+func DateFormat(ctx context.Context) (string, error) {
+	layout, err := GlobalString(ctx, SectionGeneral, "date_format")
+	if err != nil {
+		return DefaultDateFormat, err
+	}
+	layout = strings.TrimSpace(layout)
+	if layout == "" || !ValidDateFormat(layout) {
+		return DefaultDateFormat, nil
+	}
+	return layout, nil
+}
+
+// ValidDateFormat reports whether layout is one of the supported date_format options.
+func ValidDateFormat(layout string) bool {
+	switch strings.TrimSpace(layout) {
+	case "01/02/2006", "2006-01-02", "02/01/2006", "Jan 2, 2006",
+		"January 2, 2006", "2 Jan 2006", "2006/01/02", "02-Jan-2006":
+		return true
+	default:
+		return false
+	}
+}
+
 // SiteOffline reports whether the public site should show a maintenance page.
 func SiteOffline(ctx context.Context) (bool, error) {
 	if offline, err := GlobalBool(ctx, SectionGeneral, "site_offline"); err != nil {
