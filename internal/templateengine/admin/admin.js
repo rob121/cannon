@@ -1184,6 +1184,7 @@
     initMediaPicker();
     initTemplateBrowser();
     initAccessLogTail();
+    initSystemUpdate();
     initRealtimeAnalytics();
     initPermissionPicker();
     initTurboProgress();
@@ -1316,6 +1317,417 @@
     }
     refresh();
     resetTimer();
+  }
+
+  function initSystemUpdate() {
+    var root = document.querySelector('[data-system-update]');
+    if (!root || root.dataset.bound) {
+      return;
+    }
+    root.dataset.bound = '1';
+
+    var statusURL = root.getAttribute('data-status-url') || '';
+    var actionURL = root.getAttribute('data-action-url') || '';
+    var progress = root.querySelector('[data-system-update-progress]');
+    var msgEl = root.querySelector('[data-system-update-msg]');
+    var flash = root.querySelector('[data-system-update-flash]');
+    var busy = false;
+    var pollTimer = null;
+
+    function setText(sel, value) {
+      var el = root.querySelector(sel);
+      if (el) {
+        el.textContent = value == null ? '' : String(value);
+      }
+    }
+
+    function setHidden(sel, hidden) {
+      root.querySelectorAll(sel).forEach(function (el) {
+        el.hidden = !!hidden;
+      });
+    }
+
+    function setBusy(next) {
+      busy = !!next;
+      root.querySelectorAll('[data-system-update-btn]').forEach(function (btn) {
+        btn.disabled = busy;
+      });
+    }
+
+    function showFlash(kind, text) {
+      if (!flash) {
+        return;
+      }
+      if (!text) {
+        flash.innerHTML = '';
+        return;
+      }
+      var cls = kind === 'error' ? 'admin-alert-error' : 'admin-alert-success';
+      flash.innerHTML = '<div class="admin-alert ' + cls + '" role="status">' + escapeHTML(text) + '</div>';
+    }
+
+    function escapeHTML(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatCheckedAt(iso) {
+      if (!iso) {
+        return '';
+      }
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) {
+        return String(iso);
+      }
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    function setProgress(activeStep, message, mode) {
+      if (!progress) {
+        return;
+      }
+      var show = !!activeStep || !!message;
+      progress.hidden = !show;
+      if (mode) {
+        progress.setAttribute('data-mode', mode);
+      }
+      progress.querySelectorAll('[data-step]').forEach(function (li) {
+        var step = li.getAttribute('data-step');
+        li.classList.remove('is-active', 'is-done', 'is-error');
+        if (!activeStep) {
+          return;
+        }
+        var order = ['check', 'download', 'restart', 'verify'];
+        var activeIdx = order.indexOf(activeStep);
+        var idx = order.indexOf(step);
+        if (idx < 0) {
+          return;
+        }
+        if (idx < activeIdx) {
+          li.classList.add('is-done');
+        } else if (idx === activeIdx) {
+          li.classList.add(mode === 'error' ? 'is-error' : 'is-active');
+        }
+      });
+      if (msgEl) {
+        msgEl.textContent = message || '';
+      }
+    }
+
+    function clearProgressSoon() {
+      window.setTimeout(function () {
+        if (!busy) {
+          setProgress('', '', '');
+          if (progress) {
+            progress.hidden = true;
+          }
+        }
+      }, 4000);
+    }
+
+    function applyStatus(status) {
+      if (!status) {
+        return;
+      }
+      root.setAttribute('data-current-version', status.current_version || '');
+      setText('[data-field="current_version"]', status.current_version || '');
+      setText('[data-field="commit"]', status.commit || '');
+      setHidden('[data-commit-row]', !status.commit);
+      setText('[data-field="binary_path"]', status.binary_path || '');
+      var urlEl = root.querySelector('[data-field="update_url_base"]');
+      if (urlEl) {
+        urlEl.textContent = status.update_url_base || '';
+        urlEl.setAttribute('href', status.update_url_base || '#');
+      }
+
+      var latest = status.latest_version || '';
+      setHidden('[data-latest-row]', !latest);
+      var badge = root.querySelector('[data-field="latest_badge"]');
+      if (badge) {
+        badge.classList.toggle('admin-badge-warning', !!status.update_available);
+        badge.classList.toggle('admin-badge-success', !status.update_available);
+        badge.textContent = status.update_available
+          ? ('New version ' + latest)
+          : ('Up to date (' + latest + ')');
+      }
+      setText('[data-field="apply_version"]', latest);
+
+      var stagedEl = root.querySelector('[data-field="staged_file"]');
+      if (stagedEl) {
+        if (status.has_staged) {
+          stagedEl.innerHTML = '<code class="admin-code">' + escapeHTML(status.latest_path) + '</code>' +
+            (status.staged_version ? ' (' + escapeHTML(status.staged_version) + ')' : '');
+        } else {
+          stagedEl.innerHTML = '<span class="admin-capability-none">None</span>';
+        }
+      }
+
+      var prevEl = root.querySelector('[data-field="previous_file"]');
+      if (prevEl) {
+        if (status.has_previous) {
+          prevEl.innerHTML = '<code class="admin-code">' + escapeHTML(status.previous_path) + '</code>';
+        } else {
+          prevEl.innerHTML = '<span class="admin-capability-none">None</span>' +
+            ' <span class="admin-cell-muted"> (Rollback appears when <code class="admin-code">' +
+            escapeHTML(status.binary_path) + '.previous</code> exists)</span>';
+        }
+      }
+
+      setHidden('[data-system-update-staged]', !status.has_staged);
+      setText('[data-field="staged_version"]', status.staged_version || '');
+      setText('[data-field="latest_path"]', status.latest_path || '');
+      setHidden('[data-system-update-restart-hint]', !status.restart_required);
+      setHidden('[data-system-update-restart-only]', !(!status.has_staged && status.restart_required));
+
+      var checked = formatCheckedAt(status.update_checked_at);
+      setHidden('[data-checked-row]', !checked);
+      setText('[data-field="update_checked_at"]', checked);
+
+      setHidden('[data-error-row]', !status.update_error);
+      setText('[data-field="update_error"]', status.update_error || '');
+
+      var applyForm = root.querySelector('[data-action-kind="apply"]');
+      if (applyForm) {
+        applyForm.hidden = !(status.update_available && !status.has_staged);
+        applyForm.setAttribute(
+          'data-confirm',
+          'Download Cannon ' + latest + ' to cannon.latest and restart so it can be applied?'
+        );
+      }
+      var discardForm = root.querySelector('[data-action-kind="discard"]');
+      if (discardForm) {
+        discardForm.hidden = !status.has_staged;
+      }
+      var rollbackForm = root.querySelector('[data-action-kind="rollback"]');
+      if (rollbackForm) {
+        rollbackForm.hidden = !status.has_previous;
+      }
+    }
+
+    function fetchStatus() {
+      if (!statusURL) {
+        return Promise.reject(new Error('status URL missing'));
+      }
+      return fetch(statusURL, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+      }).then(function (resp) {
+        if (!resp.ok) {
+          throw new Error('status ' + resp.status);
+        }
+        return resp.json();
+      });
+    }
+
+    function stopPolling() {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    }
+
+    function normVer(value) {
+      return String(value || '').trim().replace(/^v/i, '');
+    }
+
+    function pollUntilReady(baselineVersion, expectedVersion) {
+      setProgress('verify', 'Waiting for Cannon to come back…', 'update');
+      var attempts = 0;
+      var maxAttempts = 60;
+      var base = normVer(baselineVersion);
+      var expect = normVer(expectedVersion);
+      stopPolling();
+      return new Promise(function (resolve, reject) {
+        function tick() {
+          attempts += 1;
+          fetchStatus()
+            .then(function (status) {
+              applyStatus(status);
+              var current = normVer(status.current_version);
+              var ready = !status.has_staged && !status.restart_required;
+              var versionOk = !expect || current === expect || (base && current && current !== base);
+              if (ready && versionOk) {
+                stopPolling();
+                resolve(status);
+                return;
+              }
+              setProgress(
+                'verify',
+                'Process is back; finishing apply… (attempt ' + attempts + ')',
+                'update'
+              );
+              if (attempts >= maxAttempts) {
+                stopPolling();
+                reject(new Error('Timed out waiting for update to finish'));
+              }
+            })
+            .catch(function () {
+              setProgress(
+                'restart',
+                'Restarting… waiting for admin to respond (attempt ' + attempts + ')',
+                'update'
+              );
+              if (attempts >= maxAttempts) {
+                stopPolling();
+                reject(new Error('Timed out waiting for Cannon to restart'));
+              }
+            });
+        }
+        pollTimer = setInterval(tick, 1500);
+        tick();
+      });
+    }
+
+    function isRecoverableRestartError(err) {
+      if (!err) {
+        return false;
+      }
+      if (err.noPoll) {
+        return false;
+      }
+      var msg = String(err.message || err);
+      return err.name === 'TypeError' ||
+        err.name === 'SyntaxError' ||
+        /Failed to fetch|NetworkError|Load failed|Unexpected end|JSON/i.test(msg);
+    }
+
+    function runAction(form) {
+      if (busy || !form) {
+        return;
+      }
+      var kind = form.getAttribute('data-action-kind') || '';
+      var confirmMsg = form.getAttribute('data-confirm');
+      if (confirmMsg && !window.confirm(confirmMsg)) {
+        return;
+      }
+
+      var baseline = root.getAttribute('data-current-version') || '';
+      var expected = '';
+      var applyVersionEl = root.querySelector('[data-field="apply_version"]');
+      if (kind === 'apply' && applyVersionEl) {
+        expected = applyVersionEl.textContent.trim();
+      }
+
+      setBusy(true);
+      showFlash('', '');
+      if (kind === 'check') {
+        setProgress('check', 'Checking for updates…', 'check');
+      } else if (kind === 'apply') {
+        setProgress('download', 'Downloading update…', 'update');
+      } else if (kind === 'rollback') {
+        setProgress('restart', 'Preparing rollback…', 'update');
+      } else if (kind === 'discard') {
+        setProgress('check', 'Discarding staged update…', 'check');
+      }
+
+      fetch(actionURL || form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(function (resp) {
+          return resp.json().then(function (body) {
+            return { ok: resp.ok, body: body };
+          });
+        })
+        .then(function (result) {
+          var body = result.body || {};
+          if (body.status) {
+            applyStatus(body.status);
+          }
+          if (!result.ok || body.ok === false) {
+            throw new Error(body.error || 'Update action failed');
+          }
+          if (body.restarting) {
+            if (kind === 'apply') {
+              setProgress('restart', 'Download complete. Restarting to apply ' + (expected || 'update') + '…', 'update');
+            } else {
+              setProgress('restart', 'Restarting…', 'update');
+            }
+            return pollUntilReady(baseline, kind === 'apply' ? expected : '').then(function (status) {
+              showFlash('success', kind === 'rollback'
+                ? ('Rollback complete. Now running ' + (status.current_version || '') + '.')
+                : ('Update complete. Now running ' + (status.current_version || '') + '.'));
+              setProgress('verify', 'Done.', 'update');
+              if (progress) {
+                progress.querySelectorAll('[data-step]').forEach(function (li) {
+                  li.classList.remove('is-active', 'is-error');
+                  li.classList.add('is-done');
+                });
+              }
+              clearProgressSoon();
+            }).catch(function (pollErr) {
+              var e = pollErr instanceof Error ? pollErr : new Error(String(pollErr));
+              e.noPoll = true;
+              throw e;
+            });
+          }
+          showFlash('success', body.message || 'Done.');
+          if (kind === 'check') {
+            setProgress('check', body.status && body.status.update_available
+              ? ('Update available: ' + (body.status.latest_version || ''))
+              : 'Already up to date.', 'check');
+            var checkStep = progress ? progress.querySelector('[data-step="check"]') : null;
+            if (checkStep) {
+              checkStep.classList.add('is-done');
+              checkStep.classList.remove('is-active');
+            }
+          } else {
+            setProgress('', '', '');
+          }
+          clearProgressSoon();
+        })
+        .catch(function (err) {
+          // Apply/rollback may kill the process before the JSON response finishes.
+          if ((kind === 'apply' || kind === 'rollback') && isRecoverableRestartError(err)) {
+            setProgress('restart', 'Connection dropped during restart; polling for recovery…', 'update');
+            return pollUntilReady(baseline, kind === 'apply' ? expected : '')
+              .then(function (status) {
+                showFlash('success', 'Now running ' + (status.current_version || '') + '.');
+                setProgress('verify', 'Done.', 'update');
+                if (progress) {
+                  progress.querySelectorAll('[data-step]').forEach(function (li) {
+                    li.classList.remove('is-active', 'is-error');
+                    li.classList.add('is-done');
+                  });
+                }
+                clearProgressSoon();
+              })
+              .catch(function (pollErr) {
+                showFlash('error', pollErr.message || String(pollErr));
+                setProgress('restart', pollErr.message || 'Restart failed', 'error');
+              });
+          }
+          showFlash('error', err.message || String(err));
+          setProgress(kind === 'check' ? 'check' : 'download', err.message || 'Failed', 'error');
+        })
+        .finally(function () {
+          setBusy(false);
+        });
+    }
+
+    root.querySelectorAll('[data-system-update-form]').forEach(function (form) {
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        runAction(form);
+      });
+    });
   }
 
   function loadExternalScript(src) {

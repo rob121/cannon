@@ -195,7 +195,8 @@ func (m *Manager) Check() error {
 	if err != nil {
 		state.UpdateError = err.Error()
 		log.Printf("appupdate: check failed: %v", err)
-		return m.SaveState(state)
+		_ = m.SaveState(state)
+		return err
 	}
 	available := updater.NewerVersion(info.Version, m.CurrentVersion())
 	state.LatestVersion = info.Version

@@ -1,112 +1,119 @@
 {{template "page_header" .}}
-{{template "success_alert" .}}
-{{template "error_alert" .}}
 
-{{if .HasStaged}}
-<div class="admin-alert admin-alert-warning" role="status">
-  <strong>Update staged.</strong>
-  <code class="admin-code">{{.StagedVersion}}</code> is waiting at
-  <code class="admin-code">{{.LatestPath}}</code>.
-  On the next process start Cannon will move the live binary to
-  <code class="admin-code">cannon.previous</code> and promote
-  <code class="admin-code">cannon.latest</code>.
-  {{if .State.RestartRequired}}Restarting shortly…{{end}}
-</div>
-{{else if .State.RestartRequired}}
-<div class="admin-alert admin-alert-warning" role="status">
-  <strong>Restart required.</strong> A binary change is pending; the process should restart via systemd (<code class="admin-code">Restart=always</code>).
-</div>
-{{end}}
-
-<div class="admin-form-card">
-  <div class="admin-form-card-header">
-    <div>
-      <h2 class="admin-form-card-title">Installed Version</h2>
-      <p class="admin-form-card-desc">Running process metadata. Updates are staged next to the binary, then applied on restart—not by Reload Application.</p>
-    </div>
-    <span class="admin-form-card-icon"><i class="bi bi-box-seam"></i></span>
+<div
+  id="system-update-root"
+  data-system-update
+  data-status-url="{{.StatusPath}}"
+  data-action-url="{{.BasePath}}"
+  data-current-version="{{.CurrentVersion}}"
+>
+  <div data-system-update-flash>
+    {{template "success_alert" .}}
+    {{template "error_alert" .}}
   </div>
-  <div class="admin-form-card-body">
-    <dl class="admin-dl-grid">
-      <dt>Current version</dt>
-      <dd><code class="admin-code">{{.CurrentVersion}}</code></dd>
-      {{if .Commit}}
-      <dt>Build commit</dt>
-      <dd><code class="admin-code">{{.Commit}}</code></dd>
-      {{end}}
-      <dt>Binary path</dt>
-      <dd><code class="admin-code">{{.BinaryPath}}</code></dd>
-      <dt>Update URL base</dt>
-      <dd><a href="{{.UpdateURLBase}}" target="_blank" rel="noopener noreferrer">{{.UpdateURLBase}}</a></dd>
-      {{if .State.LatestVersion}}
-      <dt>Latest version</dt>
-      <dd>
-        {{if .State.UpdateAvailable}}
-        <span class="admin-badge admin-badge-warning">New version {{.State.LatestVersion}}</span>
-        {{else}}
-        <span class="admin-badge admin-badge-success">Up to date ({{.State.LatestVersion}})</span>
-        {{end}}
-      </dd>
-      {{end}}
-      <dt>Staged file</dt>
-      <dd>
-        {{if .HasStaged}}
-        <code class="admin-code">{{.LatestPath}}</code>{{if .StagedVersion}} ({{.StagedVersion}}){{end}}
-        {{else}}
-        <span class="admin-capability-none">None</span>
-        {{end}}
-      </dd>
-      <dt>Previous binary</dt>
-      <dd>
-        {{if .HasPrevious}}
-        <code class="admin-code">{{.PreviousPath}}</code>
-        {{else}}
-        <span class="admin-capability-none">None</span>
-        <span class="admin-cell-muted"> (Rollback appears when <code class="admin-code">{{.BinaryPath}}.previous</code> exists)</span>
-        {{end}}
-      </dd>
-      {{if .State.UpdateCheckedAt}}
-      <dt>Last checked</dt>
-      <dd>{{.State.UpdateCheckedAt.Format "Jan 2, 2006 3:04 PM"}}</dd>
-      {{end}}
-      {{if .State.UpdateError}}
-      <dt>Check error</dt>
-      <dd class="text-danger">{{.State.UpdateError}}</dd>
-      {{end}}
-    </dl>
-    <div class="admin-form-actions">
-      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top">
-        {{csrfField}}
-        <input type="hidden" name="action" value="check">
-        <button type="submit" class="btn-admin-outline"><i class="bi bi-arrow-repeat"></i> Check Now</button>
-      </form>
-      {{if and .State.UpdateAvailable (not .HasStaged)}}
-      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top" onsubmit="return confirm('Download Cannon {{.State.LatestVersion}} to cannon.latest and restart so it can be applied?')">
-        {{csrfField}}
-        <input type="hidden" name="action" value="apply">
-        <button type="submit" class="btn-admin-primary"><i class="bi bi-download"></i> Update to {{.State.LatestVersion}}</button>
-      </form>
-      {{end}}
-      {{if .HasStaged}}
-      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top" onsubmit="return confirm('Discard the staged cannon.latest update?')">
-        {{csrfField}}
-        <input type="hidden" name="action" value="discard">
-        <button type="submit" class="btn-admin-outline"><i class="bi bi-x-lg"></i> Discard staged</button>
-      </form>
-      {{end}}
-      {{if .HasPrevious}}
-      <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-turbo-frame="_top" onsubmit="return confirm('Roll back to cannon.previous and restart?')">
-        {{csrfField}}
-        <input type="hidden" name="action" value="rollback">
-        <button type="submit" class="btn-admin-outline"><i class="bi bi-arrow-counterclockwise"></i> Rollback</button>
-      </form>
-      {{end}}
+
+  <div class="admin-update-progress" data-system-update-progress hidden>
+    <ol class="admin-update-steps">
+      <li data-step="check"><span class="admin-update-step-dot"></span><span>Check</span></li>
+      <li data-step="download"><span class="admin-update-step-dot"></span><span>Download</span></li>
+      <li data-step="restart"><span class="admin-update-step-dot"></span><span>Restart</span></li>
+      <li data-step="verify"><span class="admin-update-step-dot"></span><span>Verify</span></li>
+    </ol>
+    <p class="admin-update-progress-msg" data-system-update-msg></p>
+  </div>
+
+  <div class="admin-alert admin-alert-warning" role="status" data-system-update-staged{{if not .HasStaged}} hidden{{end}}>
+    <strong>Update staged.</strong>
+    <code class="admin-code" data-field="staged_version">{{.StagedVersion}}</code> is waiting at
+    <code class="admin-code" data-field="latest_path">{{.LatestPath}}</code>.
+    On the next process start Cannon will move the live binary to
+    <code class="admin-code">cannon.previous</code> and promote
+    <code class="admin-code">cannon.latest</code>.
+    <span data-system-update-restart-hint{{if not .State.RestartRequired}} hidden{{end}}> Restarting shortly…</span>
+  </div>
+
+  <div class="admin-alert admin-alert-warning" role="status" data-system-update-restart-only{{if or .HasStaged (not .State.RestartRequired)}} hidden{{end}}>
+    <strong>Restart required.</strong> A binary change is pending; the process should restart via systemd (<code class="admin-code">Restart=always</code>).
+  </div>
+
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div>
+        <h2 class="admin-form-card-title">Installed Version</h2>
+        <p class="admin-form-card-desc">Running process metadata. Updates are staged next to the binary, then applied on restart—not by Reload Application.</p>
+      </div>
+      <span class="admin-form-card-icon"><i class="bi bi-box-seam"></i></span>
     </div>
-    <p class="admin-form-help mb-0">
-      Updates download to <code class="admin-code">cannon.latest</code> beside the live binary.
-      On restart, Cannon promotes that file and keeps the old binary as <code class="admin-code">cannon.previous</code> for rollback.
-      Requires systemd <code class="admin-code">Restart=always</code> and a writable binary directory.
-      Reload Application only refreshes config—it does not apply binary updates.
-    </p>
+    <div class="admin-form-card-body">
+      <dl class="admin-dl-grid">
+        <dt>Current version</dt>
+        <dd><code class="admin-code" data-field="current_version">{{.CurrentVersion}}</code></dd>
+        <dt data-commit-row{{if not .Commit}} hidden{{end}}>Build commit</dt>
+        <dd data-commit-row{{if not .Commit}} hidden{{end}}><code class="admin-code" data-field="commit">{{.Commit}}</code></dd>
+        <dt>Binary path</dt>
+        <dd><code class="admin-code" data-field="binary_path">{{.BinaryPath}}</code></dd>
+        <dt>Update URL base</dt>
+        <dd><a data-field="update_url_base" href="{{.UpdateURLBase}}" target="_blank" rel="noopener noreferrer">{{.UpdateURLBase}}</a></dd>
+        <dt data-latest-row{{if not .State.LatestVersion}} hidden{{end}}>Latest version</dt>
+        <dd data-latest-row{{if not .State.LatestVersion}} hidden{{end}}>
+          <span class="admin-badge{{if .State.UpdateAvailable}} admin-badge-warning{{else}} admin-badge-success{{end}}" data-field="latest_badge">
+            {{if .State.UpdateAvailable}}New version {{.State.LatestVersion}}{{else}}Up to date ({{.State.LatestVersion}}){{end}}
+          </span>
+        </dd>
+        <dt>Staged file</dt>
+        <dd data-field="staged_file">
+          {{if .HasStaged}}
+          <code class="admin-code">{{.LatestPath}}</code>{{if .StagedVersion}} ({{.StagedVersion}}){{end}}
+          {{else}}
+          <span class="admin-capability-none">None</span>
+          {{end}}
+        </dd>
+        <dt>Previous binary</dt>
+        <dd data-field="previous_file">
+          {{if .HasPrevious}}
+          <code class="admin-code">{{.PreviousPath}}</code>
+          {{else}}
+          <span class="admin-capability-none">None</span>
+          <span class="admin-cell-muted"> (Rollback appears when <code class="admin-code">{{.BinaryPath}}.previous</code> exists)</span>
+          {{end}}
+        </dd>
+        <dt data-checked-row{{if not .State.UpdateCheckedAt}} hidden{{end}}>Last checked</dt>
+        <dd data-checked-row{{if not .State.UpdateCheckedAt}} hidden{{end}} data-field="update_checked_at">
+          {{if .State.UpdateCheckedAt}}{{.State.UpdateCheckedAt.Format "Jan 2, 2006 3:04 PM"}}{{end}}
+        </dd>
+        <dt data-error-row{{if not .State.UpdateError}} hidden{{end}}>Check error</dt>
+        <dd class="text-danger" data-error-row{{if not .State.UpdateError}} hidden{{end}} data-field="update_error">{{.State.UpdateError}}</dd>
+      </dl>
+      <div class="admin-form-actions" data-system-update-actions>
+        <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-system-update-form data-action-kind="check">
+          {{csrfField}}
+          <input type="hidden" name="action" value="check">
+          <button type="submit" class="btn-admin-outline" data-system-update-btn><i class="bi bi-arrow-repeat"></i> Check Now</button>
+        </form>
+        <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-system-update-form data-action-kind="apply" data-confirm="Download Cannon {{.State.LatestVersion}} to cannon.latest and restart so it can be applied?"{{if not (and .State.UpdateAvailable (not .HasStaged))}} hidden{{end}}>
+          {{csrfField}}
+          <input type="hidden" name="action" value="apply">
+          <button type="submit" class="btn-admin-primary" data-system-update-btn data-apply-label>
+            <i class="bi bi-download"></i> Update to <span data-field="apply_version">{{.State.LatestVersion}}</span>
+          </button>
+        </form>
+        <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-system-update-form data-action-kind="discard" data-confirm="Discard the staged cannon.latest update?"{{if not .HasStaged}} hidden{{end}}>
+          {{csrfField}}
+          <input type="hidden" name="action" value="discard">
+          <button type="submit" class="btn-admin-outline" data-system-update-btn><i class="bi bi-x-lg"></i> Discard staged</button>
+        </form>
+        <form method="post" action="{{.BasePath}}" class="admin-inline-form" data-system-update-form data-action-kind="rollback" data-confirm="Roll back to cannon.previous and restart?"{{if not .HasPrevious}} hidden{{end}}>
+          {{csrfField}}
+          <input type="hidden" name="action" value="rollback">
+          <button type="submit" class="btn-admin-outline" data-system-update-btn><i class="bi bi-arrow-counterclockwise"></i> Rollback</button>
+        </form>
+      </div>
+      <p class="admin-form-help mb-0">
+        Updates download to <code class="admin-code">cannon.latest</code> beside the live binary.
+        On restart, Cannon promotes that file and keeps the old binary as <code class="admin-code">cannon.previous</code> for rollback.
+        Requires systemd <code class="admin-code">Restart=always</code> and a writable binary directory.
+        Reload Application only refreshes config—it does not apply binary updates.
+      </p>
+    </div>
   </div>
 </div>

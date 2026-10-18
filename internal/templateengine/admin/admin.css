@@ -5587,3 +5587,73 @@ select.admin-form-control {
     grid-template-columns: 1fr;
   }
 }
+
+.admin-update-progress {
+  margin: 0 0 1rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--admin-border, #e4e4e7);
+  border-radius: 0.75rem;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.admin-update-steps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-update-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #71717a;
+}
+
+.admin-update-step-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 9999px;
+  background: #d4d4d8;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.admin-update-steps li.is-done {
+  color: #15803d;
+}
+
+.admin-update-steps li.is-done .admin-update-step-dot {
+  background: #22c55e;
+}
+
+.admin-update-steps li.is-active {
+  color: #1d4ed8;
+}
+
+.admin-update-steps li.is-active .admin-update-step-dot {
+  background: #3b82f6;
+  animation: admin-update-pulse 1.1s ease-in-out infinite;
+}
+
+.admin-update-steps li.is-error {
+  color: #b91c1c;
+}
+
+.admin-update-steps li.is-error .admin-update-step-dot {
+  background: #ef4444;
+}
+
+.admin-update-progress-msg {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: #3f3f46;
+}
+
+@keyframes admin-update-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
+}

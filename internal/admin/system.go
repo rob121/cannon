@@ -18,6 +18,8 @@ func (h *Handler) system(w http.ResponseWriter, r *http.Request, path string) {
 		h.systemReload(w, r)
 	case len(parts) == 1 && parts[0] == "update":
 		h.systemUpdate(w, r)
+	case len(parts) == 2 && parts[0] == "update" && parts[1] == "status":
+		h.systemUpdateStatus(w, r)
 	case len(parts) >= 1 && parts[0] == "access-log":
 		if len(parts) == 2 && parts[1] == "tail" {
 			h.systemAccessLogTail(w, r)
