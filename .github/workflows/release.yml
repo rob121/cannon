@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: ''
+      notes:
+        description: 'Optional release notes body. Leave empty to use generated notes only.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -170,5 +175,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           # Allow patch rebuilds under the same semver (assets replaced in place).
           overwrite_files: true
+          body: ${{ github.event.inputs.notes }}
           generate_release_notes: true
           files: upload/*
