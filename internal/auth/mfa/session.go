@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -190,7 +193,9 @@ func sessionUint(v any) (uint, bool) {
 }
 
 // WebAuthnInstance builds a WebAuthn service for the current site.
-func WebAuthnInstance(ctx context.Context) (*webauthn.WebAuthn, error) {
+// When r is non-nil, RP ID and origins follow the browser request so finish
+// verification matches clientDataJSON (https behind a proxy, www, etc.).
+func WebAuthnInstance(ctx context.Context, r *http.Request) (*webauthn.WebAuthn, error) {
 	site, err := sites.FromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -206,10 +211,30 @@ func WebAuthnInstance(ctx context.Context) (*webauthn.WebAuthn, error) {
 	if err != nil {
 		return nil, err
 	}
+	origins := uniqueOrigins(origin, schemeTwinOrigin(origin), httpx.Origin(r))
+	if host := requestHostname(r); host != "" {
+		rpID = host
+	}
+	if len(origins) == 0 {
+		return nil, fmt.Errorf("no webauthn origins configured")
+	}
+	// Platform authenticators reject IP RP IDs ("This is an invalid domain").
+	// Local passkey testing must use http://localhost:<port>, not 127.0.0.1.
+	if net.ParseIP(rpID) != nil {
+		hint := "http://localhost/"
+		if r != nil {
+			if _, port, err := net.SplitHostPort(strings.TrimSpace(r.Host)); err == nil && port != "" && port != "80" && port != "443" {
+				hint = "http://localhost:" + port + "/"
+			} else {
+				hint = "http://localhost/"
+			}
+		}
+		return nil, fmt.Errorf("passkeys require a hostname; open %s instead of an IP address", hint)
+	}
 	cfg := &webauthn.Config{
 		RPID:          rpID,
 		RPDisplayName: displayName,
-		RPOrigins:     []string{origin},
+		RPOrigins:     origins,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			UserVerification: protocol.VerificationRequired,
 		},
@@ -236,4 +261,48 @@ func rpIDAndOrigin(host string) (rpID, origin string, err error) {
 	rpID = u.Hostname()
 	origin = u.Scheme + "://" + u.Host
 	return rpID, origin, nil
+}
+
+func requestHostname(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return ""
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	return host
+}
+
+func schemeTwinOrigin(origin string) string {
+	origin = strings.TrimSpace(origin)
+	switch {
+	case strings.HasPrefix(origin, "https://"):
+		return "http://" + strings.TrimPrefix(origin, "https://")
+	case strings.HasPrefix(origin, "http://"):
+		return "https://" + strings.TrimPrefix(origin, "http://")
+	default:
+		return ""
+	}
+}
+
+func uniqueOrigins(values ...string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, v := range values {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		key := strings.ToLower(v)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, v)
+	}
+	return out
 }

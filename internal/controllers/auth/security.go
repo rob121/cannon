@@ -161,7 +161,7 @@ func (c *Controller) securityPasskey(ctx *controllers.Context) controllers.Resul
 		if r.Method != http.MethodPost {
 			return controllers.Error(http.StatusMethodNotAllowed, "method not allowed")
 		}
-		payload, err := mfa.BeginRegistration(ctx.GoContext(), ctx.User, u.UserID)
+		payload, err := mfa.BeginRegistration(ctx.GoContext(), ctx.User, u.UserID, r)
 		if err != nil {
 			return controllers.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
 		}
@@ -178,7 +178,7 @@ func (c *Controller) securityPasskey(ctx *controllers.Context) controllers.Resul
 			name = "Passkey"
 		}
 		if err := mfa.FinishRegistration(ctx.GoContext(), ctx.User, u.UserID, name, r); err != nil {
-			return controllers.JSON(http.StatusBadRequest, map[string]any{"error": "passkey registration failed"})
+			return controllers.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
 		}
 		return controllers.JSON(http.StatusOK, map[string]any{"redirect": profileSecurityRedirect(ctx.GoContext(), "passkey_added=1")})
 	case "delete":

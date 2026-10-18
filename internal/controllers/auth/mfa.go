@@ -87,7 +87,7 @@ func (c *Controller) mfaChallengePasskey(ctx *controllers.Context, step string) 
 		if r.Method != http.MethodPost {
 			return controllers.Error(http.StatusMethodNotAllowed, "method not allowed")
 		}
-		payload, err := mfa.BeginLoginAssertion(ctx.GoContext(), ctx.User, pending.UserID)
+		payload, err := mfa.BeginLoginAssertion(ctx.GoContext(), ctx.User, pending.UserID, r)
 		if err != nil {
 			return controllers.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
 		}
@@ -97,7 +97,7 @@ func (c *Controller) mfaChallengePasskey(ctx *controllers.Context, step string) 
 			return controllers.Error(http.StatusMethodNotAllowed, "method not allowed")
 		}
 		if err := mfa.FinishLoginAssertion(ctx.GoContext(), ctx.User, pending.UserID, r); err != nil {
-			return controllers.JSON(http.StatusUnauthorized, map[string]any{"error": "passkey verification failed"})
+			return controllers.JSON(http.StatusUnauthorized, map[string]any{"error": err.Error()})
 		}
 		dest := pendingLoginDestination(ctx, pending)
 		if err := completeFrontendLogin(ctx, pending.UserID, pending.Context); err != nil {
@@ -125,7 +125,7 @@ func (c *Controller) passkeyLogin(ctx *controllers.Context) controllers.Result {
 		if r.Method != http.MethodPost {
 			return controllers.Error(http.StatusMethodNotAllowed, "method not allowed")
 		}
-		payload, err := mfa.BeginDiscoverableLogin(ctx.GoContext(), ctx.User)
+		payload, err := mfa.BeginDiscoverableLogin(ctx.GoContext(), ctx.User, r)
 		if err != nil {
 			return controllers.JSON(http.StatusBadRequest, map[string]any{"error": err.Error()})
 		}
@@ -136,7 +136,7 @@ func (c *Controller) passkeyLogin(ctx *controllers.Context) controllers.Result {
 		}
 		userID, err := mfa.FinishDiscoverableLogin(ctx.GoContext(), ctx.User, r)
 		if err != nil {
-			return controllers.JSON(http.StatusUnauthorized, map[string]any{"error": "passkey sign-in failed"})
+			return controllers.JSON(http.StatusUnauthorized, map[string]any{"error": err.Error()})
 		}
 		u, err := loadUserByID(ctx, userID)
 		if err != nil {

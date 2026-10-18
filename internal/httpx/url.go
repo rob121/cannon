@@ -5,6 +5,22 @@ import (
 	"strings"
 )
 
+// Scheme returns http or https for the request (honors X-Forwarded-Proto).
+func Scheme(r *http.Request) string {
+	if r != nil && (r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")) {
+		return "https"
+	}
+	return "http"
+}
+
+// Origin returns scheme://host for the request (honors X-Forwarded-Proto).
+func Origin(r *http.Request) string {
+	if r == nil || strings.TrimSpace(r.Host) == "" {
+		return ""
+	}
+	return Scheme(r) + "://" + r.Host
+}
+
 // AbsoluteURL builds an absolute URL for the current request host.
 func AbsoluteURL(r *http.Request, path string) string {
 	path = strings.TrimSpace(path)
@@ -20,9 +36,5 @@ func AbsoluteURL(r *http.Request, path string) string {
 	if r == nil || strings.TrimSpace(r.Host) == "" {
 		return path
 	}
-	scheme := "http"
-	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-		scheme = "https"
-	}
-	return scheme + "://" + r.Host + path
+	return Origin(r) + path
 }

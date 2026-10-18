@@ -22,10 +22,8 @@
   </div>
 </article>
 {{if .PasskeysAllowed}}
-<script src="/theme/site-mfa.js?v=2"></script>
+<script src="/theme/site-mfa.js?v=3"></script>
 <script>
-document.getElementById('mfa-passkey-btn')?.addEventListener('click', function () {
-  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'mfa-passkey-error', this.dataset.csrf);
-});
+cannonBindPasskeyMFA(document.getElementById('mfa-passkey-btn'), 'mfa-passkey-error');
 </script>
 {{end}}

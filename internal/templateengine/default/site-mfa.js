@@ -1,4 +1,6 @@
 (function () {
+  var busy = false;
+
   function b64ToBuf(b64) {
     var pad = '='.repeat((4 - (b64.length % 4)) % 4);
     var bin = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
@@ -69,7 +71,14 @@
     }
   }
 
+  function trimmedError(payload) {
+    if (typeof payload === 'string') return payload;
+    return '';
+  }
+
   window.cannonPasskeyAuth = async function (beginURL, finishURL, errorID, csrf) {
+    if (busy) return;
+    busy = true;
     try {
       var token = resolveCSRF(csrf);
       var begin = await fetch(beginURL, {
@@ -103,10 +112,14 @@
       if (result.redirect) window.location.href = result.redirect;
     } catch (err) {
       showError(errorID, err.message || 'Passkey sign-in failed');
+    } finally {
+      busy = false;
     }
   };
 
   window.cannonPasskeyRegister = async function (beginURL, finishURL, name, errorID, csrf) {
+    if (busy) return;
+    busy = true;
     try {
       var token = resolveCSRF(csrf);
       var begin = await fetch(beginURL, {
@@ -138,11 +151,34 @@
       if (result.redirect) window.location.href = result.redirect;
     } catch (err) {
       showError(errorID, err.message || 'Passkey registration failed');
+    } finally {
+      busy = false;
     }
   };
 
-  function trimmedError(payload) {
-    if (typeof payload === 'string') return payload;
-    return '';
-  }
+  // Idempotent binders so duplicate login/security partials do not stack listeners.
+  window.cannonBindPasskeyAuth = function (btn, errorID) {
+    if (!btn || btn.dataset.passkeyBound === '1') return;
+    btn.dataset.passkeyBound = '1';
+    btn.addEventListener('click', function () {
+      cannonPasskeyAuth(btn.dataset.begin, btn.dataset.finish, errorID || 'login-passkey-error', btn.dataset.csrf);
+    });
+  };
+
+  window.cannonBindPasskeyRegister = function (btn, errorID) {
+    if (!btn || btn.dataset.passkeyBound === '1') return;
+    btn.dataset.passkeyBound = '1';
+    btn.addEventListener('click', function () {
+      var name = document.getElementById('passkey-name')?.value || 'Passkey';
+      cannonPasskeyRegister(btn.dataset.begin, btn.dataset.finish, name, errorID || 'passkey-register-error', btn.dataset.csrf);
+    });
+  };
+
+  window.cannonBindPasskeyMFA = function (btn, errorID) {
+    if (!btn || btn.dataset.passkeyBound === '1') return;
+    btn.dataset.passkeyBound = '1';
+    btn.addEventListener('click', function () {
+      cannonPasskeyAuth(btn.dataset.begin, btn.dataset.finish, errorID || 'mfa-passkey-error', btn.dataset.csrf);
+    });
+  };
 })();

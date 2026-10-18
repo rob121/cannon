@@ -155,8 +155,8 @@ func UpdateCredentialSignCount(ctx context.Context, userID uint, cred webauthn.C
 }
 
 // BeginRegistration starts passkey enrollment for a signed-in user.
-func BeginRegistration(ctx context.Context, svc *user.Service, userID uint) (map[string]any, error) {
-	wa, err := WebAuthnInstance(ctx)
+func BeginRegistration(ctx context.Context, svc *user.Service, userID uint, r *http.Request) (map[string]any, error) {
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func BeginRegistration(ctx context.Context, svc *user.Service, userID uint) (map
 
 // FinishRegistration completes passkey enrollment.
 func FinishRegistration(ctx context.Context, svc *user.Service, userID uint, name string, r *http.Request) error {
-	wa, err := WebAuthnInstance(ctx)
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -203,8 +203,8 @@ func FinishRegistration(ctx context.Context, svc *user.Service, userID uint, nam
 }
 
 // BeginLoginAssertion starts MFA passkey assertion for a pending user.
-func BeginLoginAssertion(ctx context.Context, svc *user.Service, userID uint) (map[string]any, error) {
-	wa, err := WebAuthnInstance(ctx)
+func BeginLoginAssertion(ctx context.Context, svc *user.Service, userID uint, r *http.Request) (map[string]any, error) {
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -226,8 +226,8 @@ func BeginLoginAssertion(ctx context.Context, svc *user.Service, userID uint) (m
 }
 
 // BeginDiscoverableLogin starts passwordless passkey sign-in.
-func BeginDiscoverableLogin(ctx context.Context, svc *user.Service) (map[string]any, error) {
-	wa, err := WebAuthnInstance(ctx)
+func BeginDiscoverableLogin(ctx context.Context, svc *user.Service, r *http.Request) (map[string]any, error) {
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func BeginDiscoverableLogin(ctx context.Context, svc *user.Service) (map[string]
 
 // FinishLoginAssertion completes passkey MFA for a known user.
 func FinishLoginAssertion(ctx context.Context, svc *user.Service, userID uint, r *http.Request) error {
-	wa, err := WebAuthnInstance(ctx)
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ func FinishLoginAssertion(ctx context.Context, svc *user.Service, userID uint, r
 
 // FinishDiscoverableLogin completes passwordless passkey sign-in and returns the user id.
 func FinishDiscoverableLogin(ctx context.Context, svc *user.Service, r *http.Request) (uint, error) {
-	wa, err := WebAuthnInstance(ctx)
+	wa, err := WebAuthnInstance(ctx, r)
 	if err != nil {
 		return 0, err
 	}

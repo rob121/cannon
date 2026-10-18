@@ -51,11 +51,9 @@
 </div>
 {{end}}
 {{if .PasskeysEnabled}}
-<script src="/theme/site-mfa.js?v=2"></script>
+<script src="/theme/site-mfa.js?v=3"></script>
 <script>
-document.getElementById('login-passkey-btn')?.addEventListener('click', function () {
-  cannonPasskeyAuth(this.dataset.begin, this.dataset.finish, 'login-passkey-error', this.dataset.csrf);
-});
+cannonBindPasskeyAuth(document.getElementById('login-passkey-btn'), 'login-passkey-error');
 </script>
 {{end}}
 {{end}}
