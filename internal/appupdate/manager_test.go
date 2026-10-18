@@ -39,7 +39,7 @@ func TestCheckStoresLatestVersion(t *testing.T) {
 	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}}
 	mgr := New(cfg)
 	mgr.client.HTTP = server.Client()
-	mgr.binaryPath = filepath.Join(root, "cannon")
+	mgr.SetBinaryPath(filepath.Join(root, "cannon"))
 
 	if err := mgr.Check(); err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestApplyStagesLatestWithoutReplacingLive(t *testing.T) {
 	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}}
 	mgr := New(cfg)
 	mgr.client.HTTP = server.Client()
-	mgr.binaryPath = target
+	mgr.SetBinaryPath(target)
 
 	if err := mgr.Apply(); err != nil {
 		t.Fatal(err)
@@ -171,7 +171,7 @@ func TestRollbackFlipsPrevious(t *testing.T) {
 	}
 	cfg := &config.App{DataRoot: root}
 	mgr := New(cfg)
-	mgr.binaryPath = target
+	mgr.SetBinaryPath(target)
 	if err := mgr.Rollback(); err != nil {
 		t.Fatal(err)
 	}

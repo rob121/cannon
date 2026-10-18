@@ -79,14 +79,15 @@ func clearStagedState(statePath string) error {
 
 // Rollback swaps the live binary with {binary}.previous.
 func (m *Manager) Rollback() error {
-	path := m.binaryPath
+	path := m.refreshBinaryPath()
 	if path == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}
-	prev := previousPath(path)
-	if !fileExists(prev) {
-		return fmt.Errorf("no previous binary available to roll back to")
+	prev, ok := findSibling(path, ".previous")
+	if !ok {
+		return fmt.Errorf("no previous binary available to roll back to (looked beside %s)", path)
 	}
+	// Use the live path's directory for the demoted binary name.
 	staging := latestPath(path)
 	tmp := path + ".rollback-tmp"
 	_ = os.Remove(tmp)
@@ -118,13 +119,13 @@ func (m *Manager) Rollback() error {
 
 // DiscardStaged removes a pending {binary}.latest without applying it.
 func (m *Manager) DiscardStaged() error {
-	path := m.binaryPath
+	path := m.refreshBinaryPath()
 	if path == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}
-	latest := latestPath(path)
-	if !fileExists(latest) {
-		return fmt.Errorf("no staged update to discard")
+	latest, ok := findSibling(path, ".latest")
+	if !ok {
+		return fmt.Errorf("no staged update to discard (looked beside %s)", path)
 	}
 	if err := os.Remove(latest); err != nil {
 		return err

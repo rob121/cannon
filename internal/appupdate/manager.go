@@ -61,11 +61,12 @@ type Status struct {
 
 // Manager checks for and applies Cannon binary updates.
 type Manager struct {
-	cfg        *config.App
-	statePath  string
-	binaryPath string
-	client     *updater.Client
-	checkOnce  sync.Once
+	cfg             *config.App
+	statePath       string
+	binaryPath      string
+	fixedBinaryPath bool // when true, tests pinned binaryPath; do not re-resolve
+	client          *updater.Client
+	checkOnce       sync.Once
 }
 
 // New creates an update manager for the running Cannon process.
@@ -142,15 +143,31 @@ func (m *Manager) UpdateURLBase() string {
 
 // BinaryPath returns the path to the running executable.
 func (m *Manager) BinaryPath() string {
+	return m.refreshBinaryPath()
+}
+
+func (m *Manager) refreshBinaryPath() string {
+	if m.fixedBinaryPath && strings.TrimSpace(m.binaryPath) != "" {
+		return m.binaryPath
+	}
+	if path, err := resolveBinaryPath(""); err == nil && path != "" {
+		m.binaryPath = path
+	}
 	return m.binaryPath
+}
+
+// SetBinaryPath pins the executable path (used in tests).
+func (m *Manager) SetBinaryPath(path string) {
+	m.binaryPath = filepath.Clean(path)
+	m.fixedBinaryPath = true
 }
 
 // Status returns combined state + disk sibling presence for the admin UI.
 func (m *Manager) Status() Status {
 	state, _ := m.LoadState()
-	path := m.binaryPath
-	hasStaged := path != "" && fileExists(latestPath(path))
-	hasPrevious := path != "" && fileExists(previousPath(path))
+	path := m.refreshBinaryPath()
+	latest, hasStaged := findSibling(path, ".latest")
+	previous, hasPrevious := findSibling(path, ".previous")
 	stagedVersion := state.StagedVersion
 	if hasStaged && stagedVersion == "" {
 		stagedVersion = state.LatestVersion
@@ -158,8 +175,8 @@ func (m *Manager) Status() Status {
 	return Status{
 		State:          state,
 		BinaryPath:     path,
-		LatestPath:     latestPath(path),
-		PreviousPath:   previousPath(path),
+		LatestPath:     latest,
+		PreviousPath:   previous,
 		HasStaged:      hasStaged,
 		HasPrevious:    hasPrevious,
 		StagedVersion:  stagedVersion,
@@ -214,7 +231,7 @@ func (m *Manager) Apply() error {
 	if assetURL == "" {
 		return fmt.Errorf("update asset URL is unavailable")
 	}
-	target := m.binaryPath
+	target := m.refreshBinaryPath()
 	if target == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}

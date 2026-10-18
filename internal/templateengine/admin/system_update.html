@@ -48,14 +48,23 @@
         {{end}}
       </dd>
       {{end}}
-      {{if .HasStaged}}
       <dt>Staged file</dt>
-      <dd><code class="admin-code">{{.LatestPath}}</code>{{if .StagedVersion}} ({{.StagedVersion}}){{end}}</dd>
-      {{end}}
-      {{if .HasPrevious}}
+      <dd>
+        {{if .HasStaged}}
+        <code class="admin-code">{{.LatestPath}}</code>{{if .StagedVersion}} ({{.StagedVersion}}){{end}}
+        {{else}}
+        <span class="admin-capability-none">None</span>
+        {{end}}
+      </dd>
       <dt>Previous binary</dt>
-      <dd><code class="admin-code">{{.PreviousPath}}</code></dd>
-      {{end}}
+      <dd>
+        {{if .HasPrevious}}
+        <code class="admin-code">{{.PreviousPath}}</code>
+        {{else}}
+        <span class="admin-capability-none">None</span>
+        <span class="admin-cell-muted"> (Rollback appears when <code class="admin-code">{{.BinaryPath}}.previous</code> exists)</span>
+        {{end}}
+      </dd>
       {{if .State.UpdateCheckedAt}}
       <dt>Last checked</dt>
       <dd>{{.State.UpdateCheckedAt.Format "Jan 2, 2006 3:04 PM"}}</dd>

@@ -33,6 +33,39 @@ func previousPath(binaryPath string) string {
 }
 
 func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// binaryPathCandidates returns paths to check for siblings (raw + symlink target).
+func binaryPathCandidates(binaryPath string) []string {
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(p string) {
+		p = filepath.Clean(strings.TrimSpace(p))
+		if p == "" || p == "." {
+			return
+		}
+		if _, ok := seen[p]; ok {
+			return
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	add(binaryPath)
+	if resolved, err := filepath.EvalSymlinks(binaryPath); err == nil {
+		add(resolved)
+	}
+	return out
+}
+
+// findSibling returns the first existing {base}{suffix} beside a candidate binary path.
+func findSibling(binaryPath, suffix string) (string, bool) {
+	for _, base := range binaryPathCandidates(binaryPath) {
+		p := siblingPath(base, suffix)
+		if fileExists(p) {
+			return p, true
+		}
+	}
+	return siblingPath(binaryPath, suffix), false
 }
