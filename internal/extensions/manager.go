@@ -349,12 +349,13 @@ func (m *Manager) applyCachedMeta(ctx context.Context, row *models.Extension, me
 	if v := strings.TrimSpace(meta.UpdateURLBase); v != strings.TrimSpace(row.UpdateURLBase) {
 		updates["update_url_base"] = v
 		row.UpdateURLBase = v
+		// Clear stale check failures when the update source moves (or is removed).
+		updates["update_error"] = ""
 		if v == "" {
 			updates["update_available"] = false
 			updates["latest_version"] = ""
 			updates["update_asset_url"] = ""
 			updates["update_asset_sha256"] = ""
-			updates["update_error"] = ""
 		}
 	}
 	if len(updates) == 0 {

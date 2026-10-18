@@ -93,15 +93,9 @@ func parseBinaryMetaOutput(raw string) (BinaryMeta, error) {
 	return meta, nil
 }
 
-func extensionNeedsBinaryMeta(row models.Extension) bool {
-	return strings.TrimSpace(row.Title) == "" ||
-		strings.TrimSpace(row.Description) == "" ||
-		strings.TrimSpace(row.Version) == "" ||
-		strings.TrimSpace(row.UpdateURLBase) == "" ||
-		strings.TrimSpace(row.MenuName) == ""
-}
-
-// enrichBinaryMeta fills missing registry fields by probing binaries with --data=all.
+// enrichBinaryMeta syncs registry fields from each on-disk binary via --data=all.
+// Always probe when the binary exists so relocated updateURLBase values and version
+// bumps overwrite stale registry rows (missing-only sync left wrong URLs stuck).
 func (m *Manager) enrichBinaryMeta(ctx context.Context, db *gorm.DB) error {
 	var rows []models.Extension
 	if err := db.Find(&rows).Error; err != nil {
@@ -109,9 +103,6 @@ func (m *Manager) enrichBinaryMeta(ctx context.Context, db *gorm.DB) error {
 	}
 	for i := range rows {
 		row := &rows[i]
-		if !extensionNeedsBinaryMeta(*row) {
-			continue
-		}
 		if _, err := os.Stat(m.binaryPath(row.Name)); err != nil {
 			continue
 		}
