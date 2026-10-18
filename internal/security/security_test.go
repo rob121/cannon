@@ -13,13 +13,16 @@ import (
 
 func testContext(t *testing.T) (context.Context, *gorm.DB) {
 	t.Helper()
+	// Unique site ID per test: permission cache is process-global and keyed by
+	// site+user, so a shared ID lets user_id=1 from an earlier test pollute later ones.
 	site := &config.SiteConfig{
-		ID: "sec-test",
+		ID: t.Name(),
 		Database: config.DatabaseConfig{
 			Type: "sqlite",
 			DSN:  t.TempDir() + "/site.db",
 		},
 	}
+	InvalidateSite(site.ID)
 	db, err := database.Connect(site)
 	if err != nil {
 		t.Fatal(err)
