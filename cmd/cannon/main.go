@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/rob121/cannon/internal/appupdate"
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/server"
 	"github.com/rob121/cannon/internal/version"
@@ -30,6 +31,10 @@ func main() {
 	cfg, cfgPath, err := config.Load()
 	if err != nil {
 		log.Fatalf("load config: %v", err)
+	}
+
+	if err := appupdate.ApplyPendingAtStartup(cfg.DataRoot); err != nil {
+		log.Fatalf("apply pending update: %v", err)
 	}
 
 	mode := "application"

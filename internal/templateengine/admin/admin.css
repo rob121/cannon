@@ -3646,6 +3646,12 @@ select.admin-form-control {
   color: var(--admin-success);
 }
 
+.admin-alert-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
 .admin-empty {
   padding: 3rem 1rem;
   text-align: center;

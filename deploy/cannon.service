@@ -14,10 +14,14 @@ Type=simple
 Environment=CANNON_CONFIG=/etc/cannon/sites.json
 WorkingDirectory=/opt
 
+# Binary install location; adjust if you keep the binary elsewhere.
+# Self-update stages siblings beside this path: cannon.latest and cannon.previous.
 ExecStart=/usr/local/bin/cannon --port 8001
 ExecReload=/bin/kill -HUP $MAINPID
 
-Restart=on-failure
+# always: required so admin Apply/Rollback can exit(0) and systemd brings Cannon back.
+# on-failure would leave the service stopped after a successful staged update.
+Restart=always
 RestartSec=5
 TimeoutStopSec=30
 KillMode=mixed
@@ -26,9 +30,9 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# Cover every writable path from sites.json (data_root, extensions, sockets, site DBs).
-# Logs showed /opt/cannon/sockets — without it, ProtectSystem=strict blocks bind and extensions auto-disable.
-ReadWritePaths=/opt/ranger-sites-data /opt/cannon /etc/cannon
+# Cover every writable path from sites.json (data_root, extensions, sockets, site DBs)
+# plus the binary directory so cannon.latest / cannon.previous can be written.
+ReadWritePaths=/opt/ranger-sites-data /opt/cannon /etc/cannon /usr/local/bin
 CapabilityBoundingSet=
 AmbientCapabilities=
 LockPersonality=true

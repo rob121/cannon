@@ -3,6 +3,7 @@ package appupdate
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,14 +17,21 @@ import (
 )
 
 const (
-	binaryName         = "cannon"
-	manifestName       = "cannon.json"
-	defaultUpdateBase  = "https://github.com/rob121/cannon/releases/download"
+	binaryName          = "cannon"
+	manifestName        = "cannon.json"
+	defaultUpdateBase   = "https://github.com/rob121/cannon/releases/download"
 	updateCheckInterval = 6 * time.Hour
-	stateFileName      = "cannon-update-state.json"
+	stateFileName       = "cannon-update-state.json"
+	restartDelay        = 1500 * time.Millisecond
 )
 
-// State tracks remote update metadata for the Cannon binary.
+// exitAfterRestart is overridden in tests.
+var exitAfterRestart = func() {
+	time.Sleep(restartDelay)
+	os.Exit(0)
+}
+
+// State tracks remote update metadata and staged/rollback status.
 type State struct {
 	LatestVersion     string     `json:"latest_version"`
 	UpdateAvailable   bool       `json:"update_available"`
@@ -32,6 +40,23 @@ type State struct {
 	UpdateCheckedAt   *time.Time `json:"update_checked_at"`
 	UpdateError       string     `json:"update_error"`
 	RestartRequired   bool       `json:"restart_required"`
+	StagedVersion     string     `json:"staged_version"`
+	StagedSHA256      string     `json:"staged_sha256"`
+	StagedAt          *time.Time `json:"staged_at"`
+	LastRolledBackAt  *time.Time `json:"last_rolled_back_at"`
+}
+
+// Status is UI-facing update status combining state file and disk siblings.
+type Status struct {
+	State          State
+	BinaryPath     string
+	LatestPath     string
+	PreviousPath   string
+	HasStaged      bool
+	HasPrevious    bool
+	StagedVersion  string
+	CurrentVersion string
+	Commit         string
 }
 
 // Manager checks for and applies Cannon binary updates.
@@ -56,7 +81,7 @@ func New(cfg *config.App) *Manager {
 			Manifest: manifestName,
 		},
 	}
-	m.binaryPath, _ = os.Executable()
+	m.binaryPath, _ = resolveBinaryPath("")
 	return m
 }
 
@@ -120,6 +145,29 @@ func (m *Manager) BinaryPath() string {
 	return m.binaryPath
 }
 
+// Status returns combined state + disk sibling presence for the admin UI.
+func (m *Manager) Status() Status {
+	state, _ := m.LoadState()
+	path := m.binaryPath
+	hasStaged := path != "" && fileExists(latestPath(path))
+	hasPrevious := path != "" && fileExists(previousPath(path))
+	stagedVersion := state.StagedVersion
+	if hasStaged && stagedVersion == "" {
+		stagedVersion = state.LatestVersion
+	}
+	return Status{
+		State:          state,
+		BinaryPath:     path,
+		LatestPath:     latestPath(path),
+		PreviousPath:   previousPath(path),
+		HasStaged:      hasStaged,
+		HasPrevious:    hasPrevious,
+		StagedVersion:  stagedVersion,
+		CurrentVersion: m.CurrentVersion(),
+		Commit:         version.Commit,
+	}
+}
+
 // Check fetches the latest release metadata and updates local state.
 func (m *Manager) Check() error {
 	now := time.Now()
@@ -128,6 +176,7 @@ func (m *Manager) Check() error {
 	state.UpdateCheckedAt = &now
 	if err != nil {
 		state.UpdateError = err.Error()
+		log.Printf("appupdate: check failed: %v", err)
 		return m.SaveState(state)
 	}
 	available := updater.NewerVersion(info.Version, m.CurrentVersion())
@@ -139,11 +188,14 @@ func (m *Manager) Check() error {
 	if available {
 		state.UpdateAssetURL = info.URL
 		state.UpdateAssetSHA256 = info.SHA256
+		log.Printf("appupdate: update available %s -> %s", m.CurrentVersion(), info.Version)
+	} else {
+		log.Printf("appupdate: up to date (%s)", m.CurrentVersion())
 	}
 	return m.SaveState(state)
 }
 
-// Apply downloads and installs the pending update binary.
+// Apply downloads the pending update into {binary}.latest (does not replace the running binary).
 func (m *Manager) Apply() error {
 	if err := m.Check(); err != nil {
 		return err
@@ -166,7 +218,10 @@ func (m *Manager) Apply() error {
 	if target == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}
-	tmp, err := updater.Download(m.client.HTTP, assetURL, target)
+	staged := latestPath(target)
+	log.Printf("appupdate: staging %s -> %s", assetURL, staged)
+
+	tmp, err := updater.Download(m.client.HTTP, assetURL, staged)
 	if err != nil {
 		return err
 	}
@@ -176,13 +231,25 @@ func (m *Manager) Apply() error {
 			return err
 		}
 	}
-	if err := os.Rename(tmp, target); err != nil {
+	_ = os.Remove(staged)
+	if err := os.Rename(tmp, staged); err != nil {
+		return fmt.Errorf("stage update binary: %w", err)
+	}
+	now := time.Now()
+	state.StagedVersion = state.LatestVersion
+	state.StagedSHA256 = state.UpdateAssetSHA256
+	state.StagedAt = &now
+	state.RestartRequired = true
+	state.UpdateError = ""
+	if err := m.SaveState(state); err != nil {
 		return err
 	}
-	state.UpdateAvailable = false
-	state.UpdateAssetURL = ""
-	state.UpdateAssetSHA256 = ""
-	state.UpdateError = ""
-	state.RestartRequired = true
-	return m.SaveState(state)
+	log.Printf("appupdate: staged %s at %s (restart to apply)", state.StagedVersion, staged)
+	return nil
+}
+
+// ScheduleRestart exits the process after a short delay so systemd can restart it.
+func (m *Manager) ScheduleRestart() {
+	log.Printf("appupdate: scheduling process exit for systemd restart")
+	go exitAfterRestart()
 }

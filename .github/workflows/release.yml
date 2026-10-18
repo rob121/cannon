@@ -61,6 +61,17 @@ jobs:
           echo "Resolved VERSION=$v"
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
+      - name: Refuse overwrite of existing release
+        env:
+          VERSION: ${{ steps.resolve.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists. Bump ReleaseVersion in internal/version/version.go (or use a new tag) instead of overwriting." >&2
+            exit 1
+          fi
+
   build:
     name: Build ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -167,4 +178,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          overwrite_files: false
+          generate_release_notes: true
           files: upload/*

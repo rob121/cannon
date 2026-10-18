@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/version"
@@ -55,7 +56,7 @@ func TestCheckStoresLatestVersion(t *testing.T) {
 	}
 }
 
-func TestApplyDownloadsAndReplacesBinary(t *testing.T) {
+func TestApplyStagesLatestWithoutReplacingLive(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "cannon")
 	if err := os.WriteFile(target, []byte("old-binary"), 0755); err != nil {
@@ -103,18 +104,95 @@ func TestApplyDownloadsAndReplacesBinary(t *testing.T) {
 	if !downloaded {
 		t.Fatal("expected update binary download")
 	}
-	raw, err := os.ReadFile(target)
+	live, err := os.ReadFile(target)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(raw) != "#!/bin/sh\necho new\n" {
-		t.Fatalf("binary = %q", string(raw))
+	if string(live) != "old-binary" {
+		t.Fatalf("live binary changed before restart: %q", string(live))
+	}
+	staged, err := os.ReadFile(latestPath(target))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(staged) != "#!/bin/sh\necho new\n" {
+		t.Fatalf("staged = %q", string(staged))
 	}
 	state, err := mgr.LoadState()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.UpdateAvailable || !state.RestartRequired {
+	if !state.RestartRequired || state.StagedVersion != "v1.0.0" {
 		t.Fatalf("state = %+v", state)
+	}
+}
+
+func TestApplyPendingSwapsLatestAndKeepsPrevious(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "cannon")
+	latest := latestPath(target)
+	if err := os.WriteFile(target, []byte("old-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(latest, []byte("new-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyPending(target); err != nil {
+		t.Fatal(err)
+	}
+	live, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(live) != "new-binary" {
+		t.Fatalf("live = %q", string(live))
+	}
+	prev, err := os.ReadFile(previousPath(target))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(prev) != "old-binary" {
+		t.Fatalf("previous = %q", string(prev))
+	}
+	if fileExists(latest) {
+		t.Fatal("expected .latest removed after apply")
+	}
+}
+
+func TestRollbackFlipsPrevious(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "cannon")
+	prev := previousPath(target)
+	if err := os.WriteFile(target, []byte("new-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(prev, []byte("old-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.App{DataRoot: root}
+	mgr := New(cfg)
+	mgr.binaryPath = target
+	if err := mgr.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	live, _ := os.ReadFile(target)
+	demoted, _ := os.ReadFile(prev)
+	if string(live) != "old-binary" || string(demoted) != "new-binary" {
+		t.Fatalf("live=%q previous=%q", live, demoted)
+	}
+}
+
+func TestScheduleRestartCallsExitHook(t *testing.T) {
+	done := make(chan struct{}, 1)
+	prev := exitAfterRestart
+	exitAfterRestart = func() { done <- struct{}{} }
+	defer func() { exitAfterRestart = prev }()
+
+	mgr := New(&config.App{DataRoot: t.TempDir()})
+	mgr.ScheduleRestart()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected exit hook")
 	}
 }
