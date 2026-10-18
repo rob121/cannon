@@ -1362,8 +1362,14 @@
         flash.innerHTML = '';
         return;
       }
-      var cls = kind === 'error' ? 'admin-alert-error' : 'admin-alert-success';
-      flash.innerHTML = '<div class="admin-alert ' + cls + '" role="status">' + escapeHTML(text) + '</div>';
+      var isError = kind === 'error';
+      var cls = isError ? 'admin-alert-error' : 'admin-alert-success';
+      var icon = isError ? 'bi-exclamation-triangle' : 'bi-check-circle';
+      flash.innerHTML =
+        '<div class="admin-alert ' + cls + '" role="' + (isError ? 'alert' : 'status') + '">' +
+          '<i class="bi ' + icon + '" aria-hidden="true"></i> ' +
+          escapeHTML(text) +
+        '</div>';
     }
 
     function escapeHTML(value) {
@@ -1450,35 +1456,70 @@
       }
 
       var latest = status.latest_version || '';
+      var available = !!(status.update_available && !status.has_staged);
+      var upToDate = !!(latest && !status.update_available && !status.has_staged);
       setHidden('[data-latest-row]', !latest);
+      setText('[data-field="latest_version"]', latest);
+
+      var stateBadge = root.querySelector('[data-field="status_badge"]');
+      if (stateBadge) {
+        stateBadge.classList.remove('is-current', 'is-available', 'is-staged');
+        if (status.has_staged) {
+          stateBadge.classList.add('is-staged');
+          stateBadge.textContent = 'Staged';
+        } else if (available) {
+          stateBadge.classList.add('is-available');
+          stateBadge.textContent = 'Update available';
+        } else if (upToDate) {
+          stateBadge.classList.add('is-current');
+          stateBadge.textContent = 'Up to date';
+        } else {
+          stateBadge.textContent = 'Not checked';
+        }
+      }
+
       var badge = root.querySelector('[data-field="latest_badge"]');
       if (badge) {
         badge.classList.toggle('admin-badge-warning', !!status.update_available);
         badge.classList.toggle('admin-badge-success', !status.update_available);
-        badge.textContent = status.update_available
-          ? ('New version ' + latest)
-          : ('Up to date (' + latest + ')');
+        badge.textContent = status.update_available ? 'New' : 'Current';
       }
       setText('[data-field="apply_version"]', latest);
 
+      var stagedTile = root.querySelector('[data-file-staged]');
+      if (stagedTile) {
+        stagedTile.classList.toggle('is-present', !!status.has_staged);
+        stagedTile.classList.toggle('is-empty', !status.has_staged);
+      }
+      var stagedPill = root.querySelector('[data-field="staged_pill"]');
+      if (stagedPill) {
+        stagedPill.textContent = status.has_staged ? 'Ready' : 'None';
+      }
       var stagedEl = root.querySelector('[data-field="staged_file"]');
       if (stagedEl) {
         if (status.has_staged) {
           stagedEl.innerHTML = '<code class="admin-code">' + escapeHTML(status.latest_path) + '</code>' +
-            (status.staged_version ? ' (' + escapeHTML(status.staged_version) + ')' : '');
+            (status.staged_version ? ' <span class="admin-cell-muted">(' + escapeHTML(status.staged_version) + ')</span>' : '');
         } else {
-          stagedEl.innerHTML = '<span class="admin-capability-none">None</span>';
+          stagedEl.innerHTML = '<span class="admin-capability-none">No staged update</span>';
         }
       }
 
+      var prevTile = root.querySelector('[data-file-previous]');
+      if (prevTile) {
+        prevTile.classList.toggle('is-present', !!status.has_previous);
+        prevTile.classList.toggle('is-empty', !status.has_previous);
+      }
+      var prevPill = root.querySelector('[data-field="previous_pill"]');
+      if (prevPill) {
+        prevPill.textContent = status.has_previous ? 'Available' : 'None';
+      }
       var prevEl = root.querySelector('[data-field="previous_file"]');
       if (prevEl) {
         if (status.has_previous) {
           prevEl.innerHTML = '<code class="admin-code">' + escapeHTML(status.previous_path) + '</code>';
         } else {
-          prevEl.innerHTML = '<span class="admin-capability-none">None</span>' +
-            ' <span class="admin-cell-muted"> (Rollback appears when <code class="admin-code">' +
-            escapeHTML(status.binary_path) + '.previous</code> exists)</span>';
+          prevEl.innerHTML = '<span class="admin-capability-none">No rollback binary</span>';
         }
       }
 
@@ -1497,7 +1538,7 @@
 
       var applyForm = root.querySelector('[data-action-kind="apply"]');
       if (applyForm) {
-        applyForm.hidden = !(status.update_available && !status.has_staged);
+        applyForm.hidden = !available;
         applyForm.setAttribute(
           'data-confirm',
           'Download Cannon ' + latest + ' to cannon.latest and restart so it can be applied?'
