@@ -4,15 +4,36 @@ Cannon extensions are separate processes that communicate with the CMS over HTTP
 
 The `github.com/rob121/cannon/extension` package handles socket setup, built-in endpoints, and capability registration so you can focus on your extension logic.
 
+## CLI metadata (`--data`)
+
+Before site/socket checks, any extension that calls `Server.Run()` answers metadata queries from the `extension.Info` values (normally the `extensionName` / `extensionVersion` / … constants in `main.go`):
+
+```bash
+./cannon-ext-gdrive-gallery --data=extensionName
+# cannon-ext-gdrive-gallery
+
+./cannon-ext-gdrive-gallery --data=extensionVersion
+# 0.1.4
+
+./cannon-ext-gdrive-gallery --data=all
+# defaultAdminMenu=…
+# extensionDescription=…
+# extensionName=…
+# …
+```
+
+Supported keys: `extensionName`, `extensionTitle`, `extensionDescription`, `extensionVersion`, `updateURLBase`, `defaultAdminMenu` (plus short aliases like `name` / `version`). Use `--data=all` or `--data=list` to print every key. No `--site` or `--socket` is required for this path.
+
 ## How Cannon uses extensions
 
 1. Cannon discovers binaries in the configured extensions directory and records them in the database.
-2. On bootstrap, Cannon starts each active extension with `--site` and `--socket`, and sets `CANNON_CONFIG` to the path of `sites.json`.
-3. Cannon calls `GET /capabilities` to learn what the extension supports (request middleware, page rendering, admin UI, help, etc.).
-4. On first start, if the extension is not marked installed, Cannon sends `POST /install` with a wire request payload.
-5. Cannon calls `GET /meta` to populate version and update information in the admin UI.
-6. During requests, Cannon POSTs JSON wire requests to capability handlers (for example `/page`, `/admin`, `/request`).
-7. Cannon periodically checks each cached `update_url_base` for newer extension releases and stores update state in the extension registry.
+2. For binaries that are not yet running (including pending install), Cannon probes `<binary> --data=all` to populate title, description, version, update URL, and default admin menu in the registry.
+3. On bootstrap, Cannon starts each active extension with `--site` and `--socket`, and sets `CANNON_CONFIG` to the path of `sites.json`.
+4. Cannon calls `GET /capabilities` to learn what the extension supports (request middleware, page rendering, admin UI, help, etc.).
+5. On first start, if the extension is not marked installed, Cannon sends `POST /install` with a wire request payload.
+6. Cannon calls `GET /meta` to refresh version and update information in the admin UI once the process is running.
+7. During requests, Cannon POSTs JSON wire requests to capability handlers (for example `/page`, `/admin`, `/request`).
+8. Cannon periodically checks each cached `update_url_base` for newer extension releases and stores update state in the extension registry.
 
 ## Required and built-in endpoints
 

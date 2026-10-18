@@ -79,6 +79,35 @@ func (m *Manager) CheckExtensionUpdate(ctx context.Context, row models.Extension
 	return db.Model(&models.Extension{}).Where("extension_id = ?", row.ExtensionID).Updates(updates).Error
 }
 
+// UpdateAllResult summarizes a bulk extension update run.
+type UpdateAllResult struct {
+	Updated int
+	Failed  int
+	Errors  []string
+}
+
+// UpdateAll downloads and installs updates for every extension flagged as out of date.
+func (m *Manager) UpdateAll(ctx context.Context) (UpdateAllResult, error) {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return UpdateAllResult{}, err
+	}
+	var rows []models.Extension
+	if err := db.Where("update_available = ?", true).Order("sort asc, extension_id asc").Find(&rows).Error; err != nil {
+		return UpdateAllResult{}, err
+	}
+	var result UpdateAllResult
+	for _, row := range rows {
+		if err := m.Update(ctx, row); err != nil {
+			result.Failed++
+			result.Errors = append(result.Errors, fmt.Sprintf("%s: %v", row.Name, err))
+			continue
+		}
+		result.Updated++
+	}
+	return result, nil
+}
+
 func (m *Manager) Update(ctx context.Context, row models.Extension) error {
 	db, err := sites.DB(ctx)
 	if err != nil {

@@ -110,6 +110,9 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 	if err := m.syncDirectory(db); err != nil {
 		return err
 	}
+	if err := m.enrichBinaryMeta(ctx, db); err != nil {
+		return err
+	}
 	if err := m.deactivateMissingBinaries(db); err != nil {
 		return err
 	}

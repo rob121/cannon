@@ -44,9 +44,16 @@
     <h1 class="admin-page-title">{{.Title}}</h1>
     {{if .Subtitle}}<p class="admin-page-desc">{{.Subtitle}}</p>{{end}}
   </div>
-  {{if or .PageActionURL .PageSecondaryActionURL}}
+  {{if or .PageActionURL .PageSecondaryActionURL .PageSecondaryActionPostURL}}
   <div class="admin-page-actions">
-    {{if .PageSecondaryActionURL}}
+    {{if .PageSecondaryActionPostURL}}
+    <form method="post" action="{{.PageSecondaryActionPostURL}}" class="admin-inline-form" data-turbo-frame="_top"{{if .PageSecondaryActionConfirm}} onsubmit="return confirm('{{.PageSecondaryActionConfirm}}')"{{end}}>
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline">
+        <i class="bi {{if .PageSecondaryActionIcon}}{{.PageSecondaryActionIcon}}{{else}}bi-cloud-arrow-down{{end}}"></i> {{.PageSecondaryActionLabel}}
+      </button>
+    </form>
+    {{else if .PageSecondaryActionURL}}
     <a class="btn-admin-outline" href="{{.PageSecondaryActionURL}}" data-turbo-frame="_top">
       <i class="bi {{if .PageSecondaryActionIcon}}{{.PageSecondaryActionIcon}}{{else}}bi-three-dots{{end}}"></i> {{.PageSecondaryActionLabel}}
     </a>

@@ -302,7 +302,12 @@ func (s *Server) Run() error {
 }
 
 // RunFromArgs parses --site= and --socket= from args and starts the server.
+// --data=KEY is handled first (no site/socket required) and prints metadata then returns.
 func (s *Server) RunFromArgs(args []string) error {
+	handled, err := WriteDataArg(s.info, args, os.Stdout)
+	if handled {
+		return err
+	}
 	flags, err := ParseFlags(args)
 	if err != nil {
 		return err

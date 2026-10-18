@@ -68,6 +68,8 @@ func (h *Handler) extensions(w http.ResponseWriter, r *http.Request, path string
 		h.extensionList(w, r)
 	case len(parts) == 1 && parts[0] == "new":
 		h.extensionNew(w, r)
+	case len(parts) == 1 && parts[0] == "update-all":
+		h.extensionUpdateAll(w, r)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.extensionDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "restart":
@@ -153,7 +155,31 @@ func (h *Handler) extensionList(w http.ResponseWriter, r *http.Request) {
 		listRows = append(listRows, item)
 	}
 	data["Rows"] = listRows
+
+	var outdated int64
+	_ = db.Model(&models.Extension{}).Where("update_available = ?", true).Count(&outdated).Error
+	if outdated > 0 {
+		data["PageSecondaryActionPostURL"] = extensionsBase + "/update-all"
+		data["PageSecondaryActionLabel"] = fmt.Sprintf("Update All (%d)", outdated)
+		data["PageSecondaryActionIcon"] = "bi-cloud-arrow-down"
+		data["PageSecondaryActionConfirm"] = "Update all outdated extension binaries from their configured update sources?"
+	}
+
 	h.render(w, r, "Extensions", "admin/extensions.html", data)
+}
+
+func (h *Handler) extensionUpdateAll(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	site, _ := sites.FromContext(r.Context())
+	extMgr := h.chain.Extensions(site)
+	if _, err := extMgr.UpdateAll(r.Context()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectList(w, r, extensionsListURL(r))
 }
 
 func (h *Handler) extensionNew(w http.ResponseWriter, r *http.Request) {

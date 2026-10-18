@@ -83,6 +83,9 @@ func (m *Manager) SaveBinary(ctx context.Context, opts SaveBinaryOptions) (model
 	if err := m.syncDirectory(db); err != nil {
 		return models.Extension{}, err
 	}
+	if err := m.enrichBinaryMeta(ctx, db); err != nil {
+		return models.Extension{}, err
+	}
 	var row models.Extension
 	if err := db.Where("name = ?", name).First(&row).Error; err != nil {
 		return models.Extension{}, err
