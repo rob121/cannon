@@ -1,0 +1,27 @@
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Review Queue</h2>
+      <p class="admin-form-card-desc">Items and comments waiting for moderation.</p>
+    </div>
+    <a class="btn-admin-ghost btn-admin-sm" href="/admin/review" data-turbo-frame="_top">Open review</a>
+  </div>
+  <div class="admin-form-card-body">
+    <div class="admin-dashboard-widget-stats mb-3">
+      <a class="admin-stat-badge admin-stat-badge-warning" href="/admin/review" data-turbo-frame="_top">{{if .PendingItemCount}}{{.PendingItemCount}}{{else}}0{{end}} pending items</a>
+      <a class="admin-stat-badge admin-stat-badge-neutral" href="/admin/comments" data-turbo-frame="_top">{{if .PendingCommentCount}}{{.PendingCommentCount}}{{else}}0{{end}} pending comments</a>
+    </div>
+    {{if .ReviewItems}}
+    <ul class="admin-dashboard-list list-unstyled mb-0">
+      {{range .ReviewItems}}
+      <li class="admin-dashboard-list-item">
+        <a href="/admin/items/{{.ItemID}}" data-turbo-frame="_top">{{.Title}}</a>
+        <code class="admin-code">{{.Slug}}</code>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-muted mb-0">Nothing waiting for review.</p>
+    {{end}}
+  </div>
+</div>

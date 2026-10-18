@@ -60,6 +60,7 @@ func (h *Handler) blocks(w http.ResponseWriter, r *http.Request, path string) {
 }
 
 func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
+	_ = blocks.EnsureAdminDashboardBlocks(r.Context())
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
 	spaceFilter := strings.TrimSpace(r.URL.Query().Get("space"))
@@ -79,26 +80,66 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 		"name": "blocks.name", "space": "blocks.space", "type": "blocks.type", "sort": "blocks.sort", "status": "blocks.status",
 	}, "sort")
 	sortParam := strings.TrimSpace(r.URL.Query().Get("sort"))
-	if sortParam == "" || sortParam == "sort" {
+	dirParam := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("dir")))
+	defaultSort := sortParam == "" || sortParam == "sort"
+	if defaultSort {
 		if spaceFilter != "" {
-			order = "block_spaces.sort ASC, blocks.block_id ASC"
+			if dirParam == "desc" {
+				order = "block_spaces.sort DESC, blocks.block_id DESC"
+			} else {
+				order = "block_spaces.sort ASC, blocks.block_id ASC"
+			}
 		} else {
-			order = "blocks.block_id ASC"
+			// Prefer denormalized sort; refine in-memory by primary space for stable row order.
+			if dirParam == "desc" {
+				order = "blocks.sort DESC, blocks.name ASC, blocks.block_id ASC"
+			} else {
+				order = "blocks.sort ASC, blocks.name ASC, blocks.block_id ASC"
+			}
+		}
+		data["Sort"] = "sort"
+		if dirParam != "desc" {
+			data["Dir"] = "asc"
 		}
 	}
 
 	var rows []models.Block
 	listQ := db.Model(&models.Block{}).Preload("Spaces")
+	pageSize := pageSizeFor(r)
 	if spaceFilter != "" {
-		listQ = listQ.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+		listQ.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
 			Where("block_spaces.space = ?", spaceFilter).
-			Select("blocks.*, block_spaces.sort AS sort")
+			Select("blocks.*, block_spaces.sort AS sort").
+			Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+	} else if defaultSort {
+		// Sort by primary space + membership sort across the full set, then page.
+		listQ.Order(order).Find(&rows)
+		sortBlocksByPrimarySpace(rows, dirParam == "desc")
+		for i := range rows {
+			rows[i].Sort = primarySpaceSort(rows[i])
+		}
+		start := (page - 1) * pageSize
+		if start >= len(rows) {
+			rows = nil
+		} else {
+			end := start + pageSize
+			if end > len(rows) {
+				end = len(rows)
+			}
+			rows = rows[start:end]
+		}
+	} else {
+		listQ.Offset((page - 1) * pageSize).Limit(pageSize).Order(order).Find(&rows)
+		for i := range rows {
+			rows[i].Sort = primarySpaceSort(rows[i])
+		}
 	}
-	listQ.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
-	position := map[uint]blockSortPosition{}
+	var position map[uint]blockSortPosition
 	if spaceFilter != "" {
 		position = blockSortPositions(db, spaceFilter)
+	} else {
+		position = blockSortPositionsByPrimarySpace(rows)
 	}
 
 	listRows := make([]blockListRow, 0, len(rows))
@@ -120,7 +161,7 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	data["SpaceFilter"] = spaceFilter
 	data["Spaces"] = spaces
 	data["ListQuery"] = listQueryFromData(data)
-	data["ReorderEnabled"] = spaceFilter != ""
+	data["ReorderEnabled"] = true
 	if spaceFilter != "" {
 		data["PageActionURL"] = blocksBase + "/new?space=" + url.QueryEscape(spaceFilter)
 	}
@@ -307,6 +348,7 @@ func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta bloc
 		templateDir = site.TemplateDir
 	}
 	frontendTheme, _ := settings.FrontendTheme(ctx)
+	adminTheme, _ := settings.AdminTheme(ctx)
 	wrapperTemplates, _ := blocks.ListWrapperTemplates(templateDir, frontendTheme)
 	if meta.TemplateWrapper != "" && !wrapperOptionContains(wrapperTemplates, meta.TemplateWrapper) {
 		wrapperTemplates = append(wrapperTemplates, blocks.WrapperOption{
@@ -317,7 +359,7 @@ func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta bloc
 	}
 	spaceNames := blocks.SpaceNames(row)
 	dbSpaces, _ := blocks.DistinctSpaces(db)
-	knownSpaces, _ := blocks.ListKnownSpaces(templateDir, frontendTheme, dbSpaces)
+	knownSpaces, _ := blocks.ListKnownSpaces(templateDir, frontendTheme, adminTheme, dbSpaces)
 	extSpaces := extensionBlockSpaces(extOptions, row.ExtensionName, row.ExtensionBlockID)
 	suggestedSpaces := knownSpaces
 	if len(extSpaces) > 0 {
@@ -428,6 +470,18 @@ func blockTypeLabel(row models.Block) string {
 		return "Search Horizontal"
 	case models.BlockTypeSearchVertical:
 		return "Search Vertical"
+	case models.BlockTypeAdminLiveAnalytics:
+		return "Admin · Live Analytics"
+	case models.BlockTypeAdminReviewQueue:
+		return "Admin · Review Queue"
+	case models.BlockTypeAdminUpdateCheck:
+		return "Admin · Update Check"
+	case models.BlockTypeAdminLatestSignups:
+		return "Admin · Latest Signups"
+	case models.BlockTypeAdminQuickStart:
+		return "Admin · Quick Start"
+	case models.BlockTypeAdminSystemReload:
+		return "Admin · System Reload"
 	default:
 		return string(row.Type)
 	}
@@ -457,6 +511,62 @@ func blockSortPositions(db *gorm.DB, spaceFilter string) map[uint]blockSortPosit
 	return out
 }
 
+// blockSortPositionsByPrimarySpace enables up/down within each primary-space group
+// on the unfiltered blocks list.
+func blockSortPositionsByPrimarySpace(rows []models.Block) map[uint]blockSortPosition {
+	grouped := map[string][]uint{}
+	order := make([]string, 0)
+	for _, row := range rows {
+		space := blocks.PrimarySpace(row)
+		if _, seen := grouped[space]; !seen {
+			order = append(order, space)
+		}
+		grouped[space] = append(grouped[space], row.BlockID)
+	}
+	out := make(map[uint]blockSortPosition, len(rows))
+	for _, space := range order {
+		ids := grouped[space]
+		last := len(ids) - 1
+		for i, id := range ids {
+			out[id] = blockSortPosition{
+				canMoveUp:   i > 0,
+				canMoveDown: i < last,
+			}
+		}
+	}
+	return out
+}
+
+func sortBlocksByPrimarySpace(rows []models.Block, desc bool) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		si, sj := blocks.PrimarySpace(rows[i]), blocks.PrimarySpace(rows[j])
+		if si != sj {
+			if desc {
+				return si > sj
+			}
+			return si < sj
+		}
+		oi, oj := primarySpaceSort(rows[i]), primarySpaceSort(rows[j])
+		if oi != oj {
+			if desc {
+				return oi > oj
+			}
+			return oi < oj
+		}
+		return rows[i].BlockID < rows[j].BlockID
+	})
+}
+
+func primarySpaceSort(row models.Block) int {
+	space := blocks.PrimarySpace(row)
+	for _, membership := range row.Spaces {
+		if membership.Space == space {
+			return membership.Sort
+		}
+	}
+	return row.Sort
+}
+
 func (h *Handler) blockMoveSort(w http.ResponseWriter, r *http.Request, idStr string, direction int) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -467,12 +577,20 @@ func (h *Handler) blockMoveSort(w http.ResponseWriter, r *http.Request, idStr st
 		h.notFound(w, r)
 		return
 	}
+	db, _ := sites.DB(r.Context())
 	spaceFilter := strings.TrimSpace(r.URL.Query().Get("space"))
 	if spaceFilter == "" {
-		http.Error(w, "space filter required for reorder", http.StatusBadRequest)
-		return
+		var row models.Block
+		if err := db.Preload("Spaces").First(&row, id).Error; err != nil {
+			h.notFound(w, r)
+			return
+		}
+		spaceFilter = blocks.PrimarySpace(row)
+		if spaceFilter == "" {
+			http.Error(w, "block has no space to reorder", http.StatusBadRequest)
+			return
+		}
 	}
-	db, _ := sites.DB(r.Context())
 	if err := blockReorder(db, id, spaceFilter, direction); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -509,11 +627,20 @@ func blockReorder(db *gorm.DB, id uint, space string, direction int) error {
 	}
 	all[idx], all[target] = all[target], all[idx]
 	for i, item := range all {
-		if item.Sort == i {
-			continue
+		if item.Sort != i {
+			if err := db.Model(&models.BlockSpace{}).Where("block_space_id = ?", item.BlockSpaceID).Update("sort", i).Error; err != nil {
+				return err
+			}
 		}
-		if err := db.Model(&models.BlockSpace{}).Where("block_space_id = ?", item.BlockSpaceID).Update("sort", i).Error; err != nil {
+		// Keep denormalized blocks.sort in sync for unfiltered list ordering.
+		var row models.Block
+		if err := db.Preload("Spaces").First(&row, item.BlockID).Error; err != nil {
 			return err
+		}
+		if blocks.PrimarySpace(row) == space && row.Sort != i {
+			if err := db.Model(&models.Block{}).Where("block_id = ?", item.BlockID).Update("sort", i).Error; err != nil {
+				return err
+			}
 		}
 	}
 	return nil

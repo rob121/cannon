@@ -11,22 +11,22 @@ import (
 
 // Metadata holds type-specific block configuration stored as JSON.
 type Metadata struct {
-	Content      string `json:"content,omitempty"`
-	FormID       int    `json:"form_id,omitempty"`
-	ContentMode  string `json:"content_mode,omitempty"`
-	Limit        int    `json:"limit,omitempty"`
-	CategorySlug string `json:"category_slug,omitempty"`
-	TagSlug      string `json:"tag_slug,omitempty"`
-	AuthorKey    string `json:"author_key,omitempty"`
-	ItemSlug     string `json:"item_slug,omitempty"`
-	Layout       string `json:"layout,omitempty"`
-	RouteMode        string     `json:"route_mode,omitempty"`
-	RouteIDs         []uint     `json:"route_ids,omitempty"`
-	TemplateWrapper  string     `json:"template_wrapper,omitempty"`
-	ShowName         bool       `json:"show_name,omitempty"`
-	PublishStart     *time.Time `json:"publish_start,omitempty"`
-	PublishEnd       *time.Time `json:"publish_end,omitempty"`
-	LoginTitle       string     `json:"login_title,omitempty"`
+	Content           string     `json:"content,omitempty"`
+	FormID            int        `json:"form_id,omitempty"`
+	ContentMode       string     `json:"content_mode,omitempty"`
+	Limit             int        `json:"limit,omitempty"`
+	CategorySlug      string     `json:"category_slug,omitempty"`
+	TagSlug           string     `json:"tag_slug,omitempty"`
+	AuthorKey         string     `json:"author_key,omitempty"`
+	ItemSlug          string     `json:"item_slug,omitempty"`
+	Layout            string     `json:"layout,omitempty"`
+	RouteMode         string     `json:"route_mode,omitempty"`
+	RouteIDs          []uint     `json:"route_ids,omitempty"`
+	TemplateWrapper   string     `json:"template_wrapper,omitempty"`
+	ShowName          bool       `json:"show_name,omitempty"`
+	PublishStart      *time.Time `json:"publish_start,omitempty"`
+	PublishEnd        *time.Time `json:"publish_end,omitempty"`
+	LoginTitle        string     `json:"login_title,omitempty"`
 	MenuName          string     `json:"menu_name,omitempty"`
 	MenuClass         string     `json:"menu_class,omitempty"`
 	SearchPlaceholder string     `json:"search_placeholder,omitempty"`
@@ -135,6 +135,9 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 		meta["search_button"] = strings.TrimSpace(values.Get("search_button"))
 		meta["search_label"] = strings.TrimSpace(values.Get("search_label"))
 		meta["search_class"] = strings.TrimSpace(values.Get("search_class"))
+	case "admin-live-analytics", "admin-review-queue", "admin-update-check",
+		"admin-latest-signups", "admin-quick-start", "admin-system-reload":
+		// Built-in admin dashboard cards; no type-specific fields.
 	case "extension":
 		for key, vals := range values {
 			if !strings.HasPrefix(key, "block_data_") || len(vals) == 0 {
@@ -160,6 +163,10 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 	}
 	applyCommonMeta(meta, values)
 	applyRouteMeta(meta, values)
+	if strings.HasPrefix(blockType, "admin-") {
+		meta["template_wrapper"] = PlainWrapperTemplate
+		meta["show_name"] = false
+	}
 	raw, err := json.Marshal(meta)
 	if err != nil {
 		return "", err

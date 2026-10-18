@@ -121,7 +121,7 @@
         "type": "boolean",
         "title": "Debug Template Spaces",
         "default": false,
-        "description": "When enabled, append ?tp=1 to a public URL to outline each {{space \"…\"}} region with a labeled border."
+        "description": "When enabled, append ?tp=1 to a public or admin URL to outline each {{space \"…\"}} region with a labeled border (including empty dashboard spaces)."
       },
       "frontend_theme": {
         "type": "string",

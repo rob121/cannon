@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/rob121/cannon/internal/auth"
 	"github.com/rob121/cannon/internal/auth/mfa"
+	"github.com/rob121/cannon/internal/blocks"
 	"github.com/rob121/cannon/internal/captcha"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers"
@@ -126,7 +128,51 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 		return nil, err
 	}
 	sel, _ := themes.SelectionFromContext(r.Context())
-	return templateengine.New(site, sel, nil, nil, templateengine.MergeFuncMaps(
+	ext := h.chain.Extensions(site)
+	debugSpaces := blocks.DebugSpacesActive(r.Context(), r)
+	renderCtx := blocks.WithAdminDashboard(r.Context(), &blocks.AdminDashboardContext{
+		Updates:  h.chain.AppUpdates(),
+		Hub:      h.realtime,
+		SiteName: adminSiteDisplayName(r, site),
+		SiteURL:  siteFrontendURL(site.Host),
+	})
+	var eng *templateengine.Engine
+	blockRenderer := func(name string) (template.HTML, error) {
+		// Re-check per call so Turbo/extension request rewrites still see ?tp=1.
+		debug := debugSpaces || blocks.DebugSpacesActive(renderCtx, r)
+		userCtx := map[string]any{"authenticated": true}
+		if svc, err := user.FromContext(renderCtx); err == nil {
+			if ctx, err := svc.Context(renderCtx); err == nil {
+				userCtx = ctx
+			}
+		}
+		var fragment blocks.FragmentRenderer
+		if eng != nil {
+			fragment = func(tmpl string, data map[string]any) (string, error) {
+				var buf bytes.Buffer
+				if err := eng.RenderFragment(&buf, tmpl, data); err != nil {
+					return "", err
+				}
+				return buf.String(), nil
+			}
+		}
+		html, err := blocks.RenderSpace(renderCtx, ext, name, r, userCtx, fragment)
+		if err != nil {
+			if debug {
+				// Admin rows outline via [data-space] CSS; keep the page usable.
+				return template.HTML(""), nil
+			}
+			return "", err
+		}
+		// Admin dashboard rows use data-space containers for ?tp=1 outlines so
+		// built-in cards sit inside the space region (not a nested slot).
+		return template.HTML(html), nil
+	}
+	blockLen := func(name string) (int, error) {
+		n, err := blocks.CountForSpace(renderCtx, ext, name)
+		return blocks.PreviewCount(n, err, name, debugSpaces || blocks.DebugSpacesActive(renderCtx, r))
+	}
+	eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
 		templateengine.CSRFFuncs(r),
 		lang.FuncMap(middleware.LocaleFromContext(r.Context()), lang.TranslationPreviewActive(r)),
 		template.FuncMap{
@@ -221,7 +267,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			"groupName":   GroupDisplayName,
 			"roleName":    RoleDisplayName,
 			"formatBytes": formatBytes,
-		})), nil
+		}))
+	return eng, nil
 }
 
 func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
@@ -231,6 +278,7 @@ func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
 	for k, v := range layoutContext(r) {
 		data[k] = v
 	}
+	data["DebugTemplateSpaces"] = blocks.DebugSpacesActive(r.Context(), r)
 	extNav := h.adminExtensionNav(r)
 	data["AdminExtensions"] = extNav
 	data["NavExtensionAppsVisible"] = len(extNav) > 0

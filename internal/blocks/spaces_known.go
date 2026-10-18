@@ -17,7 +17,10 @@ var (
 	spaceBackticked   = regexp.MustCompile("\\{\\{\\s*space\\s+`([^`]+)`\\s*\\}\\}")
 )
 
-var defaultKnownSpaces = []string{"header", "sidebar", "footer"}
+var defaultKnownSpaces = []string{
+	"header", "sidebar", "footer",
+	"admin-dashboard-top", "admin-dashboard-widgets", "admin-dashboard-main",
+}
 
 // ExtractSpacesFromSource returns literal {{space "name"}} / {{space `name`}} names from template source.
 func ExtractSpacesFromSource(src string) []string {
@@ -47,9 +50,10 @@ func ExtractSpacesFromSource(src string) []string {
 	return out
 }
 
-// ListKnownSpaces discovers space names from embedded + active theme templates,
-// merges default layout spaces and any extra names (e.g. DistinctSpaces from DB).
-func ListKnownSpaces(templateDir, frontendTheme string, extras ...[]string) ([]string, error) {
+// ListKnownSpaces discovers space names from embedded + active theme templates
+// (frontend and admin), merges default layout spaces and any extra names
+// (e.g. DistinctSpaces from DB).
+func ListKnownSpaces(templateDir, frontendTheme, adminTheme string, extras ...[]string) ([]string, error) {
 	seen := map[string]struct{}{}
 	out := make([]string, 0)
 
@@ -73,7 +77,7 @@ func ListKnownSpaces(templateDir, frontendTheme string, extras ...[]string) ([]s
 		return nil, err
 	}
 	for _, path := range builtins {
-		if !strings.HasPrefix(path, themes.BuiltinFrontend+"/") {
+		if !strings.HasPrefix(path, themes.BuiltinFrontend+"/") && !strings.HasPrefix(path, themes.BuiltinAdmin+"/") {
 			continue
 		}
 		raw, err := templateengine.ReadBuiltin(path)
@@ -85,11 +89,23 @@ func ListKnownSpaces(templateDir, frontendTheme string, extras ...[]string) ([]s
 		}
 	}
 
-	themesToScan := []string{themes.BuiltinFrontend}
 	frontendTheme = strings.TrimSpace(frontendTheme)
-	if frontendTheme != "" && frontendTheme != themes.BuiltinFrontend {
-		themesToScan = append(themesToScan, frontendTheme)
+	adminTheme = strings.TrimSpace(adminTheme)
+	themesToScan := []string{themes.BuiltinFrontend, themes.BuiltinAdmin}
+	addTheme := func(theme string) {
+		theme = strings.TrimSpace(theme)
+		if theme == "" {
+			return
+		}
+		for _, existing := range themesToScan {
+			if existing == theme {
+				return
+			}
+		}
+		themesToScan = append(themesToScan, theme)
 	}
+	addTheme(frontendTheme)
+	addTheme(adminTheme)
 	for _, theme := range themesToScan {
 		files, err := templatemgr.ListThemeFiles(templateDir, theme)
 		if err != nil {

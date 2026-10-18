@@ -254,11 +254,13 @@
       var isLogin = typeEl.value === 'login';
       var isMenu = typeEl.value === 'menu-vertical' || typeEl.value === 'menu-horizontal';
       var isSearch = typeEl.value === 'search-horizontal' || typeEl.value === 'search-vertical';
+      var isAdminDash = typeEl.value.indexOf('admin-') === 0;
       var contentEl = document.getElementById('block-fields-content');
       var loginEl = document.getElementById('block-fields-login');
       var menuEl = document.getElementById('block-fields-menu');
       var searchEl = document.getElementById('block-fields-search');
-      nativeEl.style.display = (isExtension || isContent || isLogin || isMenu || isSearch) ? 'none' : '';
+      var adminDashEl = document.getElementById('block-fields-admin-dashboard');
+      nativeEl.style.display = (isExtension || isContent || isLogin || isMenu || isSearch || isAdminDash) ? 'none' : '';
       if (contentEl) {
         contentEl.hidden = !isContent;
         contentEl.style.display = isContent ? '' : 'none';
@@ -278,6 +280,10 @@
         searchEl.hidden = !isSearch;
         searchEl.style.display = isSearch ? '' : 'none';
       }
+      if (adminDashEl) {
+        adminDashEl.hidden = !isAdminDash;
+        adminDashEl.style.display = isAdminDash ? '' : 'none';
+      }
       extEl.hidden = !isExtension;
       extEl.style.display = isExtension ? '' : 'none';
       syncBlockItems();
@@ -286,7 +292,7 @@
       if (contentTextarea) {
         contentTextarea.setAttribute('data-editor-mode', typeEl.value === 'markdown' ? 'markdown' : 'htmlmixed');
       }
-      var showNative = !(isExtension || isContent || isLogin || isMenu || isSearch);
+      var showNative = !(isExtension || isContent || isLogin || isMenu || isSearch || isAdminDash);
       if (showNative) {
         initTemplateEditors();
         syncBlockContentEditorMode();
@@ -1054,6 +1060,70 @@
     document.addEventListener('turbo:frame-load', finish);
   }
 
+  // Keep ?tp=1 across admin Turbo navigations so space outlines stay enabled.
+  function initPreserveTemplateSpaceDebug() {
+    if (document.body.dataset.tpPreserveBound) {
+      return;
+    }
+    document.body.dataset.tpPreserveBound = '1';
+
+    function wantsTP() {
+      return document.body.dataset.debugTemplateSpaces === '1' ||
+        new URLSearchParams(window.location.search).get('tp') === '1';
+    }
+
+    function withTP(href) {
+      try {
+        var url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) {
+          return href;
+        }
+        if (!url.pathname.startsWith('/admin')) {
+          return href;
+        }
+        if (url.searchParams.get('tp') === '1') {
+          return url.pathname + url.search + url.hash;
+        }
+        url.searchParams.set('tp', '1');
+        return url.pathname + url.search + url.hash;
+      } catch (e) {
+        return href;
+      }
+    }
+
+    document.addEventListener('click', function (event) {
+      if (!wantsTP()) {
+        return;
+      }
+      var link = event.target && event.target.closest ? event.target.closest('a[href]') : null;
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) {
+        return;
+      }
+      var raw = link.getAttribute('href');
+      if (!raw || raw.charAt(0) === '#') {
+        return;
+      }
+      var next = withTP(raw);
+      if (next !== raw) {
+        link.setAttribute('href', next);
+      }
+    }, true);
+
+    document.addEventListener('turbo:before-fetch-request', function (event) {
+      if (!wantsTP()) {
+        return;
+      }
+      try {
+        var url = new URL(event.detail.url.toString(), window.location.origin);
+        if (!url.pathname.startsWith('/admin') || url.searchParams.get('tp') === '1') {
+          return;
+        }
+        url.searchParams.set('tp', '1');
+        event.detail.url = url;
+      } catch (e) {}
+    });
+  }
+
   function initUserMenu() {
     if (document.body.dataset.userMenuBound) {
       return;
@@ -1370,6 +1440,7 @@
     initRealtimeAnalytics();
     initPermissionPicker();
     initTurboProgress();
+    initPreserveTemplateSpaceDebug();
     initUserMenu();
     initCommandPalette();
   }

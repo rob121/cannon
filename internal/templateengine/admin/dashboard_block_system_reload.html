@@ -1,0 +1,23 @@
+<div class="admin-form-card admin-dashboard-side">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">System</h2>
+      <p class="admin-form-card-desc">Refresh configuration after editing files on disk.</p>
+    </div>
+  </div>
+  <div class="admin-form-card-body admin-dashboard-system">
+    <div class="admin-dashboard-system-row">
+      <div class="admin-dashboard-system-icon" aria-hidden="true"><i class="bi bi-hdd-network"></i></div>
+      <div>
+        <div class="admin-dashboard-system-title">Reload Application</div>
+        <p class="admin-dashboard-system-desc">Applies changes to <code class="admin-code">sites.json</code>, routes, and extensions without restarting the Cannon process.</p>
+      </div>
+    </div>
+    <form method="post" action="/admin/system/reload" class="admin-inline-form" onsubmit="return confirm('Reload the application now? Active requests may finish; new requests use the updated configuration.')">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-primary w-100">
+        <i class="bi bi-arrow-clockwise"></i> Reload Now
+      </button>
+    </form>
+  </div>
+</div>

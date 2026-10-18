@@ -32,7 +32,7 @@ func WrapDebugSpace(name, content string) string {
 		label = "?"
 	}
 	return fmt.Sprintf(
-		`<div class="cannon-space-debug" style="border:1px dashed #FF3300"><div class="cannon-space-debug-label" style="color:#FF3300;font-size:12px;font-family:monospace;padding:2px 4px">%s</div>%s</div>`,
+		`<div class="cannon-space-debug" style="border:2px dashed #FF3300;min-height:2rem;margin:0.35rem 0;padding:0.35rem;background:rgba(255,51,0,0.06)"><div class="cannon-space-debug-label" style="color:#FF3300;font-size:12px;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;padding:2px 4px">%s</div>%s</div>`,
 		html.EscapeString(label),
 		content,
 	)

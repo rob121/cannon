@@ -28,3 +28,12 @@ func CountForSpace(ctx context.Context, extMgr *extensions.Manager, space string
 	}
 	return len(rows), nil
 }
+
+// PreviewCount adjusts a space count for template-space debug mode (?tp=1): empty
+// spaces count as 1 so hasSpace/lenspace still reach the space renderer outline.
+func PreviewCount(n int, err error, space string, debugActive bool) (int, error) {
+	if debugActive && err == nil && n == 0 && strings.TrimSpace(space) != "" {
+		return 1, nil
+	}
+	return n, err
+}

@@ -19,6 +19,14 @@ const (
 	SearchHorizontalBlockTemplate = "default/partials/blocks/search-horizontal.html"
 	// SearchVerticalBlockTemplate renders stacked search blocks.
 	SearchVerticalBlockTemplate = "default/partials/blocks/search-vertical.html"
+
+	// Admin dashboard widget body templates (admin theme; Lookup uses basename).
+	AdminLiveAnalyticsTemplate = "admin/dashboard_block_live_analytics.html"
+	AdminReviewQueueTemplate   = "admin/dashboard_block_review_queue.html"
+	AdminUpdateCheckTemplate   = "admin/dashboard_block_update_check.html"
+	AdminLatestSignupsTemplate = "admin/dashboard_block_latest_signups.html"
+	AdminQuickStartTemplate    = "admin/dashboard_block_quick_start.html"
+	AdminSystemReloadTemplate  = "admin/dashboard_block_system_reload.html"
 )
 
 var legacyBlockTemplates = map[string]string{

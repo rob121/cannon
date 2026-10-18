@@ -22,7 +22,7 @@
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
           {{template "sort_th" (dict "Root" $ "Key" "space" "Label" "Space")}}
           {{template "sort_th" (dict "Root" $ "Key" "type" "Label" "Type")}}
-          <th>Order</th>
+          {{template "sort_th" (dict "Root" $ "Key" "sort" "Label" "Order")}}
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
           <th class="admin-col-actions"></th>
         </tr>
@@ -33,7 +33,14 @@
           <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery "Label" .Name)}}</td>
           <td><code class="admin-code">{{.SpacesDisplay}}</code></td>
           <td>{{.TypeLabel}}</td>
-          <td>{{if $.ReorderEnabled}}{{template "sort_controls" (dict "Root" $ "ID" .BlockID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}{{else}}—{{end}}</td>
+          <td>
+            {{if $.ReorderEnabled}}
+            <div class="admin-order-cell">
+              <span class="admin-order-index" title="Sort position">{{.Sort}}</span>
+              {{template "sort_controls" (dict "Root" $ "ID" .BlockID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}
+            </div>
+            {{else}}—{{end}}
+          </td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .BlockID "Status" .Status "ListQuery" $.ListQuery)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery)}}
         </tr>

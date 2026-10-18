@@ -34,7 +34,7 @@ func TestListKnownSpaces(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(theme, "layout.html"), []byte(`{{space "hero"}} {{space "sidebar"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ListKnownSpaces(root, "mysite", []string{"custom-used"})
+	got, err := ListKnownSpaces(root, "mysite", "", []string{"custom-used"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestListKnownSpaces(t *testing.T) {
 	for _, name := range got {
 		found[name] = true
 	}
-	for _, want := range []string{"header", "sidebar", "footer", "hero", "custom-used"} {
+	for _, want := range []string{"header", "sidebar", "footer", "admin-dashboard-top", "admin-dashboard-widgets", "admin-dashboard-main", "hero", "custom-used"} {
 		if !found[want] {
 			t.Fatalf("missing %q in %#v", want, got)
 		}

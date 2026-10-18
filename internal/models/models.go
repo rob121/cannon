@@ -32,6 +32,8 @@ type User struct {
 	Auth         *Authenticator
 	Groups       []Group `gorm:"many2many:user_groups;"`
 	Roles        []Role  `gorm:"many2many:user_roles;"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 // UserOAuthIdentity links a Cannon user to an external OAuth account.
@@ -185,15 +187,21 @@ type Setting struct {
 type BlockType string
 
 const (
-	BlockTypeHTML             BlockType = "html"
-	BlockTypeMarkdown         BlockType = "markdown"
-	BlockTypeExtension        BlockType = "extension"
-	BlockTypeContent          BlockType = "content"
-	BlockTypeLogin            BlockType = "login"
-	BlockTypeMenuVertical     BlockType = "menu-vertical"
-	BlockTypeMenuHorizontal   BlockType = "menu-horizontal"
-	BlockTypeSearchHorizontal BlockType = "search-horizontal"
-	BlockTypeSearchVertical   BlockType = "search-vertical"
+	BlockTypeHTML               BlockType = "html"
+	BlockTypeMarkdown           BlockType = "markdown"
+	BlockTypeExtension          BlockType = "extension"
+	BlockTypeContent            BlockType = "content"
+	BlockTypeLogin              BlockType = "login"
+	BlockTypeMenuVertical       BlockType = "menu-vertical"
+	BlockTypeMenuHorizontal     BlockType = "menu-horizontal"
+	BlockTypeSearchHorizontal   BlockType = "search-horizontal"
+	BlockTypeSearchVertical     BlockType = "search-vertical"
+	BlockTypeAdminLiveAnalytics BlockType = "admin-live-analytics"
+	BlockTypeAdminReviewQueue   BlockType = "admin-review-queue"
+	BlockTypeAdminUpdateCheck   BlockType = "admin-update-check"
+	BlockTypeAdminLatestSignups BlockType = "admin-latest-signups"
+	BlockTypeAdminQuickStart    BlockType = "admin-quick-start"
+	BlockTypeAdminSystemReload  BlockType = "admin-system-reload"
 )
 
 // Block assigns content to a template space for {{space "space"}} rendering.

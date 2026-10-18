@@ -36,8 +36,8 @@ type extensionRouteOption struct {
 }
 
 type controllerRouteOption struct {
-	ID     string
-	Title  string
+	ID      string
+	Title   string
 	Actions []controllers.ActionDefinition
 }
 
@@ -159,14 +159,14 @@ func paginateRoutes(rows []models.Route, page, size int) []models.Route {
 }
 
 type builtinRouteRow struct {
-	RouteID   uint
-	Name      string
-	Path      string
-	Prefix    string
-	Controller string
+	RouteID          uint
+	Name             string
+	Path             string
+	Prefix           string
+	Controller       string
 	ControllerAction string
-	Methods   string
-	ShowTitle bool
+	Methods          string
+	ShowTitle        bool
 }
 
 func loadBuiltinRouteRows(db *gorm.DB) []builtinRouteRow {
@@ -399,26 +399,26 @@ func (h *Handler) renderRouteForm(w http.ResponseWriter, r *http.Request, row mo
 	}
 	menuParentOptions, _ := allMenuItemParentOptions(db, 0)
 	data := formData(map[string]any{
-		"ActiveNav":                   "routes",
-		"Row":                         row,
-		"IsNew":                       isNew,
-		"BasePath":                    routesBase,
-		"AllGroups":                   allGroups,
-		"SelectedIDs":                 defaultGroupSelectedIDs(db, row.Groups, isNew),
-		"ExtensionOptions":            extOptions,
-		"ControllerOptions":           ctrlOptions,
-		"PageData":                    routemeta.MetadataStringMap(row.Metadata),
-		"TemplateOverride":            templateOverride,
-		"ControllerTemplateOptions":   controllerTemplateOptions,
-		"Categories":                  content.FlattenCategoryOptions(categories),
-		"Tags":                        tags,
-		"Items":                       items,
-		"Users":                       users,
-		"AllMenus":                    h.loadMenus(r),
-		"MenuParentOptions":           menuParentOptions,
-		"RouteMenuLinks":              loadRouteMenuLinks(db, row.RouteID),
-		"MenuItemsBase":               menuItemsBase,
-		"Success":                     routeFormSuccessMessage(r),
+		"ActiveNav":                 "routes",
+		"Row":                       row,
+		"IsNew":                     isNew,
+		"BasePath":                  routesBase,
+		"AllGroups":                 allGroups,
+		"SelectedIDs":               defaultGroupSelectedIDs(db, row.Groups, isNew),
+		"ExtensionOptions":          extOptions,
+		"ControllerOptions":         ctrlOptions,
+		"PageData":                  routemeta.MetadataStringMap(row.Metadata),
+		"TemplateOverride":          templateOverride,
+		"ControllerTemplateOptions": controllerTemplateOptions,
+		"Categories":                content.FlattenCategoryOptions(categories),
+		"Tags":                      tags,
+		"Items":                     items,
+		"Users":                     users,
+		"AllMenus":                  h.loadMenus(r),
+		"MenuParentOptions":         menuParentOptions,
+		"RouteMenuLinks":            loadRouteMenuLinks(db, row.RouteID),
+		"MenuItemsBase":             menuItemsBase,
+		"Success":                   routeFormSuccessMessage(r),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

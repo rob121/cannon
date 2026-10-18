@@ -230,9 +230,10 @@ func (s *Server) frontendHandler() http.Handler {
 			return template.HTML(html), nil
 		}
 
-		blockLen := previewBlockLen(func(name string) (int, error) {
-			return blocks.CountForSpace(renderCtx(), ext, name)
-		}, debugSpaces)
+		blockLen := func(name string) (int, error) {
+			n, err := blocks.CountForSpace(renderCtx(), ext, name)
+			return blocks.PreviewCount(n, err, name, debugSpaces)
+		}
 
 		sel, _ := themes.SelectionFromContext(r.Context())
 		eng = templateengine.New(site, sel, blockRenderer, blockLen, templateengine.MergeFuncMaps(
@@ -246,18 +247,6 @@ func (s *Server) frontendHandler() http.Handler {
 		))
 		router.NewDispatcher(ext, eng).ServeHTTP(w, r)
 	}))
-}
-
-// In space preview, count the empty outline as one placeholder so conditional
-// layouts using lenspace or hasSpace still reach the space renderer.
-func previewBlockLen(count templateengine.BlockLenRenderer, enabled bool) templateengine.BlockLenRenderer {
-	return func(name string) (int, error) {
-		n, err := count(name)
-		if enabled && err == nil && n == 0 && strings.TrimSpace(name) != "" {
-			return 1, nil
-		}
-		return n, err
-	}
 }
 
 func extensionUserContext(r *http.Request) map[string]any {

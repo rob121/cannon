@@ -20,11 +20,11 @@ type EffectivePermissionRow struct {
 
 // EffectivePermissionPreview groups resolved permissions by category for the user form.
 type EffectivePermissionPreview struct {
-	Total       int
-	AllowTotal  int
-	DenyTotal   int
-	Categories  []string
-	ByCategory  map[string][]EffectivePermissionRow
+	Total      int
+	AllowTotal int
+	DenyTotal  int
+	Categories []string
+	ByCategory map[string][]EffectivePermissionRow
 }
 
 func effectivePermissionPreview(ctx context.Context, userID uint) (EffectivePermissionPreview, error) {

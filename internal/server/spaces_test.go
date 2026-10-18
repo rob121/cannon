@@ -15,7 +15,9 @@ func TestConditionalSpacePreview(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
 		for _, condition := range []string{`gt (lenspace "sidebar") 0`, `hasSpace "sidebar"`} {
 			t.Run(condition+"/preview="+map[bool]string{false: "off", true: "on"}[enabled], func(t *testing.T) {
-				count := previewBlockLen(func(string) (int, error) { return 0, nil }, enabled)
+				count := func(name string) (int, error) {
+					return blocks.PreviewCount(0, nil, name, enabled)
+				}
 				render := func(name string) (template.HTML, error) {
 					if enabled {
 						return template.HTML(blocks.WrapDebugSpace(name, "")), nil
@@ -37,7 +39,7 @@ func TestConditionalSpacePreview(t *testing.T) {
 					}
 					return
 				}
-				for _, want := range []string{"<aside>", "border:1px dashed #FF3300", ">sidebar</div></div></aside>"} {
+				for _, want := range []string{"<aside>", "border:2px dashed #FF3300", ">sidebar</div></div></aside>"} {
 					if !strings.Contains(out.String(), want) {
 						t.Fatalf("preview missing %q: %s", want, out.String())
 					}
@@ -62,10 +64,9 @@ func TestSpacePreviewPreservesCountsAndErrors(t *testing.T) {
 		{name: ""},
 		{name: "  "},
 	} {
-		count := previewBlockLen(func(string) (int, error) { return tc.count, tc.err }, true)
-		got, err := count(tc.name)
+		got, err := blocks.PreviewCount(tc.count, tc.err, tc.name, true)
 		if got != tc.count || !errors.Is(err, tc.err) {
-			t.Fatalf("count(%q) = %d, %v; want %d, %v", tc.name, got, err, tc.count, tc.err)
+			t.Fatalf("PreviewCount(%q) = %d, %v; want %d, %v", tc.name, got, err, tc.count, tc.err)
 		}
 	}
 }

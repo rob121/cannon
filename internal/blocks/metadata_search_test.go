@@ -9,8 +9,8 @@ func TestMetadataFromFormValuesSearchBlock(t *testing.T) {
 	values := url.Values{
 		"search_placeholder": {"Find articles"},
 		"search_button":      {"Go"},
-		"search_label":         {"Site search"},
-		"search_class":         {"sidebar-search"},
+		"search_label":       {"Site search"},
+		"search_class":       {"sidebar-search"},
 	}
 	raw, err := MetadataFromFormValues("search-vertical", "", values)
 	if err != nil {

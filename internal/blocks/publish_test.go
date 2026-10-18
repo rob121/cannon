@@ -38,9 +38,9 @@ func TestPublishVisible(t *testing.T) {
 func TestMetadataFromFormValuesSettings(t *testing.T) {
 	values := map[string][]string{
 		"template_wrapper": {"default/partials/blocks/default.html"},
-		"show_name":          {"1"},
-		"publish_start":      {"2026-07-01T09:00"},
-		"publish_end":        {"2026-07-31T17:00"},
+		"show_name":        {"1"},
+		"publish_start":    {"2026-07-01T09:00"},
+		"publish_end":      {"2026-07-31T17:00"},
 	}
 	raw, err := MetadataFromFormValues("html", "hello", values)
 	if err != nil {

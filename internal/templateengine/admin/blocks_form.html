@@ -35,6 +35,12 @@
                 <option value="menu-horizontal" {{if eq .Row.Type "menu-horizontal"}}selected{{end}}>Menu Horizontal</option>
                 <option value="search-horizontal" {{if eq .Row.Type "search-horizontal"}}selected{{end}}>Search Horizontal</option>
                 <option value="search-vertical" {{if eq .Row.Type "search-vertical"}}selected{{end}}>Search Vertical</option>
+                <option value="admin-live-analytics" {{if eq .Row.Type "admin-live-analytics"}}selected{{end}}>Admin · Live Analytics</option>
+                <option value="admin-review-queue" {{if eq .Row.Type "admin-review-queue"}}selected{{end}}>Admin · Review Queue</option>
+                <option value="admin-update-check" {{if eq .Row.Type "admin-update-check"}}selected{{end}}>Admin · Update Check</option>
+                <option value="admin-latest-signups" {{if eq .Row.Type "admin-latest-signups"}}selected{{end}}>Admin · Latest Signups</option>
+                <option value="admin-quick-start" {{if eq .Row.Type "admin-quick-start"}}selected{{end}}>Admin · Quick Start</option>
+                <option value="admin-system-reload" {{if eq .Row.Type "admin-system-reload"}}selected{{end}}>Admin · System Reload</option>
                 <option value="extension" {{if eq .Row.Type "extension"}}selected{{end}}>Extension</option>
               </select>
             </div>
@@ -113,6 +119,11 @@
                 <p class="admin-form-help">Optional title shown above the form. Leave blank for no heading.</p>
               </div>
             </div>
+          </div>
+
+          <div class="block-fields-admin-dashboard" id="block-fields-admin-dashboard" hidden>
+            {{template "form_section_header" (dict "Title" "Admin Dashboard Widget" "Description" "Built-in dashboard card. Assign it to an admin-dashboard-* space and use sort order to rearrange cards within that row.")}}
+            <p class="admin-form-help mb-0">Row spaces: <code class="admin-code">admin-dashboard-top</code>, <code class="admin-code">admin-dashboard-widgets</code>, <code class="admin-code">admin-dashboard-main</code>. Live Analytics only appears when Analytics is enabled.</p>
           </div>
 
           <div class="block-fields-menu" id="block-fields-menu" hidden>

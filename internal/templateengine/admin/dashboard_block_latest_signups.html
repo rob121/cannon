@@ -1,0 +1,23 @@
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Latest Signups</h2>
+      <p class="admin-form-card-desc">Most recently created accounts.</p>
+    </div>
+    <a class="btn-admin-ghost btn-admin-sm" href="/admin/users" data-turbo-frame="_top">View users</a>
+  </div>
+  <div class="admin-form-card-body">
+    {{if .LatestSignups}}
+    <ul class="admin-dashboard-list list-unstyled mb-0">
+      {{range .LatestSignups}}
+      <li class="admin-dashboard-list-item">
+        <a href="/admin/users/{{.UserID}}" data-turbo-frame="_top">{{if .Name}}{{.Name}}{{else}}{{.Username}}{{end}}</a>
+        <span class="admin-stat-meta">{{.Username}}{{if not .CreatedAt.IsZero}} · {{.CreatedAt.Format "Jan 2, 2006"}}{{end}}</span>
+      </li>
+      {{end}}
+    </ul>
+    {{else}}
+    <p class="text-muted mb-0">No users yet.</p>
+    {{end}}
+  </div>
+</div>

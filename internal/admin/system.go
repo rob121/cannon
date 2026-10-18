@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/rob121/cannon/internal/accesslog"
-	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/blocks"
 	"github.com/rob121/cannon/internal/sites"
 )
 
@@ -70,14 +70,14 @@ func (h *Handler) systemAccessLog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	h.render(w, r, "Access Log", "admin/system_access_log.html", formData(map[string]any{
-		"ActiveNav":   "access_log",
-		"Subtitle":    "HTTP request log for this site.",
-		"LogPath":     accesslog.Path(site),
-		"LogHostKey":  accesslog.HostKey(site.Host),
-		"Files":       files,
+		"ActiveNav":    "access_log",
+		"Subtitle":     "HTTP request log for this site.",
+		"LogPath":      accesslog.Path(site),
+		"LogHostKey":   accesslog.HostKey(site.Host),
+		"Files":        files,
 		"SelectedFile": selected,
-		"LogContent":  content,
-		"TailURL":     systemAccessLogBase + "/tail",
+		"LogContent":   content,
+		"TailURL":      systemAccessLogBase + "/tail",
 	}))
 }
 
@@ -130,33 +130,7 @@ func (h *Handler) systemReload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, data map[string]any) {
-	db, _ := sites.DB(r.Context())
-	var userCount, routeCount, activeRouteCount, extCount int64
-	var itemCount, categoryCount, tagCount, commentCount, trashedCount int64
-	db.Model(&models.User{}).Count(&userCount)
-	db.Model(&models.Route{}).Count(&routeCount)
-	db.Model(&models.Route{}).Where("status = ?", models.StatusActive).Count(&activeRouteCount)
-	db.Model(&models.Extension{}).Count(&extCount)
-	db.Model(&models.Item{}).Where("status <> ?", models.ItemStatusTrashed).Count(&itemCount)
-	db.Model(&models.Category{}).Count(&categoryCount)
-	db.Model(&models.Tag{}).Count(&tagCount)
-	db.Model(&models.Comment{}).Where("approved = ?", false).Count(&commentCount)
-	db.Model(&models.Item{}).Where("status = ?", models.ItemStatusTrashed).Count(&trashedCount)
-	var pendingItemCount int64
-	db.Model(&models.Item{}).Where("status = ?", models.ItemStatusPending).Count(&pendingItemCount)
-	cfg := h.chain.Sites.Config()
-	data["UserCount"] = userCount
-	data["RouteCount"] = routeCount
-	data["ActiveRouteCount"] = activeRouteCount
-	data["ExtensionCount"] = extCount
-	data["ItemCount"] = itemCount
-	data["CategoryCount"] = categoryCount
-	data["TagCount"] = tagCount
-	data["PendingCommentCount"] = commentCount
-	data["PendingItemCount"] = pendingItemCount
-	data["TrashedItemCount"] = trashedCount
-	data["SiteCount"] = len(cfg.Sites)
-	dashboardAnalyticsData(h, r, data)
+	_ = blocks.EnsureAdminDashboardBlocks(r.Context())
 	if _, ok := data["Subtitle"]; !ok {
 		data["Subtitle"] = dashboardWelcomeSubtitle(r)
 	}

@@ -9,7 +9,7 @@ import (
 
 func TestWrapDebugSpace(t *testing.T) {
 	got := WrapDebugSpace("header", "<p>Hi</p>")
-	for _, part := range []string{`border:1px dashed #FF3300`, ">header<", "<p>Hi</p>"} {
+	for _, part := range []string{`border:2px dashed #FF3300`, "min-height:2rem", ">header<", "<p>Hi</p>"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("WrapDebugSpace missing %q: %q", part, got)
 		}
@@ -18,7 +18,7 @@ func TestWrapDebugSpace(t *testing.T) {
 
 func TestWrapDebugEmptySpace(t *testing.T) {
 	got := WrapDebugSpace("empty", "")
-	for _, part := range []string{`border:1px dashed #FF3300`, ">empty</div></div>"} {
+	for _, part := range []string{`border:2px dashed #FF3300`, ">empty</div></div>"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("empty space missing %q: %q", part, got)
 		}

@@ -192,11 +192,11 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 		subtitle = "Update account details, group membership, and role assignments."
 	}
 	data := formData(map[string]any{
-		"ActiveNav":   "accounts",
-		"Row":         row,
-		"IsNew":       isNew,
-		"BasePath":    usersBase,
-		"Subtitle":    subtitle,
+		"ActiveNav":         "accounts",
+		"Row":               row,
+		"IsNew":             isNew,
+		"BasePath":          usersBase,
+		"Subtitle":          subtitle,
 		"AllGroups":         allGroups,
 		"AllRoles":          allRoles,
 		"SelectedIDs":       selected,

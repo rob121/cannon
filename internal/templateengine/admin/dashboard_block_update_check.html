@@ -1,0 +1,40 @@
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Update Check</h2>
+      <p class="admin-form-card-desc">Cannon release status for this host.</p>
+    </div>
+    <a class="btn-admin-ghost btn-admin-sm" href="/admin/system/update" data-turbo-frame="_top">Manage updates</a>
+  </div>
+  <div class="admin-form-card-body">
+    <div class="admin-dashboard-update">
+      <div class="admin-dashboard-update-row">
+        <span class="admin-stat-label">Running</span>
+        <code class="admin-code">{{if .UpdateCurrentVersion}}{{.UpdateCurrentVersion}}{{else}}dev{{end}}</code>
+      </div>
+      {{if .UpdateLatestVersion}}
+      <div class="admin-dashboard-update-row">
+        <span class="admin-stat-label">Latest</span>
+        <code class="admin-code">{{.UpdateLatestVersion}}</code>
+      </div>
+      {{end}}
+      <div class="admin-dashboard-update-foot">
+        {{if .UpdateAvailable}}
+        <span class="admin-stat-badge admin-stat-badge-warning">Update available</span>
+        {{else if .UpdateRestartRequired}}
+        <span class="admin-stat-badge admin-stat-badge-warning">Restart required</span>
+        {{else if .UpdateHasStaged}}
+        <span class="admin-stat-badge admin-stat-badge-neutral">Staged {{.UpdateStagedVersion}}</span>
+        {{else}}
+        <span class="admin-stat-badge admin-stat-badge-success">Up to date</span>
+        {{end}}
+        {{if .UpdateCheckedAt}}
+        <span class="admin-stat-meta">Checked {{.UpdateCheckedAt.Format "Jan 2, 15:04"}}</span>
+        {{end}}
+      </div>
+      {{if .UpdateError}}
+      <p class="text-danger small mb-0 mt-2">{{.UpdateError}}</p>
+      {{end}}
+    </div>
+  </div>
+</div>

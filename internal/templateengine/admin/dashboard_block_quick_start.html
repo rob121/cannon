@@ -1,0 +1,52 @@
+<div class="admin-form-card">
+  <div class="admin-form-card-header">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Quick Start</h2>
+      <p class="admin-form-card-desc">Jump to common admin tasks for {{if .SiteName}}{{.SiteName}}{{else}}your site{{end}}.</p>
+    </div>
+  </div>
+  <div class="admin-quick-links">
+    <a class="admin-quick-link" href="/admin/items" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-journal-richtext"></i></span>
+      <span class="admin-quick-link-label">Items</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/categories" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-folder2"></i></span>
+      <span class="admin-quick-link-label">Categories</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/routes" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-signpost-split"></i></span>
+      <span class="admin-quick-link-label">Routes</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/templates" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-file-earmark-code"></i></span>
+      <span class="admin-quick-link-label">Templates</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/menus" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-list-ul"></i></span>
+      <span class="admin-quick-link-label">Menus</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/blocks" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-layout-text-window"></i></span>
+      <span class="admin-quick-link-label">Blocks</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/extensions" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-puzzle"></i></span>
+      <span class="admin-quick-link-label">Extensions</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/configuration" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-sliders"></i></span>
+      <span class="admin-quick-link-label">Configuration</span>
+    </a>
+    <a class="admin-quick-link" href="/admin/help" data-turbo-frame="_top">
+      <span class="admin-quick-link-icon"><i class="bi bi-question-circle"></i></span>
+      <span class="admin-quick-link-label">Help</span>
+    </a>
+    {{if .SiteURL}}
+    <a class="admin-quick-link" href="{{.SiteURL}}" target="_blank" rel="noopener noreferrer">
+      <span class="admin-quick-link-icon"><i class="bi bi-box-arrow-up-right"></i></span>
+      <span class="admin-quick-link-label">View Site</span>
+    </a>
+    {{end}}
+  </div>
+</div>

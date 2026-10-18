@@ -199,6 +199,21 @@ func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block
 		if err != nil {
 			return "", err
 		}
+	case models.BlockTypeAdminLiveAnalytics,
+		models.BlockTypeAdminReviewQueue,
+		models.BlockTypeAdminUpdateCheck,
+		models.BlockTypeAdminLatestSignups,
+		models.BlockTypeAdminQuickStart,
+		models.BlockTypeAdminSystemReload:
+		html, err = renderAdminDashboardBlock(ctx, row, r, render)
+		if err != nil {
+			return "", err
+		}
+		// Widgets ship their own card chrome; skip the default frontend wrapper.
+		if strings.TrimSpace(meta.TemplateWrapper) == "" {
+			meta.TemplateWrapper = PlainWrapperTemplate
+			meta.ShowName = false
+		}
 	default:
 		return "", nil
 	}
