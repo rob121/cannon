@@ -23,28 +23,39 @@
     </div>
     <ol class="admin-update-steps">
       <li data-step="check">
-        <span class="admin-update-step-marker"><i class="bi bi-search" aria-hidden="true"></i></span>
+        <div class="admin-update-step-track">
+          <span class="admin-update-step-marker"><i class="bi bi-search" aria-hidden="true"></i></span>
+          <span class="admin-update-step-connector" aria-hidden="true"></span>
+        </div>
         <span class="admin-update-step-copy">
           <span class="admin-update-step-title">Check</span>
           <span class="admin-update-step-hint">Look for a release</span>
         </span>
       </li>
       <li data-step="download">
-        <span class="admin-update-step-marker"><i class="bi bi-download" aria-hidden="true"></i></span>
+        <div class="admin-update-step-track">
+          <span class="admin-update-step-marker"><i class="bi bi-download" aria-hidden="true"></i></span>
+          <span class="admin-update-step-connector" aria-hidden="true"></span>
+        </div>
         <span class="admin-update-step-copy">
           <span class="admin-update-step-title">Download</span>
           <span class="admin-update-step-hint">Stage cannon.latest</span>
         </span>
       </li>
       <li data-step="restart">
-        <span class="admin-update-step-marker"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+        <div class="admin-update-step-track">
+          <span class="admin-update-step-marker"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+          <span class="admin-update-step-connector" aria-hidden="true"></span>
+        </div>
         <span class="admin-update-step-copy">
           <span class="admin-update-step-title">Restart</span>
           <span class="admin-update-step-hint">Swap via systemd</span>
         </span>
       </li>
       <li data-step="verify">
-        <span class="admin-update-step-marker"><i class="bi bi-check2" aria-hidden="true"></i></span>
+        <div class="admin-update-step-track">
+          <span class="admin-update-step-marker"><i class="bi bi-check2" aria-hidden="true"></i></span>
+        </div>
         <span class="admin-update-step-copy">
           <span class="admin-update-step-title">Verify</span>
           <span class="admin-update-step-hint">Confirm new version</span>

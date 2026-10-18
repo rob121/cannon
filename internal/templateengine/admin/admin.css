@@ -5629,32 +5629,25 @@ select.admin-form-control {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.75rem 0;
   margin: 0;
   padding: 0;
 }
 
 .admin-update-steps li {
-  position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
   min-width: 0;
   color: var(--admin-muted-fg);
 }
 
-.admin-update-steps li:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 1rem;
-  left: calc(2rem + 0.35rem);
-  right: -0.35rem;
-  height: 2px;
-  background: var(--admin-border);
-}
-
-.admin-update-steps li.is-done:not(:last-child)::after {
-  background: var(--admin-success);
+.admin-update-step-track {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 2rem;
 }
 
 .admin-update-step-marker {
@@ -5673,12 +5666,24 @@ select.admin-form-control {
   font-size: 0.875rem;
 }
 
+.admin-update-step-connector {
+  flex: 1 1 auto;
+  height: 2px;
+  margin: 0 0.35rem 0 0.45rem;
+  background: var(--admin-border);
+  border-radius: 9999px;
+}
+
+.admin-update-steps li.is-done .admin-update-step-connector {
+  background: var(--admin-success);
+}
+
 .admin-update-step-copy {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
-  padding-top: 0.15rem;
+  padding-right: 0.75rem;
 }
 
 .admin-update-step-title {
@@ -5732,6 +5737,10 @@ select.admin-form-control {
 .admin-update-progress[data-mode="check"] [data-step="download"],
 .admin-update-progress[data-mode="check"] [data-step="restart"],
 .admin-update-progress[data-mode="check"] [data-step="verify"] {
+  display: none;
+}
+
+.admin-update-progress[data-mode="check"] .admin-update-step-connector {
   display: none;
 }
 
@@ -6013,7 +6022,7 @@ select.admin-form-control {
     gap: 0.85rem 0.75rem;
   }
 
-  .admin-update-steps li:not(:last-child)::after {
+  .admin-update-step-connector {
     display: none;
   }
 

@@ -34,6 +34,9 @@ func TestClientFetchManifest(t *testing.T) {
 		if r.URL.Path != "/latest/download/cannon.json" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
+		if r.URL.Query().Get("_") == "" {
+			t.Fatal("expected cache-bust query param")
+		}
 		_, _ = w.Write([]byte(`{
 			"name": "cannon",
 			"version": "v0.2.0",
@@ -54,6 +57,46 @@ func TestClientFetchManifest(t *testing.T) {
 	}
 	if info.Version != "v0.2.0" || info.URL != "http://example.test/cannon" || info.SHA256 != "abc123" {
 		t.Fatalf("unexpected update info: %+v", info)
+	}
+}
+
+func TestClientPrefersGitHubAPIOverStaleManifest(t *testing.T) {
+	assetName := "cannon-" + runtime.GOOS + "_" + runtime.GOARCH
+	var hits []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits = append(hits, r.URL.Path)
+		switch r.URL.Path {
+		case "/repos/rob121/cannon/releases/latest":
+			_, _ = w.Write([]byte(`{
+				"tag_name": "v0.2.0",
+				"assets": [
+					{"name": "` + assetName + `", "browser_download_url": "http://example.test/new", "digest": "sha256:newsha"}
+				]
+			}`))
+		case "/rob121/cannon/releases/latest/download/cannon.json":
+			_, _ = w.Write([]byte(`{"name":"cannon","version":"v0.1.9","assets":{}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	client := &Client{
+		HTTP: &http.Client{
+			Timeout: time.Second,
+			Transport: rewriteHostTransport{base: server.URL},
+		},
+		Manifest: "cannon.json",
+	}
+	info, err := client.LatestInfo("https://github.com/rob121/cannon/releases/download", "cannon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Version != "v0.2.0" || info.URL != "http://example.test/new" {
+		t.Fatalf("expected API result, got %+v", info)
+	}
+	if len(hits) == 0 || hits[0] != "/repos/rob121/cannon/releases/latest" {
+		t.Fatalf("expected GitHub API first, hits=%v", hits)
 	}
 }
 
@@ -96,7 +139,8 @@ type rewriteHostTransport struct {
 }
 
 func (rt rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	rewritten, err := http.NewRequest(req.Method, rt.base, req.Body)
+	target := rt.base + req.URL.RequestURI()
+	rewritten, err := http.NewRequest(req.Method, target, req.Body)
 	if err != nil {
 		return nil, err
 	}

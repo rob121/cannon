@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type githubLatestRelease struct {
@@ -43,19 +46,44 @@ func (c *Client) LatestInfo(base, binaryName string) (Info, error) {
 	if base == "" {
 		return Info{}, fmt.Errorf("update URL base is empty")
 	}
-	if info, err := c.fetchManifest(base, binaryName); err == nil {
-		return info, nil
-	} else if apiURL := GitHubLatestAPIURL(base); apiURL != "" {
+	// Prefer the GitHub Releases API when possible. The public
+	// /releases/latest/download/* CDN often keeps serving the previous
+	// cannon.json for several minutes after a new release is published, and a
+	// successful stale response would skip the API fallback entirely.
+	if apiURL := GitHubLatestAPIURL(base); apiURL != "" {
 		if info, err := c.fetchGitHubLatest(base, binaryName, apiURL); err == nil {
 			return info, nil
 		}
 	}
+	if info, err := c.fetchManifest(base, binaryName); err == nil {
+		return info, nil
+	}
 	return Info{}, fmt.Errorf("no update manifest or GitHub latest release found")
+}
+
+func (c *Client) get(rawURL string) (*http.Response, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	q := u.Query()
+	q.Set("_", strconv.FormatInt(time.Now().UnixNano(), 10))
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("User-Agent", "cannon-updater")
+	return c.httpClient().Do(req)
 }
 
 func (c *Client) fetchManifest(base, binaryName string) (Info, error) {
 	manifestURL := ManifestURL(base, c.manifestName())
-	resp, err := c.httpClient().Get(manifestURL)
+	resp, err := c.get(manifestURL)
 	if err != nil {
 		return Info{}, err
 	}
@@ -79,7 +107,7 @@ func (c *Client) fetchManifest(base, binaryName string) (Info, error) {
 }
 
 func (c *Client) fetchGitHubLatest(base, binaryName, apiURL string) (Info, error) {
-	resp, err := c.httpClient().Get(apiURL)
+	resp, err := c.get(apiURL)
 	if err != nil {
 		return Info{}, err
 	}
