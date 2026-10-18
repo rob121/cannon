@@ -1,87 +1,89 @@
 {{template "page_header" .}}
 
-<div class="admin-data-card">
-  <div class="admin-data-card-header">
-    <div class="admin-data-card-summary-main">
-      <h2 class="admin-data-card-title">Installed</h2>
-      <p class="admin-data-card-desc">Extensions that have completed install and can be started. Order matters for some extensions—for example, run compression (gzip) after render/content extensions so they see uncompressed output.</p>
+<div class="admin-data-card-stack admin-extensions-list">
+  <div class="admin-data-card">
+    <div class="admin-data-card-header">
+      <div class="admin-data-card-summary-main">
+        <h2 class="admin-data-card-title">Installed</h2>
+        <p class="admin-data-card-desc">Extensions that have completed install and can be started. Order matters for some extensions—for example, run compression (gzip) after render/content extensions so they see uncompressed output.</p>
+      </div>
+    </div>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Extension</th>
+            <th>Description</th>
+            <th>Version</th>
+            <th>Update</th>
+            <th>Order</th>
+            <th>Process</th>
+            <th>Status</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .InstalledRows}}
+          <tr>
+            <td>
+              {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ExtensionID "Label" .DisplayTitle)}}
+              {{if ne .DisplayTitle .Name}}<div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>{{end}}
+            </td>
+            <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+            <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+            <td>{{template "extension_update_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            <td>{{template "extension_sort_controls" (dict "Root" $ "Row" .)}}</td>
+            <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            <td>{{template "extension_list_status_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
+          </tr>
+          {{else}}
+          <tr><td colspan="8" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-puzzle" "Title" "No installed extensions" "Message" "Install an available extension below, or add a new extension binary.")}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
     </div>
   </div>
-  <div class="admin-table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Extension</th>
-          <th>Description</th>
-          <th>Version</th>
-          <th>Update</th>
-          <th>Order</th>
-          <th>Process</th>
-          <th>Status</th>
-          <th class="admin-col-actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .InstalledRows}}
-        <tr>
-          <td>
-            {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ExtensionID "Label" .DisplayTitle)}}
-            {{if ne .DisplayTitle .Name}}<div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>{{end}}
-          </td>
-          <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
-          <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
-          <td>{{template "extension_update_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          <td>{{template "extension_sort_controls" (dict "Root" $ "Row" .)}}</td>
-          <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          <td>{{template "extension_list_status_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
-        </tr>
-        {{else}}
-        <tr><td colspan="8" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-puzzle" "Title" "No installed extensions" "Message" "Install an available extension below, or add a new extension binary.")}}</td></tr>
-        {{end}}
-      </tbody>
-    </table>
-  </div>
-</div>
 
-<div class="admin-data-card admin-extensions-available-card">
-  <div class="admin-data-card-header">
-    <div class="admin-data-card-summary-main">
-      <h2 class="admin-data-card-title">Available</h2>
-      <p class="admin-data-card-desc">Discovered binaries that are not installed yet, listed alphabetically.</p>
+  <div class="admin-data-card">
+    <div class="admin-data-card-header">
+      <div class="admin-data-card-summary-main">
+        <h2 class="admin-data-card-title">Available</h2>
+        <p class="admin-data-card-desc">Discovered binaries that are not installed yet, listed alphabetically.</p>
+      </div>
     </div>
-  </div>
-  <div class="admin-table-scroll">
-    <table class="admin-table">
-      <thead>
-        <tr>
-          <th>Extension</th>
-          <th>Description</th>
-          <th>Version</th>
-          <th>Update</th>
-          <th>Process</th>
-          <th>Status</th>
-          <th class="admin-col-actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .AvailableRows}}
-        <tr>
-          <td>
-            {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ExtensionID "Label" .DisplayTitle)}}
-            {{if ne .DisplayTitle .Name}}<div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>{{end}}
-          </td>
-          <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
-          <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
-          <td>{{template "extension_update_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          <td>{{template "extension_list_status_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
-        </tr>
-        {{else}}
-        <tr><td colspan="7" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-box-seam" "Title" "No available extensions" "Message" "Place extension binaries in the extensions directory or use Add Extension.")}}</td></tr>
-        {{end}}
-      </tbody>
-    </table>
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Extension</th>
+            <th>Description</th>
+            <th>Version</th>
+            <th>Update</th>
+            <th>Process</th>
+            <th>Status</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .AvailableRows}}
+          <tr>
+            <td>
+              {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .ExtensionID "Label" .DisplayTitle)}}
+              {{if ne .DisplayTitle .Name}}<div class="admin-cell-muted"><code class="admin-code">{{.Name}}</code></div>{{end}}
+            </td>
+            <td class="admin-extension-desc">{{if .Description}}{{.Description}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+            <td>{{if .Version}}{{.Version}}{{else}}<span class="admin-capability-none">—</span>{{end}}</td>
+            <td>{{template "extension_update_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            <td>{{template "extension_list_process_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            <td>{{template "extension_list_status_cell" (dict "Root" $ "BasePath" $.BasePath "Row" .)}}</td>
+            {{template "row_actions" (dict "BasePath" $.BasePath "ID" .ExtensionID)}}
+          </tr>
+          {{else}}
+          <tr><td colspan="7" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-box-seam" "Title" "No available extensions" "Message" "Place extension binaries in the extensions directory or use Add Extension.")}}</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

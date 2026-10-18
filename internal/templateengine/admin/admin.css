@@ -868,8 +868,8 @@ body.admin-sidebar-collapsed .admin-main { margin-left: var(--admin-sidebar-coll
   margin: 0;
 }
 
-.admin-extensions-available-card {
-  margin-top: 2.5rem;
+.admin-extensions-list {
+  gap: 2.5rem;
 }
 
 /* ── Stat cards (Apex dashboard KPIs) ── */
