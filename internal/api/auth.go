@@ -189,10 +189,8 @@ func (h *Handler) authLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		if passkeysAllowed && passkeyCount > 0 {
 			methods = append(methods, "passkey")
-			resp["passkey_required"] = true
 			resp["passkey_begin_url"] = "/api/v1/auth/passkey-login/begin"
 			resp["passkey_finish_url"] = "/api/v1/auth/passkey-login/finish"
-			resp["mfa_token"] = mfaToken
 		}
 		resp["methods"] = methods
 		writeJSON(w, http.StatusOK, resp)

@@ -134,42 +134,23 @@ func ClearWebAuthnSession(s *user.Service) error {
 	return s.ClearSessionValue(sessionWebAuthnData)
 }
 
-// UserRequiresMFA reports whether the user must complete MFA at sign-in.
+// UserRequiresMFA reports whether password/OAuth sign-in must complete a second
+// factor. Only enrolled TOTP counts: passkeys are a passwordless sign-in method
+// (and an optional alternate on the TOTP challenge page), not a gate that locks
+// out devices that do not have the credential.
 func UserRequiresMFA(ctx context.Context, userID uint) (bool, error) {
 	totpAllowed, err := settings.AllowMFATOTP(ctx)
 	if err != nil {
 		return false, err
 	}
-	passkeysAllowed, err := settings.AllowPasskeys(ctx)
-	if err != nil {
-		return false, err
-	}
-	if !totpAllowed && !passkeysAllowed {
+	if !totpAllowed {
 		return false, nil
 	}
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return false, err
 	}
-	if totpAllowed {
-		enabled, err := TOTPEnabled(db, userID)
-		if err != nil {
-			return false, err
-		}
-		if enabled {
-			return true, nil
-		}
-	}
-	if passkeysAllowed {
-		count, err := PasskeyCount(db, userID)
-		if err != nil {
-			return false, err
-		}
-		if count > 0 {
-			return true, nil
-		}
-	}
-	return false, nil
+	return TOTPEnabled(db, userID)
 }
 
 // PasskeyCount returns how many passkeys a user has registered.
