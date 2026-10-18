@@ -11,6 +11,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -121,40 +122,32 @@ func (h *Handler) extensionList(w http.ResponseWriter, r *http.Request) {
 	extMgr := h.chain.Extensions(site)
 	_ = extMgr.Bootstrap(r.Context())
 
-	page := parsePage(r)
-	var rows []models.Extension
-	var total int64
-	db.Model(&models.Extension{}).Count(&total)
-	data := listPage(r, page, total, extensionsBase,
-		"Installed extension processes and their status.",
+	data := listPage(r, 1, 0, extensionsBase,
+		"Installed extensions and binaries available to install.",
 		"Add Extension", map[string]any{"ActiveNav": "extension_registry"})
-	order := applyListSort(r, data, map[string]string{
-		"name": "name", "status": "status", "installed": "installed", "sort": "sort",
-	}, "sort")
-	sortParam := strings.TrimSpace(r.URL.Query().Get("sort"))
-	if sortParam == "" || sortParam == "sort" {
-		order = "sort asc, extension_id asc"
-	}
-	db.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
-	var ordered []models.Extension
-	db.Order("sort asc, extension_id asc").Find(&ordered)
-	position := make(map[uint]int, len(ordered))
-	for i, row := range ordered {
-		position[row.ExtensionID] = i
-	}
-	last := len(ordered) - 1
+	var all []models.Extension
+	db.Order("sort asc, extension_id asc").Find(&all)
 
-	listRows := make([]extensionRow, 0, len(rows))
-	for _, row := range rows {
-		item := extensionListRow(row, extMgr)
-		if pos, ok := position[row.ExtensionID]; ok {
-			item.CanMoveUp = pos > 0
-			item.CanMoveDown = pos < last
+	var installed, available []models.Extension
+	for _, row := range all {
+		if row.Installed {
+			installed = append(installed, row)
+		} else {
+			available = append(available, row)
 		}
-		listRows = append(listRows, item)
 	}
-	data["Rows"] = listRows
+	data["InstalledRows"] = extensionListRows(installed, extMgr, true)
+	availableRows := extensionListRows(available, extMgr, false)
+	sort.Slice(availableRows, func(i, j int) bool {
+		left := strings.ToLower(strings.TrimSpace(availableRows[i].DisplayTitle))
+		right := strings.ToLower(strings.TrimSpace(availableRows[j].DisplayTitle))
+		if left == right {
+			return strings.ToLower(availableRows[i].Name) < strings.ToLower(availableRows[j].Name)
+		}
+		return left < right
+	})
+	data["AvailableRows"] = availableRows
 
 	var outdated int64
 	_ = db.Model(&models.Extension{}).Where("update_available = ?", true).Count(&outdated).Error
@@ -166,6 +159,20 @@ func (h *Handler) extensionList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.render(w, r, "Extensions", "admin/extensions.html", data)
+}
+
+func extensionListRows(rows []models.Extension, extMgr *extensions.Manager, withOrder bool) []extensionRow {
+	listRows := make([]extensionRow, 0, len(rows))
+	last := len(rows) - 1
+	for i, row := range rows {
+		item := extensionListRow(row, extMgr)
+		if withOrder {
+			item.CanMoveUp = i > 0
+			item.CanMoveDown = i < last
+		}
+		listRows = append(listRows, item)
+	}
+	return listRows
 }
 
 func (h *Handler) extensionUpdateAll(w http.ResponseWriter, r *http.Request) {
@@ -774,8 +781,13 @@ func extensionReorder(db *gorm.DB, id uint, direction int) error {
 	if direction == 0 {
 		return nil
 	}
+	var current models.Extension
+	if err := db.First(&current, id).Error; err != nil {
+		return err
+	}
+	// Reorder only within the installed/available group so the two list tables stay independent.
 	var all []models.Extension
-	if err := db.Order("sort asc, extension_id asc").Find(&all).Error; err != nil {
+	if err := db.Where("installed = ?", current.Installed).Order("sort asc, extension_id asc").Find(&all).Error; err != nil {
 		return err
 	}
 	idx := -1

@@ -38,9 +38,10 @@ func TestMergeExtensionMetaUsesCachedRow(t *testing.T) {
 func TestExtensionReorder(t *testing.T) {
 	db := testAdminDB(t)
 	rows := []models.Extension{
-		{ExtensionID: 1, Name: "a", Sort: 0, Socket: "/tmp/a.sock", Status: models.StatusInactive},
-		{ExtensionID: 2, Name: "b", Sort: 1, Socket: "/tmp/b.sock", Status: models.StatusInactive},
-		{ExtensionID: 3, Name: "c", Sort: 2, Socket: "/tmp/c.sock", Status: models.StatusInactive},
+		{ExtensionID: 1, Name: "a", Sort: 0, Socket: "/tmp/a.sock", Status: models.StatusInactive, Installed: true},
+		{ExtensionID: 2, Name: "b", Sort: 1, Socket: "/tmp/b.sock", Status: models.StatusInactive, Installed: true},
+		{ExtensionID: 3, Name: "c", Sort: 2, Socket: "/tmp/c.sock", Status: models.StatusInactive, Installed: true},
+		{ExtensionID: 4, Name: "pending", Sort: 0, Socket: "/tmp/p.sock", Status: models.StatusInactive, Installed: false},
 	}
 	for _, row := range rows {
 		if err := db.Create(&row).Error; err != nil {
@@ -50,12 +51,19 @@ func TestExtensionReorder(t *testing.T) {
 	if err := extensionReorder(db, 2, 1); err != nil {
 		t.Fatal(err)
 	}
-	var ordered []models.Extension
-	if err := db.Order("sort asc, extension_id asc").Find(&ordered).Error; err != nil {
+	var installed []models.Extension
+	if err := db.Where("installed = ?", true).Order("sort asc, extension_id asc").Find(&installed).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(ordered) != 3 || ordered[0].Name != "a" || ordered[1].Name != "c" || ordered[2].Name != "b" {
-		t.Fatalf("ordered = %#v", ordered)
+	if len(installed) != 3 || installed[0].Name != "a" || installed[1].Name != "c" || installed[2].Name != "b" {
+		t.Fatalf("installed = %#v", installed)
+	}
+	var pending models.Extension
+	if err := db.Where("name = ?", "pending").First(&pending).Error; err != nil {
+		t.Fatal(err)
+	}
+	if pending.Sort != 0 {
+		t.Fatalf("available row sort changed: %#v", pending)
 	}
 }
 
