@@ -2346,6 +2346,39 @@ tr.is-current-menu-item > td {
   padding-right: 0.25rem;
 }
 
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-section > .d-flex .btn-admin-outline,
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-outline,
+.admin-item-form .admin-media-field-actions .btn-admin-outline {
+  border-color: #a1a1aa;
+  color: var(--admin-foreground);
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(24, 24, 27, 0.04);
+}
+
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-section > .d-flex .btn-admin-outline:hover,
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-outline:hover,
+.admin-item-form .admin-media-field-actions .btn-admin-outline:hover {
+  border-color: #71717a;
+  background: var(--admin-muted);
+  color: var(--admin-foreground);
+}
+
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-ghost,
+.admin-item-form .admin-media-field-actions .btn-admin-ghost {
+  border: 1px solid #d4d4d8;
+  color: #3f3f46;
+  background: #fff;
+  height: 1.875rem;
+}
+
+.admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-ghost:hover,
+.admin-item-form .admin-media-field-actions .btn-admin-ghost:hover {
+  border-color: #a1a1aa;
+  background: var(--admin-muted);
+  color: var(--admin-foreground);
+}
+
 .admin-block-spaces {
   display: flex;
   flex-direction: column;
