@@ -66,12 +66,12 @@
           <a class="btn-admin-outline btn-admin-sm" href="{{.DocsURL}}" target="_blank" rel="noopener"><i class="bi bi-book"></i> Open API docs</a>
         </div>
       </div>
-    </div>
-    <div class="admin-form-actions admin-api-settings-actions">
-      <a class="btn-admin-outline" href="/admin/api/credentials" data-turbo-frame="_top">Back to credentials</a>
-      {{if .CanWrite}}
-      <button type="submit" class="btn-admin-primary">Save settings</button>
-      {{end}}
+      <div class="admin-form-actions">
+        <a class="btn-admin-outline" href="/admin/api/credentials" data-turbo-frame="_top">Back to Credentials</a>
+        {{if .CanWrite}}
+        <button type="submit" class="btn-admin-primary">Save Settings</button>
+        {{end}}
+      </div>
     </div>
   </form>
 </div>

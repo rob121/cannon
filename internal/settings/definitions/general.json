@@ -97,6 +97,20 @@
         "default": true,
         "description": "Cache frequently read site data (settings, routes, blocks, groups) in process memory with bounded LRU eviction (safe for small VPS). Disable for debugging or when running multiple Cannon processes against one database."
       },
+      "page_cache_enabled": {
+        "type": "boolean",
+        "title": "Enable Page Cache",
+        "default": false,
+        "description": "Cache full HTML responses for anonymous GET requests in process memory. Flushed when content, settings, blocks, or menus change. Leave off when running multiple Cannon processes against one database (each process has its own cache)."
+      },
+      "page_cache_ttl_seconds": {
+        "type": "integer",
+        "title": "Page Cache TTL (Seconds)",
+        "default": 300,
+        "minimum": 30,
+        "maximum": 86400,
+        "description": "How long a cached anonymous page may be served before it is regenerated."
+      },
       "development_mode": {
         "type": "boolean",
         "title": "Development Mode",
@@ -122,6 +136,13 @@
         "default": "admin",
         "enum": ["admin"],
         "description": "Template pack used for the admin UI. Built-in admin uses embedded templates; custom themes live as folders under the site template directory."
+      },
+      "admin_accent": {
+        "type": "string",
+        "title": "Admin Accent Color",
+        "default": "green",
+        "enum": ["green", "black", "blue", "red", "brown", "purple", "dark-gray"],
+        "description": "Primary color for admin buttons, links, logo badge, and highlights. Use different accents per site to tell multi-site admins apart."
       },
       "content_multilingual": {
         "type": "boolean",
@@ -166,6 +187,8 @@
       {"type": "Control", "scope": "#/properties/default_list_limit"},
       {"type": "Control", "scope": "#/properties/log_level"},
       {"type": "Control", "scope": "#/properties/memory_cache_enabled"},
+      {"type": "Control", "scope": "#/properties/page_cache_enabled"},
+      {"type": "Control", "scope": "#/properties/page_cache_ttl_seconds"},
       {
         "type": "Group",
         "label": "Development",
@@ -176,6 +199,7 @@
       },
       {"type": "Control", "scope": "#/properties/frontend_theme"},
       {"type": "Control", "scope": "#/properties/admin_theme"},
+      {"type": "Control", "scope": "#/properties/admin_accent"},
       {
         "type": "Group",
         "label": "Multilingual Content",

@@ -55,6 +55,34 @@
             {{template "toggle_value_grid" (dict "InputName" "role_notification_events" "Values" .Events "Selected" $.SelectedRoleNotificationEvents)}}
           </div>
           {{end}}
+          <div class="admin-notif-filters mt-3">
+            <p class="admin-form-label mb-2">Filters for <code class="admin-code">onItemAfterSave</code></p>
+            <p class="admin-form-help mb-3">Optional. Applied when that event is selected above. Leave status empty for all saves.</p>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="admin-form-label" for="role-notif-filter-status">Item Status</label>
+                <select class="admin-form-control" id="role-notif-filter-status" name="role_notif_filter_status_onItemAfterSave">
+                  <option value="">Any status</option>
+                  <option value="draft" {{if eq .ItemNotificationFilters.Status "draft"}}selected{{end}}>Draft</option>
+                  <option value="pending" {{if eq .ItemNotificationFilters.Status "pending"}}selected{{end}}>Pending</option>
+                  <option value="published" {{if eq .ItemNotificationFilters.Status "published"}}selected{{end}}>Published</option>
+                  <option value="archived" {{if eq .ItemNotificationFilters.Status "archived"}}selected{{end}}>Archived</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="admin-form-label" for="role-notif-filter-category">Category ID or Slug</label>
+                <input class="admin-form-control" id="role-notif-filter-category" name="role_notif_filter_category_onItemAfterSave" value="{{.ItemNotificationFilters.Category}}" placeholder="news">
+              </div>
+              <div class="col-md-4">
+                <label class="admin-form-label">Author</label>
+                <label class="admin-form-toggle">
+                  <input type="checkbox" name="role_notif_filter_author_self_onItemAfterSave" value="1" {{if .ItemNotificationFilters.AuthorSelf}}checked{{end}}>
+                  <span class="admin-form-toggle-ui" aria-hidden="true"></span>
+                  <span class="admin-form-toggle-label">Only items authored by the recipient</span>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="col-12"><div class="admin-form-divider"></div></div>
         <div class="col-12">

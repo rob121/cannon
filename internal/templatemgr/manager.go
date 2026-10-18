@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/internal/fsutil"
 	"github.com/rob121/cannon/internal/templateengine"
 )
 
@@ -125,7 +126,7 @@ func Save(root, relPath string, content []byte) error {
 		}
 	}
 
-	if err := os.WriteFile(target, content, 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(target, content, 0644); err != nil {
 		return fmt.Errorf("write template: %w", err)
 	}
 	templateengine.InvalidateAll()
@@ -141,7 +142,7 @@ func writeVersion(root, relPath string, content []byte) error {
 		return err
 	}
 	versionPath := filepath.Join(versionDir, versionName)
-	if err := os.WriteFile(versionPath, content, 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(versionPath, content, 0644); err != nil {
 		return fmt.Errorf("write template version: %w", err)
 	}
 	return pruneVersions(versionDir, base)

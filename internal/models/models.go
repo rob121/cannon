@@ -207,16 +207,25 @@ type UserToken struct {
 }
 
 type Block struct {
-	BlockID          uint      `gorm:"primaryKey"`
-	Name             string    `gorm:"size:128;not null"`
-	Type             BlockType `gorm:"size:32;not null"`
-	Space            string    `gorm:"size:128;index;not null"`
-	Status           Status    `gorm:"size:16;not null;default:active"`
-	Sort             int       `gorm:"not null;default:0"`
-	ExtensionName    string    `gorm:"size:128"`
-	ExtensionBlockID string    `gorm:"size:128"`
-	Metadata         string    `gorm:"type:text"`
-	Groups           []Group   `gorm:"many2many:block_groups;"`
+	BlockID          uint         `gorm:"primaryKey"`
+	Name             string       `gorm:"size:128;not null"`
+	Type             BlockType    `gorm:"size:32;not null"`
+	Space            string       `gorm:"size:128;index"` // legacy/denormalized primary space; prefer Spaces
+	Status           Status       `gorm:"size:16;not null;default:active"`
+	Sort             int          `gorm:"not null;default:0"` // legacy; per-space order lives on BlockSpace
+	ExtensionName    string       `gorm:"size:128"`
+	ExtensionBlockID string       `gorm:"size:128"`
+	Metadata         string       `gorm:"type:text"`
+	Groups           []Group      `gorm:"many2many:block_groups;"`
+	Spaces           []BlockSpace `gorm:"foreignKey:BlockID;constraint:OnDelete:CASCADE"`
+}
+
+// BlockSpace assigns a block to an adhoc template space with per-space sort order.
+type BlockSpace struct {
+	BlockSpaceID uint   `gorm:"primaryKey"`
+	BlockID      uint   `gorm:"index;not null;uniqueIndex:idx_block_space"`
+	Space        string `gorm:"size:128;index;not null;uniqueIndex:idx_block_space"`
+	Sort         int    `gorm:"not null;default:0"`
 }
 
 func All() []any {
@@ -238,6 +247,7 @@ func All() []any {
 		&Setting{},
 		&UserToken{},
 		&Block{},
+		&BlockSpace{},
 		&Category{},
 		&Tag{},
 		&Item{},

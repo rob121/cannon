@@ -331,6 +331,27 @@ img {
   padding-bottom: 0;
 }
 
+.site-item-summary__media {
+  display: block;
+  margin: 0 0 0.75rem;
+  overflow: hidden;
+  border-radius: var(--site-radius, 0.375rem);
+  background: var(--site-muted-bg, #f8fafc);
+}
+
+.site-item-summary__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+
+.site-item-list--cards .site-item-summary__media {
+  margin: -1.25rem -1.25rem 0.75rem;
+  border-radius: var(--site-radius, 0.375rem) var(--site-radius, 0.375rem) 0 0;
+}
+
 .site-item-summary__header {
   margin-bottom: 0.5rem;
 }

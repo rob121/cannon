@@ -160,6 +160,11 @@ A sample systemd unit is in [`deploy/cannon.service`](deploy/cannon.service). Fo
 - Use `Restart=always` (the process exits after staging/rollback so systemd can bring it back)
 - Allow writes to the binary directory (for `cannon.latest` / `cannon.previous`) and to your data paths
 
+**Caching (Configuration → General):**
+
+- **In-Memory Data Cache** — settings, routes, blocks, menus, groups (default on)
+- **Page Cache** — anonymous `GET` HTML responses in process memory (default off). Responses include `X-Cannon-Page-Cache: HIT|MISS`. Flushed when content, comments, settings, blocks, menus, or media change. Leave off if you run multiple Cannon processes against one database (each process has its own cache).
+
 Reload Application in admin refreshes config and extensions; it does **not** replace the Cannon binary.
 
 ## Extensions

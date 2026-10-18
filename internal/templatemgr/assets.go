@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/internal/fsutil"
 	"github.com/rob121/cannon/internal/themes"
 )
 
@@ -25,10 +26,10 @@ type AssetEntry struct {
 
 // AssetFolder groups asset files by subdirectory.
 type AssetFolder struct {
-	Key    string
-	Label  string
+	Key     string
+	Label   string
 	Entries []AssetEntry
-	Total  int
+	Total   int
 }
 
 var editableAssetExtensions = map[string]string{
@@ -221,7 +222,8 @@ func assetEntryFolder(relative string) string {
 	return dir
 }
 
-func sortAssetEntries(entries []AssetEntry, col, dir string) {
+// SortAssetEntries sorts asset entries in place.
+func SortAssetEntries(entries []AssetEntry, col, dir string) {
 	sort.Slice(entries, func(i, j int) bool {
 		switch col {
 		case "type":
@@ -232,6 +234,10 @@ func sortAssetEntries(entries []AssetEntry, col, dir string) {
 			return sortLess(entries[i].Name, entries[j].Name, dir)
 		}
 	})
+}
+
+func sortAssetEntries(entries []AssetEntry, col, dir string) {
+	SortAssetEntries(entries, col, dir)
 }
 
 // ReadAsset loads editable asset content from disk.
@@ -272,7 +278,7 @@ func SaveAsset(root, relPath string, content []byte) error {
 		}
 	}
 
-	if err := os.WriteFile(target, content, 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(target, content, 0644); err != nil {
 		return fmt.Errorf("write asset: %w", err)
 	}
 	return nil

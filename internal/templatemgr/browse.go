@@ -255,11 +255,11 @@ func RootGroups(root string) ([]GroupSummary, error) {
 	out := make([]GroupSummary, 0, len(themesList))
 	for _, theme := range themesList {
 		out = append(out, GroupSummary{
-			Name:  theme.Name,
-			Label: theme.Label,
-			Type:  theme.Type,
+			Name:   theme.Name,
+			Label:  theme.Label,
+			Type:   theme.Type,
 			Status: theme.Status,
-			Total: theme.Total,
+			Total:  theme.Total,
 		})
 	}
 	return out, nil

@@ -16,7 +16,7 @@ func subscriptionsTestDB(t *testing.T) (*gorm.DB, context.Context) {
 	t.Helper()
 	path := t.TempDir() + "/notifications.sqlite"
 	site := &config.SiteConfig{
-		ID: t.Name(),
+		ID:       t.Name(),
 		Database: config.DatabaseConfig{Type: "sqlite", DSN: path},
 	}
 	if err := database.Migrate(site); err != nil {
@@ -142,7 +142,7 @@ func TestResolveEmailRecipients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recipients, err := resolveEmailRecipients(ctx, hooks.OnUserSignup)
+	recipients, err := resolveEmailRecipients(ctx, hooks.OnUserSignup, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

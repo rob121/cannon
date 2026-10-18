@@ -2,18 +2,18 @@ package hooks
 
 // System hook events.
 const (
-	OnBeforeRoute            = "onBeforeRoute"
-	OnAfterRoute             = "onAfterRoute"
-	OnBeforeRender           = "onBeforeRender"
-	OnAfterRender            = "onAfterRender"
-	OnPrepareDocumentHead    = "onPrepareDocumentHead"
-	OnPrepareDocumentBody    = "onPrepareDocumentBody"
-	OnAdminBeforeRender      = "onAdminBeforeRender"
+	OnBeforeRoute              = "onBeforeRoute"
+	OnAfterRoute               = "onAfterRoute"
+	OnBeforeRender             = "onBeforeRender"
+	OnAfterRender              = "onAfterRender"
+	OnPrepareDocumentHead      = "onPrepareDocumentHead"
+	OnPrepareDocumentBody      = "onPrepareDocumentBody"
+	OnAdminBeforeRender        = "onAdminBeforeRender"
 	OnAdminPrepareDocumentHead = "onAdminPrepareDocumentHead"
 	OnAdminPrepareDocumentBody = "onAdminPrepareDocumentBody"
-	OnSettingsSave           = "onSettingsSave"
-	OnSitemapGenerate        = "onSitemapGenerate"
-	OnRobotsGenerate         = "onRobotsGenerate"
+	OnSettingsSave             = "onSettingsSave"
+	OnSitemapGenerate          = "onSitemapGenerate"
+	OnRobotsGenerate           = "onRobotsGenerate"
 )
 
 // User hook events.

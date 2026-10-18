@@ -10,6 +10,7 @@ import (
 	"github.com/rob121/cannon/internal/config"
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/groups"
+	"github.com/rob121/cannon/internal/media"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/router"
@@ -177,6 +178,13 @@ func frontendFuncMap(opts frontendFuncOpts) template.FuncMap {
 		"itemHasDate": templateengine.ItemHasDate,
 		"excerpt":     templateengine.Excerpt,
 		"themeAsset":  templateengine.ThemeAssetURL,
+		"imageStyle": func(path, styleKey string) string {
+			assetsDir := ""
+			if site != nil {
+				assetsDir = site.AssetsDir
+			}
+			return media.ResolveWebStyle(assetsDir, path, styleKey)
+		},
 		"absoluteURL": func(path string) string {
 			return templateengine.AbsoluteURL(r, path)
 		},

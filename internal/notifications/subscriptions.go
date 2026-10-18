@@ -101,6 +101,11 @@ func RoleSubscriptionEvents(db *gorm.DB, roleID uint) ([]string, error) {
 
 // ReplaceRoleSubscriptions saves role-default notification events.
 func ReplaceRoleSubscriptions(db *gorm.DB, roleID uint, events []string) error {
+	return ReplaceRoleSubscriptionsWithFilters(db, roleID, events, nil)
+}
+
+// ReplaceRoleSubscriptionsWithFilters saves role defaults and optional per-event filters.
+func ReplaceRoleSubscriptionsWithFilters(db *gorm.DB, roleID uint, events []string, filtersByEvent map[string]SubscriptionFilters) error {
 	if err := db.Where("role_id = ?", roleID).Delete(&models.NotificationSubscription{}).Error; err != nil {
 		return err
 	}
@@ -111,16 +116,31 @@ func ReplaceRoleSubscriptions(db *gorm.DB, roleID uint, events []string) error {
 		}
 		roleIDCopy := roleID
 		row := models.NotificationSubscription{
-			RoleID:  &roleIDCopy,
-			Event:   event,
-			Channel: models.NotificationChannelEmail,
-			Status:  models.StatusActive,
+			RoleID:      &roleIDCopy,
+			Event:       event,
+			Channel:     models.NotificationChannelEmail,
+			Status:      models.StatusActive,
+			FiltersJSON: FiltersToJSON(filtersByEvent[event]),
 		}
 		if err := db.Create(&row).Error; err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// RoleSubscriptionFilters returns filters keyed by event for a role.
+func RoleSubscriptionFilters(db *gorm.DB, roleID uint) (map[string]SubscriptionFilters, error) {
+	var rows []models.NotificationSubscription
+	if err := db.Where("role_id = ? AND channel = ?", roleID, models.NotificationChannelEmail).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make(map[string]SubscriptionFilters, len(rows))
+	for _, row := range rows {
+		out[row.Event] = ParseFiltersJSON(row.FiltersJSON)
+	}
+	return out, nil
 }
 
 // DeleteRoleSubscriptions removes subscriptions for a deleted role.
@@ -133,38 +153,57 @@ type recipient struct {
 	Email  string
 }
 
-func resolveEmailRecipients(ctx context.Context, event string) ([]recipient, error) {
+func resolveEmailRecipients(ctx context.Context, event string, args map[string]any) ([]recipient, error) {
 	db, err := sites.DB(ctx)
 	if err != nil {
 		return nil, err
 	}
-	roleUserIDs, err := usersForRoleSubscriptions(db, event)
-	if err != nil {
+	var roleSubs []models.NotificationSubscription
+	if err := db.Where("role_id IS NOT NULL AND event = ? AND channel = ? AND status = ?", event, models.NotificationChannelEmail, models.StatusActive).
+		Find(&roleSubs).Error; err != nil {
 		return nil, err
 	}
-	userSubs, err := allUserSubscriptionsForEvent(db, event)
-	if err != nil {
+	var userSubRows []models.NotificationSubscription
+	if err := db.Where("user_id IS NOT NULL AND event = ? AND channel = ?", event, models.NotificationChannelEmail).
+		Find(&userSubRows).Error; err != nil {
 		return nil, err
 	}
 	optOut := map[uint]struct{}{}
-	optIn := map[uint]struct{}{}
-	for userID, status := range userSubs {
-		switch status {
-		case models.StatusActive:
-			optIn[userID] = struct{}{}
-		case models.StatusInactive:
-			optOut[userID] = struct{}{}
+	for _, row := range userSubRows {
+		if row.UserID == nil {
+			continue
+		}
+		if row.Status == models.StatusInactive {
+			optOut[*row.UserID] = struct{}{}
 		}
 	}
 	ids := map[uint]struct{}{}
-	for id := range roleUserIDs {
-		if _, skip := optOut[id]; skip {
+	for _, sub := range roleSubs {
+		if sub.RoleID == nil {
 			continue
 		}
-		ids[id] = struct{}{}
+		members, err := userIDsWithRole(db, *sub.RoleID)
+		if err != nil {
+			return nil, err
+		}
+		for id := range members {
+			if _, skip := optOut[id]; skip {
+				continue
+			}
+			if !MatchFilters(db, sub.FiltersJSON, args, id) {
+				continue
+			}
+			ids[id] = struct{}{}
+		}
 	}
-	for id := range optIn {
-		ids[id] = struct{}{}
+	for _, row := range userSubRows {
+		if row.UserID == nil || row.Status != models.StatusActive {
+			continue
+		}
+		if !MatchFilters(db, row.FiltersJSON, args, *row.UserID) {
+			continue
+		}
+		ids[*row.UserID] = struct{}{}
 	}
 	if len(ids) == 0 {
 		return nil, nil
@@ -190,29 +229,6 @@ func resolveEmailRecipients(ctx context.Context, event string) ([]recipient, err
 		}
 		seen[email] = struct{}{}
 		out = append(out, recipient{UserID: u.UserID, Email: strings.TrimSpace(u.Email)})
-	}
-	return out, nil
-}
-
-func usersForRoleSubscriptions(db *gorm.DB, event string) (map[uint]struct{}, error) {
-	var roleIDs []uint
-	if err := db.Model(&models.NotificationSubscription{}).
-		Where("role_id IS NOT NULL AND event = ? AND channel = ? AND status = ?", event, models.NotificationChannelEmail, models.StatusActive).
-		Pluck("role_id", &roleIDs).Error; err != nil {
-		return nil, err
-	}
-	if len(roleIDs) == 0 {
-		return map[uint]struct{}{}, nil
-	}
-	out := map[uint]struct{}{}
-	for _, roleID := range roleIDs {
-		ids, err := userIDsWithRole(db, roleID)
-		if err != nil {
-			return nil, err
-		}
-		for id := range ids {
-			out[id] = struct{}{}
-		}
 	}
 	return out, nil
 }
@@ -296,22 +312,6 @@ func userSubscriptionMap(db *gorm.DB, userID uint) (map[string]models.Notificati
 	out := make(map[string]models.NotificationSubscription, len(rows))
 	for _, row := range rows {
 		out[row.Event] = row
-	}
-	return out, nil
-}
-
-func allUserSubscriptionsForEvent(db *gorm.DB, event string) (map[uint]models.Status, error) {
-	var rows []models.NotificationSubscription
-	if err := db.Where("user_id IS NOT NULL AND event = ? AND channel = ?", event, models.NotificationChannelEmail).
-		Find(&rows).Error; err != nil {
-		return nil, err
-	}
-	out := make(map[uint]models.Status, len(rows))
-	for _, row := range rows {
-		if row.UserID == nil {
-			continue
-		}
-		out[*row.UserID] = row.Status
 	}
 	return out, nil
 }

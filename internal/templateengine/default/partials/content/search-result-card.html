@@ -32,7 +32,7 @@
   </div>
   {{if $item.Image}}
   <a class="site-search-result__media" href="{{itemURL $item.Slug}}" tabindex="-1" aria-hidden="true">
-    <img src="{{$item.Image}}" alt="" loading="lazy" decoding="async">
+    <img src="{{imageStyle $item.Image "medium"}}" alt="" loading="lazy" decoding="async">
   </a>
   {{end}}
 </article>

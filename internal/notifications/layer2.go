@@ -10,7 +10,7 @@ import (
 )
 
 func dispatchLayer2(ctx context.Context, event string, args map[string]any) {
-	recipients, err := resolveEmailRecipients(ctx, event)
+	recipients, err := resolveEmailRecipients(ctx, event, args)
 	if err != nil {
 		log.Printf("notifications: resolve recipients for %s: %v", event, err)
 		return
@@ -40,11 +40,12 @@ func dispatchLayer2(ctx context.Context, event string, args map[string]any) {
 }
 
 func formatEmail(event string, args map[string]any) (subject, body string) {
+	vars := FlattenArgs(args)
 	subject = "Cannon: " + event
 	lines := []string{"Event: " + event}
-	for _, key := range []string{"username", "email", "user_id", "item_id", "comment_id"} {
-		if v, ok := args[key]; ok && fmt.Sprint(v) != "" {
-			lines = append(lines, fmt.Sprintf("%s: %v", key, v))
+	for _, key := range []string{"username", "email", "user_id", "item_id", "comment_id", "title", "status"} {
+		if v := vars[key]; v != "" {
+			lines = append(lines, fmt.Sprintf("%s: %s", key, v))
 		}
 	}
 	body = strings.Join(lines, "\n")

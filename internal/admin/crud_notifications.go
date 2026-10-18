@@ -3,12 +3,21 @@ package admin
 import (
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/rob121/cannon/internal/mail"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/notifications"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
+
+type notificationListRow struct {
+	models.Notification
+	DeliveryLabel string
+	DeliveryTime  string
+	DeliveryError bool
+}
 
 const notificationsBase = "/admin/notifications"
 
@@ -46,8 +55,28 @@ func (h *Handler) notificationList(w http.ResponseWriter, r *http.Request) {
 	}, "name")
 	var rows []models.Notification
 	db.Preload("Events").Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
-	data["Rows"] = rows
+	listRows := make([]notificationListRow, 0, len(rows))
+	for _, row := range rows {
+		item := notificationListRow{Notification: row}
+		if strings.TrimSpace(row.LastError) != "" {
+			item.DeliveryLabel = "Error"
+			item.DeliveryError = true
+			item.DeliveryTime = formatNotificationTime(row.LastErrorAt)
+		} else if row.LastSentAt != nil {
+			item.DeliveryLabel = "Sent"
+			item.DeliveryTime = formatNotificationTime(row.LastSentAt)
+		}
+		listRows = append(listRows, item)
+	}
+	data["Rows"] = listRows
 	h.render(w, r, "Notifications", "admin/notifications.html", data)
+}
+
+func formatNotificationTime(t *time.Time) string {
+	if t == nil || t.IsZero() {
+		return ""
+	}
+	return t.Local().Format("2006-01-02 15:04")
 }
 
 func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id uint) {
@@ -63,6 +92,14 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 		row.Status = models.StatusActive
 	}
 	selectedEvents := notificationEventSet(row.Events)
+	templates := notifications.ParseTemplatesJSON(row.TemplatesJSON)
+	mailCfg, _ := mail.LoadSettings(r.Context())
+	useSiteMail := false
+	siteMailTo := ""
+	if to, ok := mail.SiteMailRecipient(mailCfg, row.ShoutrrURL); ok {
+		useSiteMail = true
+		siteMailTo = to
+	}
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
@@ -70,11 +107,24 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 			return
 		}
 		row.Name = formString(r, "name")
-		row.ShoutrrURL = formString(r, "shoutrr_url")
 		row.Status = formStatus(r)
 		selectedEvents = r.Form["events"]
+		templates = notificationTemplatesFromForm(r)
+		row.TemplatesJSON = notifications.TemplatesToJSON(templates)
+		useSiteMail = r.FormValue("shoutrr_source") == "site_mail"
+		siteMailTo = formString(r, "site_mail_to")
+		if useSiteMail {
+			built, err := mail.ShoutrrSMTPURL(mailCfg, siteMailTo)
+			if err != nil {
+				h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
+				return
+			}
+			row.ShoutrrURL = built
+		} else {
+			row.ShoutrrURL = formString(r, "shoutrr_url")
+		}
 		if row.Name == "" || row.ShoutrrURL == "" {
-			h.renderNotificationForm(w, r, row, selectedEvents, isNew, "Name and shoutrrr URL are required.")
+			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "Name and shoutrrr URL are required.")
 			return
 		}
 		var saveErr error
@@ -84,17 +134,30 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 			saveErr = db.Save(&row).Error
 		}
 		if saveErr != nil {
-			h.renderNotificationForm(w, r, row, selectedEvents, isNew, saveErr.Error())
+			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, saveErr.Error())
 			return
 		}
 		if err := replaceNotificationEvents(db, row.NotificationID, r.Form["events"]); err != nil {
-			h.renderNotificationForm(w, r, row, selectedEvents, isNew, err.Error())
+			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
 			return
 		}
 		redirectList(w, r, notificationsBase)
 		return
 	}
-	h.renderNotificationForm(w, r, row, selectedEvents, isNew, "")
+	h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "")
+}
+
+func notificationTemplatesFromForm(r *http.Request) map[string]notifications.EventTemplate {
+	out := map[string]notifications.EventTemplate{}
+	for _, event := range notifications.NotificationEvents {
+		subject := strings.TrimSpace(r.FormValue("template_subject_" + event))
+		body := strings.TrimSpace(r.FormValue("template_body_" + event))
+		if subject == "" && body == "" {
+			continue
+		}
+		out[event] = notifications.EventTemplate{Subject: subject, Body: body}
+	}
+	return out
 }
 
 func replaceNotificationEvents(db *gorm.DB, notificationID uint, events []string) error {
@@ -121,19 +184,32 @@ func notificationEventSet(events []models.NotificationEvent) []string {
 	return out
 }
 
-func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request, row models.Notification, selected []string, isNew bool, errMsg string) {
+func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request, row models.Notification, selected []string, templates map[string]notifications.EventTemplate, useSiteMail bool, siteMailTo string, isNew bool, errMsg string) {
 	title := "Add Notification"
 	if !isNew {
 		title = "Edit Notification"
 	}
+	if templates == nil {
+		templates = map[string]notifications.EventTemplate{}
+	}
+	mailCfg, _ := mail.LoadSettings(r.Context())
 	data := formData(map[string]any{
-		"ActiveNav":      "notifications",
-		"Row":            row,
-		"IsNew":          isNew,
-		"BasePath":       notificationsBase,
-		"SelectedEvents": selected,
-		"HookEvents":     notifications.NotificationEvents,
+		"ActiveNav":          "notifications",
+		"Row":                row,
+		"IsNew":              isNew,
+		"BasePath":           notificationsBase,
+		"SelectedEvents":     selected,
+		"HookEvents":         notifications.NotificationEvents,
 		"SubscribableGroups": notifications.EventGroups(),
+		"Templates":          templates,
+		"TemplateEvents":     notifications.NotificationEvents,
+		"LastSentLabel":      formatNotificationTime(row.LastSentAt),
+		"LastErrorLabel":     formatNotificationTime(row.LastErrorAt),
+		"MailConfigured":     mailCfg.Configured(),
+		"MailHostLabel":      strings.TrimSpace(mailCfg.Host),
+		"MailFromLabel":      strings.TrimSpace(mailCfg.FromEmail),
+		"UseSiteMail":        useSiteMail,
+		"SiteMailTo":         siteMailTo,
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

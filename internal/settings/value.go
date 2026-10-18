@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/cache"
 )
@@ -292,6 +293,45 @@ func AdminTheme(ctx context.Context) (string, error) {
 	return strings.TrimSpace(theme), nil
 }
 
+const (
+	AdminAccentGreen    = "green"
+	AdminAccentBlack    = "black"
+	AdminAccentBlue     = "blue"
+	AdminAccentRed      = "red"
+	AdminAccentBrown    = "brown"
+	AdminAccentPurple   = "purple"
+	AdminAccentDarkGray = "dark-gray"
+)
+
+// NormalizeAdminAccent returns a known admin accent id, defaulting to green.
+func NormalizeAdminAccent(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case AdminAccentBlack, "blk":
+		return AdminAccentBlack
+	case AdminAccentBlue:
+		return AdminAccentBlue
+	case AdminAccentRed:
+		return AdminAccentRed
+	case AdminAccentBrown:
+		return AdminAccentBrown
+	case AdminAccentPurple:
+		return AdminAccentPurple
+	case AdminAccentDarkGray, "dark_gray", "darkgray", "grey", "dark-grey":
+		return AdminAccentDarkGray
+	default:
+		return AdminAccentGreen
+	}
+}
+
+// AdminAccent returns the configured admin primary accent color id.
+func AdminAccent(ctx context.Context) (string, error) {
+	value, err := GlobalString(ctx, SectionGeneral, "admin_accent")
+	if err != nil {
+		return AdminAccentGreen, err
+	}
+	return NormalizeAdminAccent(value), nil
+}
+
 // RobotsTXT returns custom robots.txt body or empty for default generation.
 func RobotsTXT(ctx context.Context) (string, error) {
 	return GlobalString(ctx, SectionSEO, "robots_txt")
@@ -315,6 +355,26 @@ func AnalyticsAuthenticatedOnly(ctx context.Context) (bool, error) {
 // MemoryCacheEnabled reports whether domain-level in-memory caches are active.
 func MemoryCacheEnabled(ctx context.Context) (bool, error) {
 	return cache.Enabled(ctx), nil
+}
+
+// PageCacheEnabled reports whether anonymous full-page HTML caching is active.
+func PageCacheEnabled(ctx context.Context) (bool, error) {
+	return GlobalBoolDefault(ctx, SectionGeneral, "page_cache_enabled", false)
+}
+
+// PageCacheTTL returns the page-cache time-to-live.
+func PageCacheTTL(ctx context.Context) (time.Duration, error) {
+	sec, err := GlobalIntDefault(ctx, SectionGeneral, "page_cache_ttl_seconds", 300)
+	if err != nil {
+		return 300 * time.Second, err
+	}
+	if sec < 30 {
+		sec = 30
+	}
+	if sec > 86400 {
+		sec = 86400
+	}
+	return time.Duration(sec) * time.Second, nil
 }
 
 // Bool coerces a configuration map value to bool.

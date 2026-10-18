@@ -19,4 +19,10 @@ var (
 
 	// MaxMenusPerSite caps cached named menus (items+groups+route) per site.
 	MaxMenusPerSite = 32
+
+	// MaxPagesPerSite caps cached anonymous full-page responses per site.
+	MaxPagesPerSite = 256
+
+	// MaxObjectsPerSite caps cached content objects (items, etc.) per site.
+	MaxObjectsPerSite = 512
 )

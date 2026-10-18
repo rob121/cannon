@@ -101,6 +101,9 @@ func Migrate(site *config.SiteConfig) error {
 	if err := RepairContentLocaleSchema(db); err != nil {
 		return err
 	}
+	if err := RepairBlockSpacesSchema(db); err != nil {
+		return err
+	}
 	return nil
 }
 

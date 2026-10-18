@@ -70,7 +70,7 @@ func TestFinishBlockHTMLPlainWrapper(t *testing.T) {
 		body, _ := data["Body"].(template.HTML)
 		return string(body), nil
 	}
-	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", render)
+	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", "sidebar", render)
 	if err != nil {
 		t.Fatal(err)
 	}

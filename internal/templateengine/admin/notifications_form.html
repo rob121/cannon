@@ -16,11 +16,46 @@
             <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
           </select>
         </div>
-        <div class="col-12">
-          <label class="admin-form-label">Shoutrrr URL</label>
-          <input class="admin-form-control" name="shoutrr_url" value="{{.Row.ShoutrrURL}}" placeholder="smtp://user:pass@host:587/?from=...&to=..." required>
-          <p class="admin-form-help">Service URL in <a href="https://github.com/containrrr/shoutrrr" target="_blank" rel="noopener">shoutrrr</a> format (smtp, slack, etc.).</p>
+        <div class="col-12" data-notif-shoutrr>
+          <label class="admin-form-label" for="shoutrr-source">Delivery Target</label>
+          <select class="admin-form-control" id="shoutrr-source" name="shoutrr_source" data-notif-shoutrr-source>
+            <option value="custom" {{if not .UseSiteMail}}selected{{end}}>Custom Shoutrrr URL</option>
+            <option value="site_mail" {{if .UseSiteMail}}selected{{end}} {{if not .MailConfigured}}disabled{{end}}>Site mail (Configuration → Mail)</option>
+          </select>
+          {{if .MailConfigured}}
+          <p class="admin-form-help">Site mail uses SMTP <code class="admin-code">{{.MailHostLabel}}</code> from <code class="admin-code">{{.MailFromLabel}}</code>.</p>
+          {{else}}
+          <p class="admin-form-help">Configure SMTP under <a href="/admin/configuration/global/mail">Configuration → Mail</a> to enable the site mail option.</p>
+          {{end}}
+
+          <div class="mt-3" data-notif-shoutrr-custom {{if .UseSiteMail}}hidden{{end}}>
+            <label class="admin-form-label" for="shoutrr-url">Shoutrrr URL</label>
+            <input class="admin-form-control" id="shoutrr-url" name="shoutrr_url" value="{{.Row.ShoutrrURL}}" placeholder="smtp://user:pass@host:587/?from=...&to=..." {{if not .UseSiteMail}}required{{end}} data-notif-shoutrr-url>
+            <p class="admin-form-help">Service URL in <a href="https://github.com/containrrr/shoutrrr" target="_blank" rel="noopener">shoutrrr</a> format (smtp, slack, webhook, etc.).</p>
+          </div>
+
+          <div class="mt-3" data-notif-shoutrr-site {{if not .UseSiteMail}}hidden{{end}}>
+            <label class="admin-form-label" for="site-mail-to">Recipient Email</label>
+            <input class="admin-form-control" id="site-mail-to" name="site_mail_to" type="email" value="{{.SiteMailTo}}" placeholder="alerts@example.com" {{if .UseSiteMail}}required{{end}} data-notif-shoutrr-to>
+            <p class="admin-form-help">On save, Cannon builds an <code class="admin-code">smtp://</code> Shoutrrr URL from Configuration → Mail for this recipient.</p>
+          </div>
         </div>
+        {{if or .Row.LastError .LastSentLabel}}
+        <div class="col-12">
+          <label class="admin-form-label">Delivery</label>
+          {{if .LastSentLabel}}
+          <p class="admin-form-help mb-1">Last sent {{.LastSentLabel}}</p>
+          {{end}}
+          {{if .Row.LastError}}
+          <div class="alert alert-danger mb-0" role="alert">
+            <strong>Last error{{if .LastErrorLabel}} ({{.LastErrorLabel}}){{end}}:</strong>
+            {{.Row.LastError}}
+          </div>
+          {{else}}
+          <p class="admin-form-help mb-0">No recent delivery errors.</p>
+          {{end}}
+        </div>
+        {{end}}
         <div class="col-12">
           <label class="admin-form-label">Hook Events</label>
           {{range .SubscribableGroups}}
@@ -31,6 +66,29 @@
           {{else}}
           {{template "toggle_value_grid" (dict "InputName" "events" "Values" .HookEvents "Selected" .SelectedEvents)}}
           {{end}}
+        </div>
+        <div class="col-12"><div class="admin-form-divider"></div></div>
+        <div class="col-12">
+          <label class="admin-form-label">Message Templates</label>
+          <p class="admin-form-help mb-3">Optional per-event subject and body. Use placeholders like <code class="admin-code">{{"{{"}}username{{"}}"}}</code>, <code class="admin-code">{{"{{"}}email{{"}}"}}</code>, <code class="admin-code">{{"{{"}}item_id{{"}}"}}</code>, <code class="admin-code">{{"{{"}}title{{"}}"}}</code>, <code class="admin-code">{{"{{"}}status{{"}}"}}</code>. Leave blank to use the default one-line message.</p>
+          <div class="vstack gap-3">
+            {{range .TemplateEvents}}
+            {{$tmpl := index $.Templates .}}
+            <div class="admin-notif-template">
+              <p class="admin-form-label mb-2"><code class="admin-code">{{.}}</code></p>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="admin-form-label" for="template-subject-{{.}}">Subject</label>
+                  <input class="admin-form-control" id="template-subject-{{.}}" name="template_subject_{{.}}" value="{{$tmpl.Subject}}" placeholder="Optional (SMTP / prepended for Slack)">
+                </div>
+                <div class="col-md-8">
+                  <label class="admin-form-label" for="template-body-{{.}}">Body</label>
+                  <textarea class="admin-form-control" id="template-body-{{.}}" name="template_body_{{.}}" rows="2" placeholder="Leave blank for default message">{{$tmpl.Body}}</textarea>
+                </div>
+              </div>
+            </div>
+            {{end}}
+          </div>
         </div>
       </div>
       {{template "form_actions" .}}

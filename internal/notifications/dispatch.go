@@ -5,18 +5,25 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 // Send delivers a message via a shoutrrr service URL.
 func Send(ctx context.Context, shoutrrURL, message string) error {
+	return SendWithSubject(ctx, shoutrrURL, "", message)
+}
+
+// SendWithSubject delivers a message, optionally overriding the SMTP subject.
+func SendWithSubject(ctx context.Context, shoutrrURL, subject, message string) error {
 	shoutrrURL = strings.TrimSpace(shoutrrURL)
 	if shoutrrURL == "" {
 		return fmt.Errorf("shoutrrr url is required")
 	}
-	return sendShoutrr(ctx, shoutrrURL, message)
+	return sendShoutrr(ctx, shoutrrURL, subject, message)
 }
 
 // DispatchEvent sends notifications configured for the given hook event.
@@ -36,22 +43,36 @@ func DispatchEvent(ctx context.Context, event string, args map[string]any) {
 		Find(&rows).Error; err != nil {
 		log.Printf("notifications: load for %s: %v", event, err)
 	} else if len(rows) > 0 {
-		message := formatMessage(event, args)
 		for _, row := range rows {
-			if err := Send(ctx, row.ShoutrrURL, message); err != nil {
+			subject, body := RenderEventMessage(row.TemplatesJSON, event, args)
+			if err := SendWithSubject(ctx, row.ShoutrrURL, subject, body); err != nil {
 				log.Printf("notifications: send %q (%s): %v", row.Name, event, err)
+				_ = recordDeliveryFailure(db, row.NotificationID, err.Error())
+				continue
 			}
+			_ = recordDeliverySuccess(db, row.NotificationID)
 		}
 	}
 	dispatchLayer2(ctx, event, args)
 }
 
-func formatMessage(event string, args map[string]any) string {
-	parts := []string{"Cannon: " + event}
-	for _, key := range []string{"username", "email", "user_id"} {
-		if v, ok := args[key]; ok && fmt.Sprint(v) != "" {
-			parts = append(parts, fmt.Sprintf("%s=%v", key, v))
-		}
+func recordDeliverySuccess(db *gorm.DB, notificationID uint) error {
+	now := time.Now().UTC()
+	return db.Model(&models.Notification{}).Where("notification_id = ?", notificationID).Updates(map[string]any{
+		"last_error":    "",
+		"last_error_at": nil,
+		"last_sent_at":  now,
+	}).Error
+}
+
+func recordDeliveryFailure(db *gorm.DB, notificationID uint, errMsg string) error {
+	now := time.Now().UTC()
+	errMsg = strings.TrimSpace(errMsg)
+	if len(errMsg) > 2000 {
+		errMsg = errMsg[:2000]
 	}
-	return strings.Join(parts, " ")
+	return db.Model(&models.Notification{}).Where("notification_id = ?", notificationID).Updates(map[string]any{
+		"last_error":    errMsg,
+		"last_error_at": now,
+	}).Error
 }

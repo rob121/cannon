@@ -20,6 +20,7 @@ func InvalidateSite(siteID string) {
 	invalidateBlocks(siteID)
 	invalidateMenus(siteID)
 	invalidateToggle(siteID)
+	InvalidateSitePublic(siteID)
 }
 
 // InvalidateAll drops every site's in-memory domain caches.
@@ -48,6 +49,9 @@ func InvalidateAll() {
 	toggles = map[string]bool{}
 	toggleKnown = map[string]bool{}
 	toggleMu.Unlock()
+
+	InvalidateAllPages()
+	InvalidateAllObjects()
 }
 
 // SiteIDFromContext returns the current site id or "" when unavailable.

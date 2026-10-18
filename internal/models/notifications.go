@@ -8,6 +8,10 @@ type Notification struct {
 	Name           string `gorm:"size:128;not null"`
 	ShoutrrURL     string `gorm:"size:1024;not null"`
 	Status         Status `gorm:"size:16;not null;default:active"`
+	TemplatesJSON  string `gorm:"type:text"` // map[event]{subject,body}
+	LastError      string `gorm:"type:text"`
+	LastErrorAt    *time.Time
+	LastSentAt     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	Events         []NotificationEvent `gorm:"foreignKey:NotificationID;constraint:OnDelete:CASCADE"`

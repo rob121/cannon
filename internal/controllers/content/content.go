@@ -193,7 +193,7 @@ func (c *Controller) handleCategory(ctx *controllers.Context) controllers.Result
 		"ShowReadMore":            listSettings.ShowReadMore,
 		"ItemDisplay":             itemDisplay,
 		"LeadingArticles":         listSettings.LeadingItems,
-		"PaginationBaseURL":       cms.CategoryURLForContext(ctx.GoContext(), cat.Slug),
+		"PaginationBaseURL":       categoryPaginationBaseURL(ctx, cat.Slug),
 		"Categories":              categories,
 		"ShowCategoryTitle":       showTitle,
 		"ShowCategoryDescription": showDescription,
@@ -750,10 +750,39 @@ func clientIP(r *http.Request) string {
 }
 
 func routeContentSlug(ctx *controllers.Context, metaKey string) string {
+	meta := strings.Trim(ctx.RouteMeta(metaKey), "/")
+	// Fixed-path routes (including "/" as home) always use the configured slug.
+	// Wildcard routes prefer the path segment, then fall back to metadata.
+	if ctx.Route.Path == "" || !strings.HasSuffix(ctx.Route.Path, "/*") {
+		return meta
+	}
 	if slug := strings.Trim(ctx.PathSuffix(), "/"); slug != "" {
 		return slug
 	}
-	return strings.Trim(ctx.RouteMeta(metaKey), "/")
+	return meta
+}
+
+// categoryPaginationBaseURL keeps paging on the active route path for fixed-path
+// category placements (e.g. "/" or "/news") instead of always using /content/category/{slug}.
+func categoryPaginationBaseURL(ctx *controllers.Context, slug string) string {
+	routePath := strings.TrimSpace(ctx.Route.Path)
+	if routePath != "" && !strings.HasSuffix(routePath, "/*") {
+		return cms.LocalizedPath(ctx.GoContext(), routePath)
+	}
+	if strings.HasSuffix(routePath, "/*") {
+		prefix := strings.TrimSuffix(routePath, "/*")
+		slug = strings.Trim(slug, "/")
+		if slug != "" {
+			if prefix == "" {
+				return cms.LocalizedPath(ctx.GoContext(), "/"+slug)
+			}
+			return cms.LocalizedPath(ctx.GoContext(), prefix+"/"+slug)
+		}
+		if prefix != "" {
+			return cms.LocalizedPath(ctx.GoContext(), prefix)
+		}
+	}
+	return cms.CategoryURLForContext(ctx.GoContext(), slug)
 }
 
 func feedSuffixFromMeta(ctx *controllers.Context) string {

@@ -16,6 +16,47 @@
         "title": "Approved File Extensions",
         "default": "jpg, jpeg, png, gif, webp, svg, pdf, mp4, webm, mp3, wav, zip",
         "description": "Comma-separated list of allowed extensions without dots. Use * to allow all file types."
+      },
+      "image_styles": {
+        "type": "array",
+        "title": "Image Styles",
+        "description": "Named derivatives generated on image upload. Key thumbnail maps to legacy _thumb files. Mode fit only; width 1–4096; height 0 = proportional. Never upscales.",
+        "default": [
+          {"key": "thumbnail", "width": 320, "height": 0, "mode": "fit"},
+          {"key": "medium", "width": 640, "height": 0, "mode": "fit"},
+          {"key": "large", "width": 1200, "height": 0, "mode": "fit"}
+        ],
+        "items": {
+          "type": "object",
+          "required": ["key", "width"],
+          "properties": {
+            "key": {
+              "type": "string",
+              "title": "Key",
+              "description": "Lowercase letters, digits, underscore. thumbnail writes _thumb."
+            },
+            "width": {
+              "type": "integer",
+              "title": "Max Width",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "height": {
+              "type": "integer",
+              "title": "Max Height",
+              "default": 0,
+              "minimum": 0,
+              "maximum": 4096,
+              "description": "0 keeps aspect ratio from width only."
+            },
+            "mode": {
+              "type": "string",
+              "title": "Mode",
+              "default": "fit",
+              "enum": ["fit"]
+            }
+          }
+        }
       }
     }
   },
@@ -23,7 +64,8 @@
     "type": "VerticalLayout",
     "elements": [
       {"type": "Control", "scope": "#/properties/max_file_size_mb"},
-      {"type": "Control", "scope": "#/properties/approved_extensions"}
+      {"type": "Control", "scope": "#/properties/approved_extensions"},
+      {"type": "Control", "scope": "#/properties/image_styles"}
     ]
   }
 }

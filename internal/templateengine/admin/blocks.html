@@ -31,9 +31,9 @@
         {{range .Rows}}
         <tr>
           <td>{{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery "Label" .Name)}}</td>
-          <td><code class="admin-code">{{.Space}}</code></td>
+          <td><code class="admin-code">{{.SpacesDisplay}}</code></td>
           <td>{{.TypeLabel}}</td>
-          <td>{{template "sort_controls" (dict "Root" $ "ID" .BlockID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>
+          <td>{{if $.ReorderEnabled}}{{template "sort_controls" (dict "Root" $ "ID" .BlockID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}{{else}}—{{end}}</td>
           <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .BlockID "Status" .Status "ListQuery" $.ListQuery)}}</td>
           {{template "row_actions" (dict "BasePath" $.BasePath "ID" .BlockID "ListQuery" $.ListQuery)}}
         </tr>

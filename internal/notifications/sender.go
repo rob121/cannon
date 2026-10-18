@@ -11,14 +11,19 @@ import (
 	"time"
 )
 
-func sendShoutrr(ctx context.Context, rawURL, message string) error {
+func sendShoutrr(ctx context.Context, rawURL, subject, message string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("parse shoutrrr url: %w", err)
 	}
+	subject = strings.TrimSpace(subject)
+	message = strings.TrimSpace(message)
+	if subject != "" && strings.ToLower(u.Scheme) != "smtp" && strings.ToLower(u.Scheme) != "smtps" {
+		message = subject + "\n\n" + message
+	}
 	switch strings.ToLower(u.Scheme) {
 	case "smtp", "smtps":
-		return sendSMTP(u, message)
+		return sendSMTP(u, subject, message)
 	case "slack":
 		return sendSlackWebhook(u, message)
 	default:
@@ -26,7 +31,7 @@ func sendShoutrr(ctx context.Context, rawURL, message string) error {
 	}
 }
 
-func sendSMTP(u *url.URL, message string) error {
+func sendSMTP(u *url.URL, subject, message string) error {
 	host := u.Hostname()
 	port := u.Port()
 	if port == "" {
@@ -43,7 +48,9 @@ func sendSMTP(u *url.URL, message string) error {
 	if to == "" {
 		return fmt.Errorf("smtp url requires to= query parameter")
 	}
-	subject := u.Query().Get("subject")
+	if subject == "" {
+		subject = u.Query().Get("subject")
+	}
 	if subject == "" {
 		subject = "Cannon Notification"
 	}

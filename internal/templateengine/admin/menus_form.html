@@ -50,7 +50,7 @@
           <td>{{template "status_toggle" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "Status" .Item.Status "ListQuery" (printf "?return_to=/admin/menus/%d" $.Row.MenuID))}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
-          <td>{{.Item.Sort}}</td>
+          <td>{{template "sort_controls" (dict "Root" (dict "BasePath" "/admin/menu-items") "ID" .Item.MenuItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown "MoveUpAction" (printf "move-up?return_to=/admin/menus/%d" $.Row.MenuID) "MoveDownAction" (printf "move-down?return_to=/admin/menus/%d" $.Row.MenuID))}}</td>
           {{template "row_actions" (dict "BasePath" "/admin/menu-items" "ID" .Item.MenuItemID "ListQuery" (printf "?menu_id=%d" $.Row.MenuID))}}
         </tr>
         {{else}}

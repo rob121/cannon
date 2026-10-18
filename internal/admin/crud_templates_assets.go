@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/config"
-	"github.com/rob121/cannon/internal/templatemgr"
 	"github.com/rob121/cannon/internal/templatemeta"
+	"github.com/rob121/cannon/internal/templatemgr"
 	"github.com/rob121/cannon/internal/themes"
 )
 
@@ -34,30 +34,34 @@ func (h *Handler) templateAssets(w http.ResponseWriter, r *http.Request, site *c
 			editable++
 		}
 	}
+	page := parsePage(r)
 	basePath := templatesBase + "/" + url.PathEscape(theme) + "/assets"
-	data := listPage(r, 1, int64(len(entries)), basePath,
-		fmt.Sprintf("CSS, JavaScript, and other static files served from /theme/ for the %s theme.", theme),
-		"New Asset", map[string]any{
-			"ActiveNav":       "templates",
-			"Theme":           theme,
-			"Breadcrumbs":     assetBreadcrumbs(theme, ""),
-			"PageActionURL":   basePath + "/new",
-			"PageActionLabel": "New Asset",
-			"TemplatesBase":   templatesBase,
-			"ThemeURL":        templatesBase + "/" + url.PathEscape(theme),
-		})
-	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
-		data["Error"] = errMsg
-	}
 	col, dir, _ := parseSort(r, map[string]string{
 		"name": "name", "type": "type", "editable": "editable",
 	}, "name")
+	templatemgr.SortAssetEntries(entries, col, dir)
+	total := len(entries)
+	pageEntries := paginateSlice(entries, page, pageSizeFor(r))
+	rootEntries, folders := templatemgr.GroupAssetsByFolder(pageEntries, col, dir)
+	data := listPage(r, page, int64(total), basePath,
+		fmt.Sprintf("CSS, JavaScript, and other static files served from /theme/ for the %s theme.", theme),
+		"New Asset", map[string]any{
+			"ActiveNav":     "templates",
+			"Theme":         theme,
+			"Breadcrumbs":   assetBreadcrumbs(theme, ""),
+			"TemplatesBase": templatesBase,
+			"ThemeURL":      templatesBase + "/" + url.PathEscape(theme),
+		})
+	data["PageActionURL"] = basePath + "/new"
+	data["PageActionLabel"] = "New Asset"
+	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
+		data["Error"] = errMsg
+	}
 	data["Sort"] = col
 	data["Dir"] = dir
-	rootEntries, folders := templatemgr.GroupAssetsByFolder(entries, col, dir)
 	data["RootEntries"] = rootEntries
 	data["Folders"] = folders
-	data["AssetTotal"] = len(entries)
+	data["AssetTotal"] = total
 	data["EditableTotal"] = editable
 	data["FolderTotal"] = len(folders)
 	data["BasePath"] = basePath

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templatemeta"
 	"github.com/rob121/cannon/internal/templatemgr"
@@ -33,6 +34,8 @@ func (h *Handler) templates(w http.ResponseWriter, r *http.Request, path string)
 		h.templateNew(w, r, site)
 	case len(parts) == 1 && parts[0] == "import":
 		h.templateImport(w, r, site)
+	case len(parts) == 1 && parts[0] == "migrate-legacy":
+		h.templateMigrateLegacy(w, r, site)
 	case len(parts) == 1 && parts[0] == "edit":
 		h.templateEdit(w, r, site)
 	case len(parts) == 1 && parts[0] == "override":
@@ -62,7 +65,15 @@ func (h *Handler) templateRoot(w http.ResponseWriter, r *http.Request, site *con
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	data := listPage(r, 1, int64(len(groups)), templatesBase,
+	page := parsePage(r)
+	summaries := convertThemeSummaries(groups)
+	col, dir, _ := parseSort(r, map[string]string{
+		"name": "name", "type": "type", "status": "status", "total": "total",
+	}, "name")
+	templatemgr.SortGroups(summaries, col, dir)
+	total := len(summaries)
+	summaries = paginateSlice(summaries, page, pageSizeFor(r))
+	data := listPage(r, page, int64(total), templatesBase,
 		"Browse installable themes. Each theme is a self-contained folder with HTML templates, assets, and template.json metadata.",
 		"New Theme", map[string]any{
 			"ActiveNav":                "templates",
@@ -72,16 +83,20 @@ func (h *Handler) templateRoot(w http.ResponseWriter, r *http.Request, site *con
 			"PageSecondaryActionURL":   templatesBase + "/import",
 			"PageSecondaryActionLabel": "Import from Git",
 		})
-	col, dir, _ := parseSort(r, map[string]string{
-		"name": "name", "type": "type", "status": "status", "total": "total",
-	}, "name")
 	data["Sort"] = col
 	data["Dir"] = dir
-	templatemgr.SortGroups(convertThemeSummaries(groups), col, dir)
-	data["Groups"] = convertThemeSummaries(groups)
+	data["Groups"] = summaries
 	data["TemplatesBase"] = templatesBase
+	data["PageActionURL"] = templatesBase + "/new?create=theme"
 	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
 		data["Error"] = errMsg
+	}
+	if okMsg := strings.TrimSpace(r.URL.Query().Get("ok")); okMsg != "" {
+		data["Success"] = okMsg
+	}
+	if report, legacy := templatemgr.DetectLegacy(site.TemplateDir); legacy {
+		data["LegacyMigration"] = report
+		data["LegacyDefaultName"] = legacyThemeDefaultName(site)
 	}
 	h.render(w, r, "Templates", "admin/templates.html", data)
 }
@@ -121,33 +136,38 @@ func (h *Handler) templateGroup(w http.ResponseWriter, r *http.Request, site *co
 			overridden++
 		}
 	}
-	data := listPage(r, 1, int64(len(entries)), templatesBase,
-		fmt.Sprintf("Override or edit templates in the %s theme.", group),
-		"New File", map[string]any{
-			"ActiveNav":       "templates",
-			"Group":           group,
-			"Overridden":      overridden,
-			"Breadcrumbs":     templateBreadcrumbs(group, ""),
-			"PageActionURL":   templatesBase + "/new?group=" + url.QueryEscape(group),
-			"PageActionLabel": "New File",
-			"TemplatesBase":   templatesBase,
-			"AssetsURL":       templatesBase + "/" + url.PathEscape(group) + "/assets",
-			"MetaURL":         templatesBase + "/" + url.PathEscape(group) + "/meta",
-		})
-	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
-		data["Error"] = errMsg
-	}
+	page := parsePage(r)
+	basePath := templatesBase + "/" + url.PathEscape(group)
 	col, dir, _ := parseSort(r, map[string]string{
 		"name": "name", "source": "source", "status": "status",
 	}, "name")
+	templatemgr.SortEntries(entries, col, dir)
+	total := len(entries)
+	pageEntries := paginateSlice(entries, page, pageSizeFor(r))
+	rootEntries, folders := templatemgr.GroupEntriesByFolder(pageEntries, col, dir)
+	data := listPage(r, page, int64(total), basePath,
+		fmt.Sprintf("Override or edit templates in the %s theme.", group),
+		"", map[string]any{
+			"ActiveNav":     "templates",
+			"Group":         group,
+			"Overridden":    overridden,
+			"Breadcrumbs":   templateBreadcrumbs(group, ""),
+			"TemplatesBase": templatesBase,
+			"AssetsURL":     templatesBase + "/" + url.PathEscape(group) + "/assets",
+			"MetaURL":       templatesBase + "/" + url.PathEscape(group) + "/meta",
+		})
+	data["PageActionURL"] = templatesBase + "/new?group=" + url.QueryEscape(group)
+	data["PageActionLabel"] = "New File"
+	if errMsg := strings.TrimSpace(r.URL.Query().Get("error")); errMsg != "" {
+		data["Error"] = errMsg
+	}
 	data["Sort"] = col
 	data["Dir"] = dir
-	rootEntries, folders := templatemgr.GroupEntriesByFolder(entries, col, dir)
 	data["RootEntries"] = rootEntries
 	data["Folders"] = folders
-	data["TemplateTotal"] = len(entries)
+	data["TemplateTotal"] = total
 	data["FolderTotal"] = len(folders)
-	data["BasePath"] = templatesBase + "/" + group
+	data["BasePath"] = basePath
 	data["TemplatesBase"] = templatesBase
 	data["GroupLabel"] = meta.Name
 	if data["GroupLabel"] == "" {
@@ -565,6 +585,87 @@ func (h *Handler) templateMeta(w http.ResponseWriter, r *http.Request, site *con
 		return
 	}
 	h.renderTemplateMetaForm(w, r, site, theme, meta, "")
+}
+
+func (h *Handler) templateMigrateLegacy(w http.ResponseWriter, r *http.Request, site *config.SiteConfig) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	frontendName := strings.TrimSpace(r.FormValue("frontend_name"))
+	adminName := strings.TrimSpace(r.FormValue("admin_name"))
+	if frontendName == "" {
+		frontendName = legacyThemeDefaultName(site)
+	}
+	front, admin, err := templatemgr.MigrateLegacy(site.TemplateDir, frontendName, adminName)
+	if err != nil {
+		http.Redirect(w, r, templatesBase+"?error="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
+	}
+	if err := applyMigratedThemeSettings(r.Context(), front, admin); err != nil {
+		http.Redirect(w, r, templatesBase+"?error="+url.QueryEscape("migrated but could not update theme settings: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	msg := "Legacy templates migrated"
+	if front != "" {
+		msg += " to theme " + front
+	}
+	if admin != "" {
+		msg += " (admin: " + admin + ")"
+	}
+	http.Redirect(w, r, templatesBase+"?ok="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func legacyThemeDefaultName(site *config.SiteConfig) string {
+	if site == nil {
+		return "site"
+	}
+	name := strings.ToLower(strings.TrimSpace(site.ID))
+	if name == "" {
+		name = strings.ToLower(strings.TrimSpace(site.Name))
+	}
+	name = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '_':
+			return r
+		case r == ' ':
+			return '-'
+		default:
+			return '-'
+		}
+	}, name)
+	name = strings.Trim(name, "-")
+	if name == "" || themes.ValidateName(name) != nil {
+		return "site"
+	}
+	return name
+}
+
+func applyMigratedThemeSettings(ctx context.Context, frontendTheme, adminTheme string) error {
+	if frontendTheme == "" && adminTheme == "" {
+		return nil
+	}
+	store := settings.NewStore()
+	data, err := store.Load(ctx, settings.ScopeGlobal, settings.SectionGeneral)
+	if err != nil {
+		return err
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
+	if frontendTheme != "" {
+		data["frontend_theme"] = frontendTheme
+	}
+	if adminTheme != "" {
+		data["admin_theme"] = adminTheme
+	}
+	return settings.Save(ctx, store, settings.ScopeGlobal, settings.SectionGeneral, data)
 }
 
 func (h *Handler) renderTemplateMetaForm(w http.ResponseWriter, r *http.Request, site *config.SiteConfig, theme string, meta templatemeta.PackMeta, errMsg string) {

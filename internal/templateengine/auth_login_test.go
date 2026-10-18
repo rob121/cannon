@@ -29,6 +29,8 @@ func testFrontendFuncs() map[string]any {
 		"itemDateISO": func(any) string { return "" },
 		"itemDate":    func(any, string) string { return "" },
 		"richText":    func(v any) template.HTML { return template.HTML("") },
+		"imageStyle":  func(path, style string) string { return path },
+		"excerpt":     func(s string, n int) string { return s },
 	}
 	for k, v := range lang.TestFuncMap() {
 		funcs[k] = v

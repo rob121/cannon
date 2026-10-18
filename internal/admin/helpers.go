@@ -162,6 +162,25 @@ func pageSizeFor(r *http.Request) int {
 	return limit
 }
 
+// paginateSlice returns one page of items from an in-memory slice.
+func paginateSlice[T any](items []T, page, size int) []T {
+	if size <= 0 {
+		size = defaultPageSize
+	}
+	if page < 1 {
+		page = 1
+	}
+	start := (page - 1) * size
+	if start >= len(items) {
+		return []T{}
+	}
+	end := start + size
+	if end > len(items) {
+		end = len(items)
+	}
+	return items[start:end]
+}
+
 func adminPageSizeOptions() []int {
 	out := make([]int, len(pageSizeOptions))
 	copy(out, pageSizeOptions)
@@ -209,6 +228,11 @@ func layoutContext(r *http.Request) map[string]any {
 		data["SiteURL"] = siteFrontendURL(site.Host)
 		data["SiteHostLabel"] = siteHostLabel(site.Host)
 	}
+	accent, err := settings.AdminAccent(r.Context())
+	if err != nil {
+		accent = settings.AdminAccentGreen
+	}
+	data["AdminAccent"] = accent
 	if svc, err := user.FromContext(r.Context()); err == nil {
 		if u, err := svc.Current(r.Context()); err == nil {
 			data["CurrentUser"] = map[string]any{

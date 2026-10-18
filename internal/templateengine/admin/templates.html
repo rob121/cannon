@@ -1,4 +1,36 @@
 {{template "page_header" .}}
+{{template "success_alert" .}}
+{{if .LegacyMigration}}
+<div class="admin-form-card admin-form-card-compact mb-3">
+  <div class="admin-form-card-body">
+    <h2 class="h6 mb-2">Legacy Template Layout Detected</h2>
+    <p class="admin-cell-muted mb-3">This site still uses the old pack layout (root <code>template.json</code> and/or <code>default/</code> / <code>admin/</code> trees). Migrate into named theme folders before relying on theme selection.</p>
+    {{if .LegacyMigration.Notes}}
+    <ul class="mb-3">
+      {{range .LegacyMigration.Notes}}
+      <li>{{.}}</li>
+      {{end}}
+    </ul>
+    {{end}}
+    <form method="post" action="{{.TemplatesBase}}/migrate-legacy" class="row g-3 align-items-end">
+      {{csrfField}}
+      <div class="col-md-4">
+        <label class="admin-form-label" for="frontend_name">Frontend Theme Name</label>
+        <input class="admin-form-control" id="frontend_name" name="frontend_name" value="{{.LegacyDefaultName}}" required>
+      </div>
+      {{if .LegacyMigration.HasAdminDir}}
+      <div class="col-md-4">
+        <label class="admin-form-label" for="admin_name">Admin Theme Name</label>
+        <input class="admin-form-control" id="admin_name" name="admin_name" value="{{.LegacyDefaultName}}-admin">
+      </div>
+      {{end}}
+      <div class="col-md-4">
+        <button type="submit" class="btn-admin-primary">Migrate Legacy Layout</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
 <div class="admin-data-card">
   {{template "error_alert" .}}
   <div class="admin-table-scroll">

@@ -70,7 +70,7 @@ func TestFinishBlockHTMLShowName(t *testing.T) {
 		}
 		return `<div class="card-header">` + row.Name + `</div>` + string(data["Body"].(template.HTML)), nil
 	}
-	got, err := finishBlockHTML(row, meta, "<p>Links</p>", render)
+	got, err := finishBlockHTML(row, meta, "<p>Links</p>", "sidebar", render)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestFinishBlockHTMLUsesCardWhenNoWrapper(t *testing.T) {
 		}
 		return "ok", nil
 	}
-	got, err := finishBlockHTML(row, meta, "<p>Hi</p>", render)
+	got, err := finishBlockHTML(row, meta, "<p>Hi</p>", "sidebar", render)
 	if err != nil || got != "ok" {
 		t.Fatalf("got %q err %v", got, err)
 	}
@@ -106,7 +106,7 @@ func TestFinishBlockHTMLWrapper(t *testing.T) {
 		}
 		return `<wrapped>` + string(data["Body"].(template.HTML)) + `</wrapped>`, nil
 	}
-	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", render)
+	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", "sidebar", render)
 	if err != nil {
 		t.Fatal(err)
 	}

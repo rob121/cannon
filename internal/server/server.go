@@ -14,19 +14,19 @@ import (
 	"github.com/rob121/cannon/internal/admin"
 	"github.com/rob121/cannon/internal/api"
 	"github.com/rob121/cannon/internal/blocks"
-	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/config"
 	_ "github.com/rob121/cannon/internal/controllers/auth"
 	_ "github.com/rob121/cannon/internal/controllers/content"
-	_ "github.com/rob121/cannon/internal/notifications"
 	"github.com/rob121/cannon/internal/database"
 	"github.com/rob121/cannon/internal/httpx"
 	"github.com/rob121/cannon/internal/install"
 	"github.com/rob121/cannon/internal/lang"
 	"github.com/rob121/cannon/internal/middleware"
+	_ "github.com/rob121/cannon/internal/notifications"
 	"github.com/rob121/cannon/internal/realtime"
 	"github.com/rob121/cannon/internal/roles"
 	"github.com/rob121/cannon/internal/router"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
@@ -192,7 +192,7 @@ func (s *Server) wrap(next http.Handler) http.Handler {
 }
 
 func (s *Server) frontendHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return withPageCache(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		site, _ := sites.FromContext(r.Context())
 		ext := s.chain.Extensions(site)
 		debugSpaces := blocks.DebugSpacesActive(r.Context(), r)
@@ -245,7 +245,7 @@ func (s *Server) frontendHandler() http.Handler {
 			}),
 		))
 		router.NewDispatcher(ext, eng).ServeHTTP(w, r)
-	})
+	}))
 }
 
 // In space preview, count the empty outline as one placeholder so conditional

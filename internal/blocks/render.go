@@ -92,13 +92,6 @@ func ListForSpace(ctx context.Context, db *gorm.DB, space string) ([]models.Bloc
 	return filtered, nil
 }
 
-// DistinctSpaces returns unique space names used by blocks.
-func DistinctSpaces(db *gorm.DB) ([]string, error) {
-	var spaces []string
-	err := db.Model(&models.Block{}).Distinct().Order("space asc").Pluck("space", &spaces).Error
-	return spaces, err
-}
-
 func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) (string, error) {
 	meta, err := ParseMetadata(row.Metadata)
 	if err != nil {
@@ -220,10 +213,10 @@ func renderOne(ctx context.Context, extMgr *extensions.Manager, row models.Block
 	} else if v, ok := out["html"].(string); ok {
 		html = v
 	}
-	return finishBlockHTML(row, meta, html, render)
+	return finishBlockHTML(row, meta, html, space, render)
 }
 
-func finishBlockHTML(row models.Block, meta Metadata, body string, render FragmentRenderer) (string, error) {
+func finishBlockHTML(row models.Block, meta Metadata, body, space string, render FragmentRenderer) (string, error) {
 	body = strings.TrimSpace(body)
 	if body == "" && !meta.ShowName {
 		return "", nil
@@ -235,20 +228,23 @@ func finishBlockHTML(row models.Block, meta Metadata, body string, render Fragme
 	if render == nil {
 		return body, nil
 	}
-	wrapped, err := render(wrapper, blockWrapperData(row, meta, body))
+	wrapped, err := render(wrapper, blockWrapperData(row, meta, body, space))
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(wrapped), nil
 }
 
-func blockWrapperData(row models.Block, meta Metadata, body string) map[string]any {
+func blockWrapperData(row models.Block, meta Metadata, body, space string) map[string]any {
+	if strings.TrimSpace(space) == "" {
+		space = PrimarySpace(row)
+	}
 	return map[string]any{
 		"Name":     row.Name,
 		"Body":     template.HTML(body),
 		"Content":  template.HTML(body),
 		"ShowName": meta.ShowName,
-		"Space":    row.Space,
+		"Space":    space,
 		"Type":     string(row.Type),
 		"BlockID":  row.BlockID,
 	}

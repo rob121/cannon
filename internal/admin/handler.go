@@ -26,6 +26,7 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/realtime"
 	"github.com/rob121/cannon/internal/routepath"
+	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templateengine"
 	"github.com/rob121/cannon/internal/themes"
@@ -476,6 +477,10 @@ func loginHTML(ctx context.Context, token, errMsg string) string {
           <button type="submit" class="btn-admin-primary w-100">Sign In</button>
         </form>`
 	}
+	accent, err := settings.AdminAccent(ctx)
+	if err != nil {
+		accent = settings.AdminAccentGreen
+	}
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -486,7 +491,7 @@ func loginHTML(ctx context.Context, token, errMsg string) string {
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="/admin/assets/admin.css?v=6" rel="stylesheet">
+  <link href="/admin/assets/admin.css?v=57" rel="stylesheet">
   <style>
     .admin-login-oauth { margin-top: 1.25rem; }
     .admin-login-oauth-divider {
@@ -501,7 +506,7 @@ func loginHTML(ctx context.Context, token, errMsg string) string {
     .admin-login-oauth-actions { display: grid; gap: 0.5rem; }
   </style>
 </head>
-<body class="admin-login-page">
+<body class="admin-login-page admin-accent-` + template.HTMLEscapeString(accent) + `">
   <div class="admin-install-wrap" style="max-width:420px">
     <div class="admin-install-brand">
       <div class="admin-brand-icon"><img class="admin-cannon-icon" src="/admin/assets/cannon-icon.svg?v=4" alt="" width="32" height="32"></div>

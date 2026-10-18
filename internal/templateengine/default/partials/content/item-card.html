@@ -6,6 +6,11 @@
 {{$showCategory := or (not $display) $display.ShowCategoryName}}
 {{$showDate := or (not $display) $display.ShowPublishedDate}}
 <article class="site-item-summary">
+  {{if $item.Image}}
+  <a class="site-item-summary__media" href="{{itemURL $item.Slug}}" tabindex="-1" aria-hidden="true">
+    <img src="{{imageStyle $item.Image "medium"}}" alt="" loading="lazy" decoding="async">
+  </a>
+  {{end}}
   <header class="site-item-summary__header">
     {{if or $showTitle (and $showCategory $item.Category)}}
     <div class="site-item-summary__title-row">

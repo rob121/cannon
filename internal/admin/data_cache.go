@@ -11,18 +11,25 @@ func invalidateRoutesDataCache(ctx context.Context) {
 	siteID := cache.SiteIDFromContext(ctx)
 	cache.InvalidateRoutes(siteID)
 	cache.InvalidateMenus(siteID) // menu hrefs depend on route path/status
+	cache.InvalidateSitePublic(siteID)
 }
 
 func invalidateBlocksDataCache(ctx context.Context) {
-	cache.InvalidateBlocks(cache.SiteIDFromContext(ctx))
+	siteID := cache.SiteIDFromContext(ctx)
+	cache.InvalidateBlocks(siteID)
+	cache.InvalidateSitePublic(siteID)
 }
 
 func invalidateGroupsDataCache(ctx context.Context) {
-	cache.InvalidateGroups(cache.SiteIDFromContext(ctx))
+	siteID := cache.SiteIDFromContext(ctx)
+	cache.InvalidateGroups(siteID)
+	cache.InvalidateSitePublic(siteID)
 }
 
 func invalidateMenusDataCache(ctx context.Context) {
-	cache.InvalidateMenus(cache.SiteIDFromContext(ctx))
+	siteID := cache.SiteIDFromContext(ctx)
+	cache.InvalidateMenus(siteID)
+	cache.InvalidateSitePublic(siteID)
 }
 
 func invalidateSecuritySiteContext(ctx context.Context) {

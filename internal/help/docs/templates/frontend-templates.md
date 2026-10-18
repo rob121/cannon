@@ -23,6 +23,12 @@ A theme is a folder like `{template_dir}/mysite/` containing:
 3. Browse the theme, click **Override** on `layout.html` or other built-ins to copy source into your theme folder
 4. Set **Frontend Theme** to `mysite` in **Configuration → General**
 
+### Legacy pack layout
+
+If your site still has a root `template.json` and/or `default/` / `admin/` trees under `template_dir`, **Admin → Templates** shows a one-time **Migrate Legacy Layout** form. That moves files into named theme folders, writes per-theme metadata, and updates the active theme settings. It does not run automatically on startup.
+
+Template and asset edits in admin use atomic saves (temp file + rename) and keep up to three prior versions under `versions/`.
+
 ---
 
 ## Layout and page

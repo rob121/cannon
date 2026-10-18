@@ -2,11 +2,14 @@ package content
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/groups"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -308,23 +311,36 @@ func ListItems(ctx context.Context, viewerGroups []uint, opts ListOptions) ([]mo
 }
 
 type ListOptions struct {
-	CategoryID     uint
-	CategoryIDs    []uint
-	AuthorID       uint
-	TagID          uint
-	Query          string
-	FieldFilters   map[string]string
-	Featured       bool
-	Sort           string
-	Dir            string
-	Page           int
-	Limit          int
-	NoPagination   bool
-	AllLocales     bool
+	CategoryID   uint
+	CategoryIDs  []uint
+	AuthorID     uint
+	TagID        uint
+	Query        string
+	FieldFilters map[string]string
+	Featured     bool
+	Sort         string
+	Dir          string
+	Page         int
+	Limit        int
+	NoPagination bool
+	AllLocales   bool
 }
 
 // ItemBySlug loads a published item by slug.
 func ItemBySlug(ctx context.Context, slug string, viewerGroups []uint) (*models.Item, error) {
+	siteID := cache.SiteIDFromContext(ctx)
+	objKey := itemSlugObjectKey(ctx, slug, viewerGroups)
+	if siteID != "" && objKey != "" {
+		if v, ok := cache.GetObject(siteID, objKey); ok {
+			if item, ok := v.(*models.Item); ok && item != nil {
+				cp := *item
+				if !groups.CanViewContent(viewerGroups, cp.Groups) {
+					return nil, gorm.ErrRecordNotFound
+				}
+				return &cp, nil
+			}
+		}
+	}
 	q, err := VisibleItemsQuery(ctx, viewerGroups)
 	if err != nil {
 		return nil, err
@@ -336,7 +352,29 @@ func ItemBySlug(ctx context.Context, slug string, viewerGroups []uint) (*models.
 	if !groups.CanViewContent(viewerGroups, item.Groups) {
 		return nil, gorm.ErrRecordNotFound
 	}
+	if siteID != "" && objKey != "" {
+		cp := item
+		cache.SetObject(siteID, objKey, &cp, time.Time{})
+	}
 	return &item, nil
+}
+
+func itemSlugObjectKey(ctx context.Context, slug string, viewerGroups []uint) string {
+	slug = strings.TrimSpace(slug)
+	if slug == "" {
+		return ""
+	}
+	groupsKey := "anon"
+	if len(viewerGroups) > 0 {
+		ids := append([]uint(nil), viewerGroups...)
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+		parts := make([]string, len(ids))
+		for i, id := range ids {
+			parts[i] = strconv.FormatUint(uint64(id), 10)
+		}
+		groupsKey = strings.Join(parts, ",")
+	}
+	return cache.ObjectKey("item_slug", fmt.Sprintf("%s|%s|%s", LocaleFromContext(ctx), slug, groupsKey))
 }
 
 // CategoryBySlug loads an active category by slug.

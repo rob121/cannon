@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -77,9 +78,7 @@ func SaveAvatarUpload(ctx context.Context, site *config.SiteConfig, userID uint,
 		return "", fmt.Errorf("avatar exceeds the maximum upload size")
 	}
 	webPath := "/assets/media/" + avatarMediaFolder + "/" + safeName
-	if strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
-		_, _ = media.GenerateThumbnail(destPath)
-	}
+	generateUploadStyles(ctx, destPath, header.Header.Get("Content-Type"), ext)
 	return webPath, nil
 }
 
@@ -132,9 +131,7 @@ func SaveProfileFieldImage(ctx context.Context, site *config.SiteConfig, userID,
 		return "", fmt.Errorf("image exceeds the maximum upload size")
 	}
 	webPath := "/assets/media/" + folder + "/" + safeName
-	if strings.HasPrefix(header.Header.Get("Content-Type"), "image/") {
-		_, _ = media.GenerateThumbnail(destPath)
-	}
+	generateUploadStyles(ctx, destPath, header.Header.Get("Content-Type"), ext)
 	return webPath, nil
 }
 
@@ -183,7 +180,20 @@ func removeLocalAsset(assetsDir, webPath string) {
 		return
 	}
 	local := filepath.Join(assetsDir, strings.TrimPrefix(webPath, "/assets/"))
+	media.RemoveDerivatives(local, media.DefaultStyles())
 	_ = os.Remove(local)
-	thumb := strings.TrimSuffix(local, filepath.Ext(local)) + "_thumb" + filepath.Ext(local)
-	_ = os.Remove(thumb)
+}
+
+func generateUploadStyles(ctx context.Context, destPath, contentType, ext string) {
+	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
+	if ext == "svg" {
+		return
+	}
+	if ct := strings.ToLower(contentType); ct != "" && !strings.HasPrefix(ct, "image/") {
+		return
+	}
+	styles, _ := media.LoadStyles(ctx)
+	if err := media.GenerateStyles(destPath, styles); err != nil {
+		slog.Warn("avatar/profile image styles", "path", destPath, "err", err)
+	}
 }

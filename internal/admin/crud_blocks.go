@@ -22,9 +22,10 @@ const blocksBase = "/admin/blocks"
 
 type blockListRow struct {
 	models.Block
-	TypeLabel   string
-	CanMoveUp   bool
-	CanMoveDown bool
+	TypeLabel     string
+	SpacesDisplay string
+	CanMoveUp     bool
+	CanMoveDown   bool
 }
 
 type extensionBlockOption struct {
@@ -61,11 +62,12 @@ func (h *Handler) blocks(w http.ResponseWriter, r *http.Request, path string) {
 func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
-	spaceFilter := r.URL.Query().Get("space")
+	spaceFilter := strings.TrimSpace(r.URL.Query().Get("space"))
 
 	q := db.Model(&models.Block{})
 	if spaceFilter != "" {
-		q = q.Where("space = ?", spaceFilter)
+		q = q.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+			Where("block_spaces.space = ?", spaceFilter)
 	}
 	var total int64
 	q.Count(&total)
@@ -74,25 +76,38 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 		"Assign HTML, Markdown, or extension blocks to template spaces.",
 		"Add Block", map[string]any{"ActiveNav": "blocks"})
 	order := applyListSort(r, data, map[string]string{
-		"name": "name", "space": "space", "type": "type", "sort": "sort", "status": "status",
+		"name": "blocks.name", "space": "blocks.space", "type": "blocks.type", "sort": "blocks.sort", "status": "blocks.status",
 	}, "sort")
 	sortParam := strings.TrimSpace(r.URL.Query().Get("sort"))
 	if sortParam == "" || sortParam == "sort" {
-		order = "sort asc, block_id asc"
+		if spaceFilter != "" {
+			order = "block_spaces.sort ASC, blocks.block_id ASC"
+		} else {
+			order = "blocks.block_id ASC"
+		}
 	}
 
 	var rows []models.Block
-	listQ := db.Model(&models.Block{})
+	listQ := db.Model(&models.Block{}).Preload("Spaces")
 	if spaceFilter != "" {
-		listQ = listQ.Where("space = ?", spaceFilter)
+		listQ = listQ.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+			Where("block_spaces.space = ?", spaceFilter).
+			Select("blocks.*, block_spaces.sort AS sort")
 	}
 	listQ.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
 
-	position := blockSortPositions(db, spaceFilter)
+	position := map[uint]blockSortPosition{}
+	if spaceFilter != "" {
+		position = blockSortPositions(db, spaceFilter)
+	}
 
 	listRows := make([]blockListRow, 0, len(rows))
 	for _, row := range rows {
-		item := blockListRow{Block: row, TypeLabel: blockTypeLabel(row)}
+		item := blockListRow{
+			Block:         row,
+			TypeLabel:     blockTypeLabel(row),
+			SpacesDisplay: strings.Join(blocks.SpaceNames(row), ", "),
+		}
 		if pos, ok := position[row.BlockID]; ok {
 			item.CanMoveUp = pos.canMoveUp
 			item.CanMoveDown = pos.canMoveDown
@@ -105,6 +120,7 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	data["SpaceFilter"] = spaceFilter
 	data["Spaces"] = spaces
 	data["ListQuery"] = listQueryFromData(data)
+	data["ReorderEnabled"] = spaceFilter != ""
 	if spaceFilter != "" {
 		data["PageActionURL"] = blocksBase + "/new?space=" + url.QueryEscape(spaceFilter)
 	}
@@ -120,14 +136,15 @@ func (h *Handler) blockForm(w http.ResponseWriter, r *http.Request, id uint) {
 	isNew := id == 0
 	var row models.Block
 	if !isNew {
-		if err := db.Preload("Groups").First(&row, id).Error; err != nil {
+		if err := db.Preload("Groups").Preload("Spaces").First(&row, id).Error; err != nil {
 			h.notFound(w, r)
 			return
 		}
 	} else {
 		row.Type = models.BlockTypeHTML
 		row.Status = models.StatusActive
-		if preset := r.URL.Query().Get("space"); preset != "" {
+		if preset := strings.TrimSpace(r.URL.Query().Get("space")); preset != "" {
+			row.Spaces = []models.BlockSpace{{Space: preset}}
 			row.Space = preset
 		}
 	}
@@ -142,43 +159,78 @@ func (h *Handler) blockForm(w http.ResponseWriter, r *http.Request, id uint) {
 			return
 		}
 		row.Name = formString(r, "name")
-		row.Space = formString(r, "space")
 		row.Type = models.BlockType(formString(r, "type"))
 		row.Status = formStatus(r)
-		row.Sort = formInt(r, "sort", 0)
 		row.ExtensionName = formString(r, "extension_name")
 		row.ExtensionBlockID = formString(r, "extension_block_id")
 		spaceFilter := formString(r, "space_filter")
+		spaceValues := blocks.NormalizeSpaces(r.Form["spaces"])
+		if len(spaceValues) == 0 {
+			// Accept legacy single "space" field if present.
+			spaceValues = blocks.NormalizeSpaces([]string{formString(r, "space")})
+		}
+		row.Spaces = make([]models.BlockSpace, 0, len(spaceValues))
+		for _, space := range spaceValues {
+			row.Spaces = append(row.Spaces, models.BlockSpace{Space: space})
+		}
+		if len(spaceValues) > 0 {
+			row.Space = spaceValues[0]
+		} else {
+			row.Space = ""
+		}
+		assignFormSpaces := func() {
+			row.Spaces = make([]models.BlockSpace, 0, len(spaceValues))
+			for _, space := range spaceValues {
+				row.Spaces = append(row.Spaces, models.BlockSpace{Space: space})
+			}
+		}
 		if row.Type == models.BlockTypeExtension {
 			if row.ExtensionName == "" || row.ExtensionBlockID == "" {
 				metaRaw, _ := blocks.MetadataFromFormValues(string(row.Type), r.FormValue("content"), r.Form)
 				meta, _ = blocks.ParseMetadata(metaRaw)
 				row.Metadata = metaRaw
+				assignFormSpaces()
 				h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, "Extension and block are required.")
 				return
 			}
+		}
+		if len(spaceValues) == 0 {
+			metaRaw, _ := blocks.MetadataFromFormValues(string(row.Type), r.FormValue("content"), r.Form)
+			meta, _ = blocks.ParseMetadata(metaRaw)
+			row.Metadata = metaRaw
+			h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, blocks.ErrNoSpaces.Error())
+			return
 		}
 		metaRaw, err := blocks.MetadataFromFormValues(string(row.Type), r.FormValue("content"), r.Form)
 		if err != nil {
 			metaRaw, _ = blocks.MetadataFromFormValues(string(row.Type), r.FormValue("content"), r.Form)
 			meta, _ = blocks.ParseMetadata(metaRaw)
 			row.Metadata = metaRaw
+			assignFormSpaces()
 			h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, err.Error())
 			return
 		}
 		row.Metadata = metaRaw
 
+		// Persist memberships via ReplaceBlockSpaces; avoid GORM association create.
+		savedSpaces := row.Spaces
+		row.Spaces = nil
 		var saveErr error
 		if isNew {
-			saveErr = db.Create(&row).Error
+			saveErr = db.Omit("Spaces").Create(&row).Error
 		} else {
-			saveErr = db.Save(&row).Error
+			saveErr = db.Omit("Spaces").Save(&row).Error
 		}
+		row.Spaces = savedSpaces
 		if saveErr != nil {
 			metaRaw, _ := blocks.MetadataFromFormValues(string(row.Type), r.FormValue("content"), r.Form)
 			meta, _ = blocks.ParseMetadata(metaRaw)
 			row.Metadata = metaRaw
 			h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, saveErr.Error())
+			return
+		}
+		if err := blocks.ReplaceBlockSpaces(db, row.BlockID, spaceValues); err != nil {
+			h.renderBlockForm(w, r, row, meta, extOptions, allGroups, isNew, spaceFilter, err.Error())
 			return
 		}
 		if err := replaceFormGroups(db, &row, r); err != nil {
@@ -209,6 +261,10 @@ func (h *Handler) blockDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		return
 	}
 	db, _ := sites.DB(r.Context())
+	if err := db.Where("block_id = ?", id).Delete(&models.BlockSpace{}).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if err := db.Exec("DELETE FROM block_groups WHERE block_block_id = ?", id).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -259,9 +315,21 @@ func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta bloc
 		})
 		sortWrapperOptions(wrapperTemplates)
 	}
+	spaceNames := blocks.SpaceNames(row)
+	dbSpaces, _ := blocks.DistinctSpaces(db)
+	knownSpaces, _ := blocks.ListKnownSpaces(templateDir, frontendTheme, dbSpaces)
+	extSpaces := extensionBlockSpaces(extOptions, row.ExtensionName, row.ExtensionBlockID)
+	suggestedSpaces := knownSpaces
+	if len(extSpaces) > 0 {
+		suggestedSpaces = extSpaces
+	}
 	data := formData(map[string]any{
 		"ActiveNav":        "blocks",
 		"Row":              row,
+		"SpaceNames":       spaceNames,
+		"KnownSpaces":      knownSpaces,
+		"ExtensionSpaces":  extSpaces,
+		"SuggestedSpaces":  suggestedSpaces,
 		"Meta":             meta,
 		"RouteMode":        routeMode,
 		"SelectedRouteIDs": selectedRouteIDs,
@@ -301,6 +369,26 @@ func extensionBlockOptions(extMgr *extensions.Manager, db *gorm.DB) []extensionB
 		})
 	}
 	return out
+}
+
+func extensionBlockSpaces(options []extensionBlockOption, extensionName, blockID string) []string {
+	extensionName = strings.TrimSpace(extensionName)
+	blockID = strings.TrimSpace(blockID)
+	if extensionName == "" || blockID == "" {
+		return nil
+	}
+	for _, opt := range options {
+		if opt.Name != extensionName {
+			continue
+		}
+		for _, def := range opt.Blocks {
+			if def.ID != blockID {
+				continue
+			}
+			return blocks.NormalizeSpaces(def.Spaces)
+		}
+	}
+	return nil
 }
 
 func blockTypeLabel(row models.Block) string {
@@ -351,26 +439,19 @@ type blockSortPosition struct {
 }
 
 func blockSortPositions(db *gorm.DB, spaceFilter string) map[uint]blockSortPosition {
-	var all []models.Block
-	q := db.Order("space asc, sort asc, block_id asc")
-	if spaceFilter != "" {
-		q = q.Where("space = ?", spaceFilter)
-	}
-	if err := q.Find(&all).Error; err != nil {
+	if strings.TrimSpace(spaceFilter) == "" {
 		return map[uint]blockSortPosition{}
 	}
-	bySpace := make(map[string][]models.Block)
-	for _, row := range all {
-		bySpace[row.Space] = append(bySpace[row.Space], row)
+	var memberships []models.BlockSpace
+	if err := db.Where("space = ?", spaceFilter).Order("sort ASC, block_id ASC").Find(&memberships).Error; err != nil {
+		return map[uint]blockSortPosition{}
 	}
-	out := make(map[uint]blockSortPosition, len(all))
-	for _, rows := range bySpace {
-		last := len(rows) - 1
-		for i, row := range rows {
-			out[row.BlockID] = blockSortPosition{
-				canMoveUp:   i > 0,
-				canMoveDown: i < last,
-			}
+	out := make(map[uint]blockSortPosition, len(memberships))
+	last := len(memberships) - 1
+	for i, row := range memberships {
+		out[row.BlockID] = blockSortPosition{
+			canMoveUp:   i > 0,
+			canMoveDown: i < last,
 		}
 	}
 	return out
@@ -386,8 +467,13 @@ func (h *Handler) blockMoveSort(w http.ResponseWriter, r *http.Request, idStr st
 		h.notFound(w, r)
 		return
 	}
+	spaceFilter := strings.TrimSpace(r.URL.Query().Get("space"))
+	if spaceFilter == "" {
+		http.Error(w, "space filter required for reorder", http.StatusBadRequest)
+		return
+	}
 	db, _ := sites.DB(r.Context())
-	if err := blockReorder(db, id, direction); err != nil {
+	if err := blockReorder(db, id, spaceFilter, direction); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -395,16 +481,16 @@ func (h *Handler) blockMoveSort(w http.ResponseWriter, r *http.Request, idStr st
 	redirectList(w, r, blocksBase+listRedirectQuery(r))
 }
 
-func blockReorder(db *gorm.DB, id uint, direction int) error {
+func blockReorder(db *gorm.DB, id uint, space string, direction int) error {
 	if direction == 0 {
 		return nil
 	}
-	var row models.Block
-	if err := db.First(&row, id).Error; err != nil {
-		return err
+	space = strings.TrimSpace(space)
+	if space == "" {
+		return blocks.ErrNoSpaces
 	}
-	var all []models.Block
-	if err := db.Where("space = ?", row.Space).Order("sort asc, block_id asc").Find(&all).Error; err != nil {
+	var all []models.BlockSpace
+	if err := db.Where("space = ?", space).Order("sort ASC, block_id ASC").Find(&all).Error; err != nil {
 		return err
 	}
 	idx := -1
@@ -426,7 +512,7 @@ func blockReorder(db *gorm.DB, id uint, direction int) error {
 		if item.Sort == i {
 			continue
 		}
-		if err := db.Model(&models.Block{}).Where("block_id = ?", item.BlockID).Update("sort", i).Error; err != nil {
+		if err := db.Model(&models.BlockSpace{}).Where("block_space_id = ?", item.BlockSpaceID).Update("sort", i).Error; err != nil {
 			return err
 		}
 	}

@@ -78,12 +78,18 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 	selectedPerms, selectedDenied, _ := security.LoadRolePermissionAssignments(db, row.RoleID)
 	parentIDs, _ := security.LoadParentRoleIDs(db, row.RoleID)
 	selectedRoleEvents, _ := notifications.RoleSubscriptionEvents(db, row.RoleID)
+	roleFilters, _ := notifications.RoleSubscriptionFilters(db, row.RoleID)
+	if roleFilters == nil {
+		roleFilters = map[string]notifications.SubscriptionFilters{}
+	}
 
 	if r.Method == http.MethodPost {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		selectedRoleEvents = r.Form["role_notification_events"]
+		roleFilters = roleNotificationFiltersFromForm(r)
 		var err error
 		if !isNew && row.SystemRole {
 			priorName := row.Name
@@ -103,19 +109,19 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 			}
 		}
 		if err != nil {
-			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, isNew, err.Error())
+			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
 		if err := security.SaveRolePermissions(db, row.RoleID, r.Form["permission_keys"], r.Form["deny_permission_keys"]); err != nil {
-			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, isNew, err.Error())
+			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
 		if err := security.SaveRoleInheritance(db, row.RoleID, formUintList(r, "parent_role_ids")); err != nil {
-			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, isNew, err.Error())
+			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
-		if err := notifications.ReplaceRoleSubscriptions(db, row.RoleID, r.Form["role_notification_events"]); err != nil {
-			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, isNew, err.Error())
+		if err := notifications.ReplaceRoleSubscriptionsWithFilters(db, row.RoleID, selectedRoleEvents, roleFilters); err != nil {
+			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
 		security.InvalidateSiteContext(r.Context())
@@ -128,33 +134,49 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 		title = "Edit Role"
 		subtitle = "Update role capabilities, inheritance, and direct permission assignments."
 	}
-	h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, isNew, "")
+	h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, "")
 	_ = title
 	_ = subtitle
 }
 
-func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row models.Role, allRoles []models.Role, categories []string, permsByCategory map[string][]security.Permission, selectedPerms, selectedDenied []string, parentIDs []uint, selectedRoleEvents []string, isNew bool, errMsg string) {
+func roleNotificationFiltersFromForm(r *http.Request) map[string]notifications.SubscriptionFilters {
+	out := map[string]notifications.SubscriptionFilters{}
+	itemEvent := "onItemAfterSave"
+	out[itemEvent] = notifications.SubscriptionFilters{
+		Status:     formString(r, "role_notif_filter_status_"+itemEvent),
+		Category:   formString(r, "role_notif_filter_category_"+itemEvent),
+		AuthorSelf: r.FormValue("role_notif_filter_author_self_"+itemEvent) == "1",
+	}
+	return out
+}
+
+func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row models.Role, allRoles []models.Role, categories []string, permsByCategory map[string][]security.Permission, selectedPerms, selectedDenied []string, parentIDs []uint, selectedRoleEvents []string, roleFilters map[string]notifications.SubscriptionFilters, isNew bool, errMsg string) {
 	title := "Add Role"
 	subtitle := "Create a role and assign permissions."
 	if !isNew {
 		title = "Edit Role"
 		subtitle = "Update role capabilities, inheritance, and direct permission assignments."
 	}
+	if roleFilters == nil {
+		roleFilters = map[string]notifications.SubscriptionFilters{}
+	}
+	itemFilters := roleFilters["onItemAfterSave"]
 	data := formData(map[string]any{
-		"ActiveNav":         "roles",
-		"Row":               row,
-		"IsNew":             isNew,
-		"BasePath":          rolesBase,
-		"Subtitle":          subtitle,
-		"AllRoles":          allRoles,
-		"Categories":        categories,
-		"PermsByCategory":   permsByCategory,
-		"SelectedPermKeys":       selectedPerms,
-		"SelectedDeniedPermKeys": selectedDenied,
-		"SelectedParentIDs": parentIDs,
+		"ActiveNav":                      "roles",
+		"Row":                            row,
+		"IsNew":                          isNew,
+		"BasePath":                       rolesBase,
+		"Subtitle":                       subtitle,
+		"AllRoles":                       allRoles,
+		"Categories":                     categories,
+		"PermsByCategory":                permsByCategory,
+		"SelectedPermKeys":               selectedPerms,
+		"SelectedDeniedPermKeys":         selectedDenied,
+		"SelectedParentIDs":              parentIDs,
 		"SelectedRoleNotificationEvents": selectedRoleEvents,
 		"SubscribableGroups":             notifications.EventGroups(),
-		"Protected":         !isNew && row.SystemRole,
+		"ItemNotificationFilters":        itemFilters,
+		"Protected":                      !isNew && row.SystemRole,
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg

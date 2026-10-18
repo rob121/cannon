@@ -11,15 +11,15 @@ import (
 
 func TestValidateRelPath(t *testing.T) {
 	cases := map[string]bool{
-		"admin/dashboard.html":              true,
-		"default/page.html":                   true,
-		"admin/dashboard.html?sort=name":      true,
-		"admin/dashboard.html&sort=name":      true,
-		"":                                    false,
-		"../secret.html":                      false,
-		"/abs.html":                           false,
-		"admin/dashboard.txt":                 false,
-		"global?section=general":              false,
+		"admin/dashboard.html":           true,
+		"default/page.html":              true,
+		"admin/dashboard.html?sort=name": true,
+		"admin/dashboard.html&sort=name": true,
+		"":                               false,
+		"../secret.html":                 false,
+		"/abs.html":                      false,
+		"admin/dashboard.txt":            false,
+		"global?section=general":         false,
 	}
 	for path, ok := range cases {
 		err := ValidateRelPath(path)

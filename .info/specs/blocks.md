@@ -2,7 +2,7 @@
 
 Blocks are site areas that are rendered discretely.    Each block can belong to one or more spaces spaces are rendered in a template ie  a block type "content" could be assigned to space "footer" and then {{space "footer" }} could be called in the template to render the block.  
 
-The admin view should allow filtration of blocks by the space, spaces are adhoc strings 
+The admin view should allow filtration of blocks by the space. Spaces remain adhoc strings (free-text), but the block edit form suggests names discovered from `{{space "…"}}` in the active/builtin theme, spaces already used in the DB, and (when applicable) an extension block’s declared `spaces` list. 
 
 # Block Types 
 

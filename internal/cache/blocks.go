@@ -71,8 +71,11 @@ func BlocksForSpace(ctx context.Context, db *gorm.DB, space string) ([]models.Bl
 
 func loadBlocksForSpace(db *gorm.DB, space string) ([]models.Block, error) {
 	var rows []models.Block
-	err := db.Preload("Groups").Where("space = ? AND status = ?", space, models.StatusActive).
-		Order("sort asc, block_id asc").
+	err := db.Preload("Groups").
+		Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+		Where("block_spaces.space = ? AND blocks.status = ?", space, models.StatusActive).
+		Select("blocks.*, block_spaces.sort AS sort").
+		Order("block_spaces.sort ASC, blocks.block_id ASC").
 		Find(&rows).Error
 	if err != nil {
 		return nil, err
@@ -105,6 +108,10 @@ func cloneBlocks(rows []models.Block) []models.Block {
 		if len(row.Groups) > 0 {
 			out[i].Groups = make([]models.Group, len(row.Groups))
 			copy(out[i].Groups, row.Groups)
+		}
+		if len(row.Spaces) > 0 {
+			out[i].Spaces = make([]models.BlockSpace, len(row.Spaces))
+			copy(out[i].Spaces, row.Spaces)
 		}
 	}
 	return out

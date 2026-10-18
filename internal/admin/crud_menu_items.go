@@ -362,8 +362,9 @@ func buildMenuItemListRows(items []models.MenuItem, currentID uint) []menuItemLi
 			}
 		}
 	}
+	positions := menuItemSortPositions(items)
 	treeRows := make([]menuItemListRow, 0, len(items))
-	return appendMenuItemTreeRows(treeRows, items, byID, parentNames, nil, currentID)
+	return appendMenuItemTreeRows(treeRows, items, byID, parentNames, positions, currentID)
 }
 
 func appendMenuItemTreeRows(out []menuItemListRow, items []models.MenuItem, byID map[uint]models.MenuItem, parentNames map[uint]string, positions map[uint]menuItemSortPosition, currentID uint) []menuItemListRow {
@@ -576,6 +577,10 @@ func (h *Handler) menuItemMoveSort(w http.ResponseWriter, r *http.Request, idStr
 		return
 	}
 	invalidateMenusDataCache(r.Context())
+	if returnTo := menuItemToggleReturnTo(r); returnTo != "" {
+		http.Redirect(w, r, returnTo, http.StatusSeeOther)
+		return
+	}
 	redirectList(w, r, menuItemsBase+listRedirectQuery(r))
 }
 

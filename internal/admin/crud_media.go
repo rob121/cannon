@@ -6,7 +6,9 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	_ "golang.org/x/image/webp"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -222,8 +224,11 @@ func (h *Handler) saveMediaUpload(r *http.Request, site *config.SiteConfig, defa
 		"asset":  asset,
 		"folder": folder,
 	})
-	if strings.HasPrefix(mimeType, "image/") {
-		_, _ = media.GenerateThumbnail(destPath)
+	if strings.HasPrefix(mimeType, "image/") && !strings.Contains(mimeType, "svg") {
+		styles, _ := media.LoadStyles(r.Context())
+		if err := media.GenerateStyles(destPath, styles); err != nil {
+			slog.Warn("media image styles", "path", destPath, "err", err)
+		}
 	}
 	return asset, folder, nil
 }
@@ -364,8 +369,10 @@ func (h *Handler) mediaDelete(w http.ResponseWriter, r *http.Request, idStr stri
 		return
 	}
 	if site != nil {
-		local := strings.TrimPrefix(asset.Path, "/assets/")
-		_ = os.Remove(filepath.Join(site.AssetsDir, local))
+		local := filepath.Join(site.AssetsDir, strings.TrimPrefix(asset.Path, "/assets/"))
+		styles, _ := media.LoadStyles(r.Context())
+		media.RemoveDerivatives(local, styles)
+		_ = os.Remove(local)
 	}
 	if err := db.Delete(&models.MediaAsset{}, id).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

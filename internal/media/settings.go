@@ -17,6 +17,7 @@ type Settings struct {
 	MaxFileSizeBytes int64
 	ApprovedExts     []string
 	AllowAllTypes    bool
+	ImageStyles      []Style
 }
 
 // LoadSettings reads media settings from the global settings store.
@@ -36,11 +37,28 @@ func LoadSettings(ctx context.Context) (Settings, error) {
 		maxMB = 512
 	}
 	exts, allowAll := parseApprovedExtensions(settingsString(data, "approved_extensions", defaultApprovedExtensions))
+	styles, err := parseImageStyles(data["image_styles"])
+	if err != nil {
+		styles = DefaultStyles()
+	}
 	return Settings{
 		MaxFileSizeBytes: int64(maxMB) * 1024 * 1024,
 		ApprovedExts:     exts,
 		AllowAllTypes:    allowAll,
+		ImageStyles:      styles,
 	}, nil
+}
+
+// LoadStyles returns configured image styles, or defaults when unset.
+func LoadStyles(ctx context.Context) ([]Style, error) {
+	cfg, err := LoadSettings(ctx)
+	if err != nil {
+		return DefaultStyles(), err
+	}
+	if len(cfg.ImageStyles) == 0 {
+		return DefaultStyles(), nil
+	}
+	return cfg.ImageStyles, nil
 }
 
 const defaultApprovedExtensions = "jpg, jpeg, png, gif, webp, svg, pdf, mp4, webm, mp3, wav, zip"
@@ -126,19 +144,62 @@ func settingsInt(data map[string]any, key string, def int) (int, error) {
 	if !ok || v == nil {
 		return def, nil
 	}
+	return anyToInt(v, def), nil
+}
+
+func parseImageStyles(raw any) ([]Style, error) {
+	if raw == nil {
+		return DefaultStyles(), nil
+	}
+	var rows []any
+	switch typed := raw.(type) {
+	case []any:
+		rows = typed
+	case []Style:
+		return ValidateStyles(typed)
+	case []map[string]any:
+		rows = make([]any, len(typed))
+		for i, m := range typed {
+			rows[i] = m
+		}
+	default:
+		return DefaultStyles(), nil
+	}
+	if len(rows) == 0 {
+		return DefaultStyles(), nil
+	}
+	out := make([]Style, 0, len(rows))
+	for _, row := range rows {
+		m, ok := row.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, Style{
+			Key:    settingsString(m, "key", ""),
+			Width:  anyToInt(m["width"], 0),
+			Height: anyToInt(m["height"], 0),
+			Mode:   settingsString(m, "mode", ModeFit),
+		})
+	}
+	return ValidateStyles(out)
+}
+
+func anyToInt(v any, def int) int {
 	switch n := v.(type) {
 	case float64:
-		return int(n), nil
+		return int(n)
+	case float32:
+		return int(n)
 	case int:
-		return n, nil
+		return n
 	case int64:
-		return int(n), nil
+		return int(n)
 	case string:
 		if i, err := strconv.Atoi(strings.TrimSpace(n)); err == nil {
-			return i, nil
+			return i
 		}
-		return def, nil
+		return def
 	default:
-		return def, nil
+		return def
 	}
 }

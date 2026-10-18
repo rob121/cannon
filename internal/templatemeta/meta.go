@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rob121/cannon/internal/fsutil"
 )
 
 const FileName = "template.json"
@@ -90,7 +92,7 @@ func Save(root string, meta PackMeta) error {
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(root, FileName), raw, 0644)
+	return fsutil.WriteFileAtomic(filepath.Join(root, FileName), raw, 0644)
 }
 
 func (m *PackMeta) normalize() {

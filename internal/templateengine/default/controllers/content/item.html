@@ -33,7 +33,7 @@
   </header>
   {{end}}
 
-  {{if .Item.Image}}<figure class="site-item-detail__image figure"><img class="figure-img img-fluid rounded" src="{{.Item.Image}}" alt="{{.Item.Title}}"></figure>{{end}}
+  {{if .Item.Image}}<figure class="site-item-detail__image figure"><img class="figure-img img-fluid rounded" src="{{imageStyle .Item.Image "large"}}" alt="{{.Item.Title}}"></figure>{{end}}
   {{space (printf "content-%s-start" .Item.Slug)}}
   {{if .IntroHTML}}<div class="site-item-detail__intro lead">{{.IntroHTML}}</div>{{end}}
   {{space (printf "content-%s-middle" .Item.Slug)}}

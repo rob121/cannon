@@ -213,4 +213,17 @@ See also: **Help → Templates → Frontend Templates** and **Template Functions
 
 ## Migration note
 
-Older layouts that placed `default/` or `admin/` directly under `template_dir` (with root `template.json`) are superseded by the theme-folder model. Move content into a named theme folder, add `{theme}/template.json`, and select the theme in Configuration → General.
+Older layouts that placed `default/` or `admin/` directly under `template_dir` (with root `template.json`) are superseded by the theme-folder model.
+
+**Admin helper:** On **Admin → Templates**, Cannon detects a legacy layout and shows a migration form. Confirming:
+
+1. Copies `default/` into a new frontend (or `full`) theme folder you name
+2. Copies `admin/` into a separate backend theme when present (default name `{frontend}-admin`)
+3. Writes per-theme `template.json`, removes the legacy trees and root pack meta
+4. Sets **Configuration → General** `frontend_theme` / `admin_theme` when applicable
+
+`extension/` and `versions/` are left untouched. Migration is never automatic on startup.
+
+### Editor saves
+
+Template, asset, and `template.json` writes use atomic temp+rename (`fsutil.WriteFileAtomic`). Prior content is still snapshotted under `versions/` before replace.

@@ -34,7 +34,7 @@ func TestFinishBlockHTMLLegacyWrapper(t *testing.T) {
 		}
 		return "<wrapped>", nil
 	}
-	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", render)
+	got, err := finishBlockHTML(row, meta, "<em>Hi</em>", "sidebar", render)
 	if err != nil {
 		t.Fatal(err)
 	}

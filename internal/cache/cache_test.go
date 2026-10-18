@@ -256,12 +256,20 @@ func TestBlockSpacesLRUEvicts(t *testing.T) {
 	cache.SetToggle(cache.SiteIDFromContext(ctx), true)
 
 	for i, space := range []string{"a", "b", "c"} {
-		if err := db.Create(&models.Block{
+		row := models.Block{
 			Name:   space,
 			Type:   models.BlockTypeHTML,
 			Space:  space,
 			Status: models.StatusActive,
 			Sort:   i,
+		}
+		if err := db.Omit("Spaces").Create(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Create(&models.BlockSpace{
+			BlockID: row.BlockID,
+			Space:   space,
+			Sort:    i,
 		}).Error; err != nil {
 			t.Fatal(err)
 		}

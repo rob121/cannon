@@ -39,13 +39,14 @@ Recipients are **not** derived from users or roles. They are encoded in the Shou
 | `onUserVerified` | Email verification complete |
 | `onUserLocked` | Account lockout alert |
 
-### Layer 1 gaps (to implement)
+### Layer 1 gaps
 
-- Expose additional hooks in the admin event picker (content, comments, editorial — see **Event catalog** below).
-- Richer message templates per event (subject/body with placeholders, not one-line plain text).
-- Optional global Shoutrrr defaults in Configuration (fallback when per-notification URL omitted).
-- Delivery log / last-error column in admin list (debug failed sends).
-- Tie to site mail settings (`internal/mail`) for SMTP when Shoutrrr URL uses site defaults.
+- [x] Content/comment hooks in admin event picker.
+- [x] Richer message templates per event (subject/body with placeholders).
+- [x] Last-error / last-sent on destinations in admin list and form.
+- [ ] Optional global Shoutrrr defaults in Configuration (fallback when per-notification URL omitted).
+- [ ] Tie to site mail settings (`internal/mail`) for SMTP when Shoutrrr URL uses site defaults.
+- [ ] Full delivery log / retry (beyond last-error).
 
 ---
 
@@ -170,9 +171,10 @@ Route/render hooks (`onBeforeRoute`, `onAfterRender`, …) remain extension-orie
 
 - [x] `Notification` + `NotificationEvent` models
 - [x] Admin CRUD + Shoutrrr send for four user hooks
-- [ ] Expand Layer 1 event picker to content/comment hooks
-- [ ] Message templates per event
-- [ ] Update `.info/TODO.md` status (done when shipped)
+- [x] Expand Layer 1 event picker to content/comment hooks
+- [x] Message templates per event
+- [x] Delivery last-error / last-sent on destinations
+- [x] Update `.info/TODO.md` status (done when shipped)
 
 ### Phase B — Layer 2 core
 
@@ -185,7 +187,7 @@ Route/render hooks (`onBeforeRoute`, `onAfterRender`, …) remain extension-orie
 
 ### Phase C — Layer 2 filters & polish
 
-- [ ] `filters_json` (category, status transition, author=self)
+- [x] `filters_json` (category, status, author=self) + role form controls
 - [ ] Admin view of effective subscriptions on user form
 - [ ] Delivery log / retry (optional)
 - [ ] In-app notification inbox (`channel: in_app`)

@@ -179,7 +179,7 @@
                   {{$extName := .Name}}
                   {{$extLabel := .Label}}
                   {{range .Blocks}}
-                  <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionBlockID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
+                  <option value="{{.ID}}" data-extension-name="{{$extName}}" data-spaces="{{range $i, $s := .Spaces}}{{if $i}},{{end}}{{$s}}{{end}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionBlockID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
                   {{end}}
                   {{end}}
                 </select>
@@ -214,7 +214,7 @@
         </div>
 
         <div class="admin-sidebar-panel" data-sidebar-panel="placement" role="tabpanel">
-          <p class="admin-form-panel-intro">Control which pages render this block in the <code class="admin-code">{{if .Row.Space}}{{.Row.Space}}{{else}}space{{end}}</code> template space. {{.RouteTotal}} routes available.</p>
+          <p class="admin-form-panel-intro">Control which pages render this block in its assigned template spaces. {{.RouteTotal}} routes available.</p>
           <div class="admin-block-route-panel admin-block-route-panel--embedded" id="block-route-panel">
             <div class="admin-block-route-header">
               <div class="admin-block-route-heading">
@@ -311,13 +311,39 @@
               <input class="admin-form-control" id="block-name" name="name" value="{{.Row.Name}}" required>
             </div>
             <div class="admin-sidebar-field">
-              <label class="admin-form-label" for="block-space">Space</label>
-              <input class="admin-form-control" id="block-space" name="space" value="{{.Row.Space}}" placeholder="sidebar" required>
-              <p class="admin-form-help">Used in <code class="admin-code">{{"{{"}}space "…"{{"}}"}}</code> in templates.</p>
-            </div>
-            <div class="admin-sidebar-field">
-              <label class="admin-form-label" for="block-sort">Sort Order</label>
-              <input class="admin-form-control" id="block-sort" name="sort" type="number" value="{{.Row.Sort}}">
+              <label class="admin-form-label" for="block-space-add">Spaces</label>
+              <div class="admin-block-spaces" data-block-spaces data-known-spaces="{{range $i, $s := .KnownSpaces}}{{if $i}},{{end}}{{$s}}{{end}}">
+                <div class="admin-block-spaces-list" data-block-spaces-list>
+                  {{range .SpaceNames}}
+                  <span class="admin-block-space-chip">
+                    <input type="hidden" name="spaces" value="{{.}}">
+                    <code class="admin-code">{{.}}</code>
+                    <button type="button" class="admin-block-space-remove" data-block-space-remove aria-label="Remove space">&times;</button>
+                  </span>
+                  {{end}}
+                </div>
+                {{if .SuggestedSpaces}}
+                <div class="admin-block-spaces-suggest mb-2">
+                  <label class="admin-form-label" for="block-space-suggest">Add from list</label>
+                  <select class="admin-form-control" id="block-space-suggest" data-block-space-suggest>
+                    <option value="">Select a space…</option>
+                    {{range .SuggestedSpaces}}
+                    <option value="{{.}}">{{.}}</option>
+                    {{end}}
+                  </select>
+                </div>
+                {{end}}
+                <div class="admin-block-spaces-add">
+                  <input class="admin-form-control" id="block-space-add" type="text" list="block-known-spaces" placeholder="sidebar" autocomplete="off" data-block-space-input>
+                  <datalist id="block-known-spaces">
+                    {{range .KnownSpaces}}
+                    <option value="{{.}}"></option>
+                    {{end}}
+                  </datalist>
+                  <button type="button" class="btn-admin-ghost btn-admin-sm" data-block-space-add>Add</button>
+                </div>
+              </div>
+              <p class="admin-form-help">Suggestions come from <code class="admin-code">{{"{{"}}space "name"{{"}}"}}</code> in the active theme (plus spaces already in use). Extension blocks may list preferred spaces. You can still type adhoc names.</p>
             </div>
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="block-status">Status</label>
