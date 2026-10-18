@@ -137,8 +137,12 @@ func TestApplyPendingSwapsLatestAndKeepsPrevious(t *testing.T) {
 	if err := os.WriteFile(latest, []byte("new-binary"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := applyPending(target); err != nil {
+	applied, err := applyPending(target)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !applied {
+		t.Fatal("expected pending apply")
 	}
 	live, err := os.ReadFile(target)
 	if err != nil {
@@ -156,6 +160,38 @@ func TestApplyPendingSwapsLatestAndKeepsPrevious(t *testing.T) {
 	}
 	if fileExists(latest) {
 		t.Fatal("expected .latest removed after apply")
+	}
+}
+
+func TestApplyPendingRepairsMistakenPreviousLatest(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "cannon")
+	mistaken := filepath.Join(root, "cannon.previous.latest")
+	if err := os.WriteFile(target, []byte("old-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mistaken, []byte("new-binary"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	applied, err := applyPending(filepath.Join(root, "cannon.previous"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !applied {
+		t.Fatal("expected pending apply after repairing mistaken name")
+	}
+	live, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(live) != "new-binary" {
+		t.Fatalf("live = %q", string(live))
+	}
+	if fileExists(mistaken) {
+		t.Fatal("expected mistaken .previous.latest removed")
+	}
+	if fileExists(latestPath(target)) {
+		t.Fatal("expected .latest consumed by apply")
 	}
 }
 
@@ -179,6 +215,60 @@ func TestRollbackFlipsPrevious(t *testing.T) {
 	demoted, _ := os.ReadFile(prev)
 	if string(live) != "old-binary" || string(demoted) != "new-binary" {
 		t.Fatalf("live=%q previous=%q", live, demoted)
+	}
+}
+
+func TestApplyFromPreviousExecutableNameStagesCannonLatest(t *testing.T) {
+	root := t.TempDir()
+	live := filepath.Join(root, "cannon")
+	prev := filepath.Join(root, "cannon.previous")
+	if err := os.WriteFile(live, []byte("new-live"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(prev, []byte("old-running"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	downloadURL := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/latest/download/cannon.json" {
+			platform := runtime.GOOS + "_" + runtime.GOARCH
+			if downloadURL == "" {
+				downloadURL = "http://" + r.Host + "/cannon-binary"
+			}
+			_, _ = w.Write([]byte(`{
+				"name": "cannon",
+				"version": "v2.0.0",
+				"assets": { "` + platform + `": { "url": "` + downloadURL + `", "sha256": "" } }
+			}`))
+			return
+		}
+		if r.URL.Path == "/cannon-binary" {
+			_, _ = w.Write([]byte("staged-binary"))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	version.Version = "v1.0.0"
+	mgr := New(&config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}})
+	mgr.client.HTTP = server.Client()
+	// Simulate Linux after swap: Executable() points at the renamed inode.
+	mgr.SetBinaryPath(prev)
+
+	if err := mgr.Apply(); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(filepath.Join(root, "cannon.previous.latest")) {
+		t.Fatal("must not stage as cannon.previous.latest")
+	}
+	staged, err := os.ReadFile(filepath.Join(root, "cannon.latest"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(staged) != "staged-binary" {
+		t.Fatalf("staged = %q", staged)
 	}
 }
 

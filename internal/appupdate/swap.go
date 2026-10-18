@@ -7,50 +7,79 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
+// reexecAfterPending is overridden in tests to avoid replacing the test process.
+var reexecAfterPending = true
+
 // ApplyPendingAtStartup swaps a staged binary into place before the server listens.
-// If {binary}.latest exists: rename live → .previous, then .latest → live.
+// If {binary}.latest exists: rename live → .previous, then .latest → live, then re-exec
+// so this process actually runs the new binary (Linux renames the running inode to .previous).
 func ApplyPendingAtStartup(dataRoot string) error {
 	path, err := resolveBinaryPath("")
 	if err != nil {
 		return err
 	}
-	if err := applyPending(path); err != nil {
+	applied, err := applyPending(path)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(dataRoot) != "" {
 		_ = clearStagedState(filepath.Join(dataRoot, stateFileName))
 	}
+	if applied && reexecAfterPending {
+		return reexecLive(path)
+	}
 	return nil
 }
 
-func applyPending(binaryPath string) error {
-	latest := latestPath(binaryPath)
+func applyPending(binaryPath string) (bool, error) {
+	live := normalizeLiveBinaryPath(binaryPath)
+	latest := latestPath(live)
 	if !fileExists(latest) {
-		return nil
+		// Repair older builds that staged beside Executable() == *.previous.
+		if mistaken := legacyMistakenLatest(live); fileExists(mistaken) {
+			log.Printf("appupdate: renaming mistaken staged file %s -> %s", mistaken, latest)
+			if err := os.Rename(mistaken, latest); err != nil {
+				return false, fmt.Errorf("repair staged name: %w", err)
+			}
+		}
 	}
-	prev := previousPath(binaryPath)
-	log.Printf("appupdate: applying staged binary %s", latest)
+	if !fileExists(latest) {
+		return false, nil
+	}
+	prev := previousPath(live)
+	log.Printf("appupdate: applying staged binary %s -> %s (previous -> %s)", latest, live, prev)
 
 	if fileExists(prev) {
 		if err := os.Remove(prev); err != nil {
-			return fmt.Errorf("remove previous binary: %w", err)
+			return false, fmt.Errorf("remove previous binary: %w", err)
 		}
 	}
-	if err := os.Rename(binaryPath, prev); err != nil {
-		return fmt.Errorf("move live binary to previous: %w", err)
-	}
-	if err := os.Rename(latest, binaryPath); err != nil {
-		// Restore live binary if possible.
-		if rerr := os.Rename(prev, binaryPath); rerr != nil {
-			return fmt.Errorf("install staged binary: %v (restore failed: %v)", err, rerr)
+	// Rename by canonical live path, not necessarily os.Executable() (which may already be *.previous).
+	if fileExists(live) {
+		if err := os.Rename(live, prev); err != nil {
+			return false, fmt.Errorf("move live binary to previous: %w", err)
 		}
-		return fmt.Errorf("install staged binary: %w", err)
 	}
-	log.Printf("appupdate: staged update installed; previous kept at %s", prev)
-	return nil
+	if err := os.Rename(latest, live); err != nil {
+		if fileExists(prev) {
+			if rerr := os.Rename(prev, live); rerr != nil {
+				return false, fmt.Errorf("install staged binary: %v (restore failed: %v)", err, rerr)
+			}
+		}
+		return false, fmt.Errorf("install staged binary: %w", err)
+	}
+	log.Printf("appupdate: staged update installed at %s; previous kept at %s", live, prev)
+	return true, nil
+}
+
+func reexecLive(binaryPath string) error {
+	live := normalizeLiveBinaryPath(binaryPath)
+	log.Printf("appupdate: re-exec %s to run the newly installed binary", live)
+	return syscall.Exec(live, os.Args, os.Environ())
 }
 
 func clearStagedState(statePath string) error {
@@ -83,25 +112,27 @@ func (m *Manager) Rollback() error {
 	if path == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}
-	prev, ok := findSibling(path, ".previous")
+	live := normalizeLiveBinaryPath(path)
+	prev, ok := findSibling(live, ".previous")
 	if !ok {
-		return fmt.Errorf("no previous binary available to roll back to (looked beside %s)", path)
+		return fmt.Errorf("no previous binary available to roll back to (looked beside %s)", live)
 	}
-	// Use the live path's directory for the demoted binary name.
-	staging := latestPath(path)
-	tmp := path + ".rollback-tmp"
+	staging := latestPath(live)
+	tmp := live + ".rollback-tmp"
 	_ = os.Remove(tmp)
 	_ = os.Remove(staging)
+	if mistaken := legacyMistakenLatest(live); fileExists(mistaken) {
+		_ = os.Remove(mistaken)
+	}
 
-	if err := os.Rename(path, tmp); err != nil {
+	if err := os.Rename(live, tmp); err != nil {
 		return fmt.Errorf("stage current binary: %w", err)
 	}
-	if err := os.Rename(prev, path); err != nil {
-		_ = os.Rename(tmp, path)
+	if err := os.Rename(prev, live); err != nil {
+		_ = os.Rename(tmp, live)
 		return fmt.Errorf("restore previous binary: %w", err)
 	}
 	if err := os.Rename(tmp, prev); err != nil {
-		// Live is previous; demoted current may be lost from .previous name — try tmp as previous.
 		log.Printf("appupdate: warning: could not store demoted binary as previous: %v", err)
 	}
 
@@ -113,7 +144,7 @@ func (m *Manager) Rollback() error {
 	if err := m.SaveState(state); err != nil {
 		return err
 	}
-	log.Printf("appupdate: rollback prepared; restarting to run %s", path)
+	log.Printf("appupdate: rollback prepared; restarting to run %s", live)
 	return nil
 }
 
@@ -123,9 +154,10 @@ func (m *Manager) DiscardStaged() error {
 	if path == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}
-	latest, ok := findSibling(path, ".latest")
+	live := normalizeLiveBinaryPath(path)
+	latest, ok := findSibling(live, ".latest")
 	if !ok {
-		return fmt.Errorf("no staged update to discard (looked beside %s)", path)
+		return fmt.Errorf("no staged update to discard (looked beside %s)", live)
 	}
 	if err := os.Remove(latest); err != nil {
 		return err

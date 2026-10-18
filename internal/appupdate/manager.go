@@ -156,7 +156,7 @@ func (m *Manager) refreshBinaryPath() string {
 	return m.binaryPath
 }
 
-// SetBinaryPath pins the executable path (used in tests).
+// SetBinaryPath pins the executable path (used in tests; may be a *.previous inode path).
 func (m *Manager) SetBinaryPath(path string) {
 	m.binaryPath = filepath.Clean(path)
 	m.fixedBinaryPath = true
@@ -165,9 +165,10 @@ func (m *Manager) SetBinaryPath(path string) {
 // Status returns combined state + disk sibling presence for the admin UI.
 func (m *Manager) Status() Status {
 	state, _ := m.LoadState()
-	path := m.refreshBinaryPath()
-	latest, hasStaged := findSibling(path, ".latest")
-	previous, hasPrevious := findSibling(path, ".previous")
+	raw := m.refreshBinaryPath()
+	path := normalizeLiveBinaryPath(raw)
+	_, hasStaged := findSibling(path, ".latest")
+	_, hasPrevious := findSibling(path, ".previous")
 	stagedVersion := state.StagedVersion
 	if hasStaged && stagedVersion == "" {
 		stagedVersion = state.LatestVersion
@@ -175,8 +176,8 @@ func (m *Manager) Status() Status {
 	return Status{
 		State:          state,
 		BinaryPath:     path,
-		LatestPath:     latest,
-		PreviousPath:   previous,
+		LatestPath:     latestPath(path),
+		PreviousPath:   previousPath(path),
 		HasStaged:      hasStaged,
 		HasPrevious:    hasPrevious,
 		StagedVersion:  stagedVersion,
@@ -231,7 +232,7 @@ func (m *Manager) Apply() error {
 	if assetURL == "" {
 		return fmt.Errorf("update asset URL is unavailable")
 	}
-	target := m.refreshBinaryPath()
+	target := normalizeLiveBinaryPath(m.refreshBinaryPath())
 	if target == "" {
 		return fmt.Errorf("current executable path is unavailable")
 	}

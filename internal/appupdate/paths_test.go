@@ -6,6 +6,24 @@ import (
 	"testing"
 )
 
+func TestNormalizeLiveBinaryPathStripsPrevious(t *testing.T) {
+	got := normalizeLiveBinaryPath("/usr/local/bin/cannon.previous")
+	if got != "/usr/local/bin/cannon" {
+		t.Fatalf("got %q", got)
+	}
+	got = normalizeLiveBinaryPath("/usr/local/bin/cannon.previous.latest")
+	if got != "/usr/local/bin/cannon" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestLatestPathNotNestedUnderPrevious(t *testing.T) {
+	got := latestPath("/usr/local/bin/cannon.previous")
+	if got != "/usr/local/bin/cannon.latest" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestFindSiblingBesideExecutable(t *testing.T) {
 	root := t.TempDir()
 	bin := filepath.Join(root, "cannon")
