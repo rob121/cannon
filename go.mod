@@ -39,10 +39,12 @@ require (
 	github.com/centrifugal/protocol v0.17.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
+	github.com/containrrr/shoutrrr v0.8.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/fatih/color v1.15.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
@@ -72,6 +74,8 @@ require (
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/markbates/going v1.0.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/maypok86/otter v1.2.4 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect

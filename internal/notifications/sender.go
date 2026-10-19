@@ -3,116 +3,34 @@ package notifications
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/http"
-	"net/smtp"
-	"net/url"
 	"strings"
-	"time"
+
+	"github.com/containrrr/shoutrrr"
+	"github.com/containrrr/shoutrrr/pkg/types"
 )
 
 func sendShoutrr(ctx context.Context, rawURL, subject, message string) error {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return fmt.Errorf("parse shoutrrr url: %w", err)
+	_ = ctx // shoutrrr API is not context-aware yet
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return fmt.Errorf("shoutrrr url is required")
 	}
-	subject = strings.TrimSpace(subject)
 	message = strings.TrimSpace(message)
-	if subject != "" && strings.ToLower(u.Scheme) != "smtp" && strings.ToLower(u.Scheme) != "smtps" {
-		message = subject + "\n\n" + message
-	}
-	switch strings.ToLower(u.Scheme) {
-	case "smtp", "smtps":
-		return sendSMTP(u, subject, message)
-	case "slack":
-		return sendSlackWebhook(u, message)
-	default:
-		return sendGenericWebhook(ctx, rawURL, message)
-	}
-}
+	subject = strings.TrimSpace(subject)
 
-func sendSMTP(u *url.URL, subject, message string) error {
-	host := u.Hostname()
-	port := u.Port()
-	if port == "" {
-		port = "587"
-	}
-	addr := net.JoinHostPort(host, port)
-	user := u.User.Username()
-	pass, _ := u.User.Password()
-	from := u.Query().Get("from")
-	if from == "" {
-		from = user
-	}
-	to := u.Query().Get("to")
-	if to == "" {
-		return fmt.Errorf("smtp url requires to= query parameter")
-	}
-	if subject == "" {
-		subject = u.Query().Get("subject")
-	}
-	if subject == "" {
-		subject = "Cannon Notification"
-	}
-	body := strings.Join([]string{
-		"From: " + from,
-		"To: " + to,
-		"Subject: " + subject,
-		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=UTF-8",
-		"",
-		message,
-	}, "\r\n")
-	auth := smtp.PlainAuth("", user, pass, host)
-	return smtp.SendMail(addr, auth, from, []string{to}, []byte(body))
-}
-
-func sendSlackWebhook(u *url.URL, message string) error {
-	token := u.User.Username()
-	if token == "" {
-		token, _ = u.User.Password()
-	}
-	webhookURL := fmt.Sprintf("https://hooks.slack.com/services/%s", token)
-	if strings.Contains(token, "/") {
-		webhookURL = "https://hooks.slack.com/services/" + strings.TrimPrefix(token, "/")
-	}
-	req, err := http.NewRequest(http.MethodPost, webhookURL, strings.NewReader(`{"text":`+quoteJSON(message)+`}`))
+	sender, err := shoutrrr.CreateSender(rawURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid shoutrrr url: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
+	params := &types.Params{}
+	if subject != "" {
+		params.SetTitle(subject)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("slack webhook status %s", resp.Status)
+	errs := sender.Send(message, params)
+	for _, sendErr := range errs {
+		if sendErr != nil {
+			return sendErr
+		}
 	}
 	return nil
-}
-
-func sendGenericWebhook(ctx context.Context, rawURL, message string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, strings.NewReader(message))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("webhook status %s", resp.Status)
-	}
-	return nil
-}
-
-func quoteJSON(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return `"` + s + `"`
 }

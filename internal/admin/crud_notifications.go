@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,8 @@ func (h *Handler) notifications(w http.ResponseWriter, r *http.Request, path str
 		h.notificationDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
 		h.notificationToggleStatus(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "test":
+		h.notificationTest(w, r, parts[0])
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -143,10 +146,10 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
 			return
 		}
-		redirectList(w, r, notificationsBase)
+		redirectList(w, r, notificationsBase+"/"+strconv.FormatUint(uint64(row.NotificationID), 10)+"?saved=1")
 		return
 	}
-	h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "")
+	h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, notificationFormErrorMessage(r, ""))
 }
 
 func notificationTemplatesFromForm(r *http.Request) map[string]notifications.EventTemplate {
@@ -213,11 +216,54 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		"MailFromLabel":      strings.TrimSpace(mailCfg.FromEmail),
 		"UseSiteMail":        useSiteMail,
 		"SiteMailTo":         siteMailTo,
+		"Success":            notificationFormSuccessMessage(r),
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
 	h.render(w, r, title, "admin/notifications_form.html", data)
+}
+
+func notificationFormSuccessMessage(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	switch {
+	case r.URL.Query().Get("tested") == "1":
+		return "Test message sent."
+	case r.URL.Query().Get("saved") == "1":
+		return "Notification saved. Use Test Now to verify delivery."
+	default:
+		return ""
+	}
+}
+
+func notificationFormErrorMessage(r *http.Request, errMsg string) string {
+	if strings.TrimSpace(errMsg) != "" {
+		return errMsg
+	}
+	if r != nil && r.URL.Query().Get("test_error") == "1" {
+		return "Test message failed. See delivery error below."
+	}
+	return ""
+}
+
+func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	dest := notificationsBase + "/" + idStr
+	if err := notifications.SendTest(r.Context(), id); err != nil {
+		redirectList(w, r, dest+"?test_error=1")
+		return
+	}
+	redirectList(w, r, dest+"?tested=1")
 }
 
 func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idStr string) {

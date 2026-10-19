@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,5 +56,38 @@ func TestRecordDeliverySuccessAndFailure(t *testing.T) {
 	}
 	if time.Since(*okRow.LastSentAt) > time.Minute {
 		t.Fatalf("unexpected last_sent_at: %v", okRow.LastSentAt)
+	}
+}
+
+func TestSendTestRecordsFailure(t *testing.T) {
+	site := &config.SiteConfig{
+		ID: t.Name(),
+		Database: config.DatabaseConfig{
+			Type: "sqlite",
+			DSN:  filepath.Join(t.TempDir(), "site.db"),
+		},
+	}
+	if err := database.Migrate(site); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Get(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := sites.WithContext(context.Background(), site)
+
+	row := models.Notification{Name: "Broken", ShoutrrURL: "not-a-valid-shoutrrr-url", Status: models.StatusActive}
+	if err := db.Create(&row).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := SendTest(ctx, row.NotificationID); err == nil {
+		t.Fatal("expected SendTest to fail")
+	}
+	var saved models.Notification
+	if err := db.First(&saved, row.NotificationID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(saved.LastError) == "" || saved.LastErrorAt == nil {
+		t.Fatalf("expected last error after test: %+v", saved)
 	}
 }

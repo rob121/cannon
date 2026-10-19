@@ -26,6 +26,30 @@ func SendWithSubject(ctx context.Context, shoutrrURL, subject, message string) e
 	return sendShoutrr(ctx, shoutrrURL, subject, message)
 }
 
+// SendTest delivers a sample message for one saved notification destination.
+// Success and failure update the row's last-sent / last-error fields.
+func SendTest(ctx context.Context, notificationID uint) error {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return err
+	}
+	var row models.Notification
+	if err := db.First(&row, notificationID).Error; err != nil {
+		return err
+	}
+	name := strings.TrimSpace(row.Name)
+	if name == "" {
+		name = fmt.Sprintf("#%d", row.NotificationID)
+	}
+	subject := "Cannon notification test"
+	body := fmt.Sprintf("This is a test message from Cannon for notification %q.", name)
+	if err := SendWithSubject(ctx, row.ShoutrrURL, subject, body); err != nil {
+		_ = recordDeliveryFailure(db, row.NotificationID, err.Error())
+		return err
+	}
+	return recordDeliverySuccess(db, row.NotificationID)
+}
+
 // DispatchEvent sends notifications configured for the given hook event.
 func DispatchEvent(ctx context.Context, event string, args map[string]any) {
 	db, err := sites.DB(ctx)

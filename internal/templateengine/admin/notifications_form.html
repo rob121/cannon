@@ -1,6 +1,7 @@
 {{template "page_header" .}}
 <div class="admin-form-card">
   <div class="admin-form-card-body">
+    {{template "success_alert" .}}
     {{template "error_alert" .}}
     <form method="post">
       {{csrfField}}
@@ -31,7 +32,7 @@
           <div class="mt-3" data-notif-shoutrr-custom {{if .UseSiteMail}}hidden{{end}}>
             <label class="admin-form-label" for="shoutrr-url">Shoutrrr URL</label>
             <input class="admin-form-control" id="shoutrr-url" name="shoutrr_url" value="{{.Row.ShoutrrURL}}" placeholder="smtp://user:pass@host:587/?from=...&to=..." {{if not .UseSiteMail}}required{{end}} data-notif-shoutrr-url>
-            <p class="admin-form-help">Service URL in <a href="https://github.com/containrrr/shoutrrr" target="_blank" rel="noopener">shoutrrr</a> format (smtp, slack, webhook, etc.).</p>
+            <p class="admin-form-help">Service URL in <a href="https://containrrr.dev/shoutrrr/v0.8/services/overview/" target="_blank" rel="noopener">shoutrrr</a> format (pushover, smtp, slack, discord, telegram, etc.).</p>
           </div>
 
           <div class="mt-3" data-notif-shoutrr-site {{if not .UseSiteMail}}hidden{{end}}>
@@ -40,7 +41,7 @@
             <p class="admin-form-help">On save, Cannon builds an <code class="admin-code">smtp://</code> Shoutrrr URL from Configuration → Mail for this recipient.</p>
           </div>
         </div>
-        {{if or .Row.LastError .LastSentLabel}}
+        {{if or (not .IsNew) .Row.LastError .LastSentLabel}}
         <div class="col-12">
           <label class="admin-form-label">Delivery</label>
           {{if .LastSentLabel}}
@@ -51,8 +52,10 @@
             <strong>Last error{{if .LastErrorLabel}} ({{.LastErrorLabel}}){{end}}:</strong>
             {{.Row.LastError}}
           </div>
-          {{else}}
+          {{else if .LastSentLabel}}
           <p class="admin-form-help mb-0">No recent delivery errors.</p>
+          {{else}}
+          <p class="admin-form-help mb-0">Save, then use Test Now to verify this destination.</p>
           {{end}}
         </div>
         {{end}}
@@ -98,7 +101,17 @@
           </div>
         </div>
       </div>
-      {{template "form_actions" .}}
+      <div class="admin-form-actions">
+        <button type="submit" class="btn-admin-primary">Save</button>
+        <a class="btn-admin-outline" href="{{.BasePath}}">Cancel</a>
+      </div>
     </form>
+    {{if not .IsNew}}
+    <form method="post" action="{{.BasePath}}/{{.Row.NotificationID}}/test" class="admin-form-actions mt-2">
+      {{csrfField}}
+      <button type="submit" class="btn-admin-outline">Test Now</button>
+      <p class="admin-form-help mb-0">Sends a sample message using the saved delivery target (save first if you changed settings).</p>
+    </form>
+    {{end}}
   </div>
 </div>
