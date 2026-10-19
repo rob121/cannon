@@ -1,4 +1,6 @@
 {{template "page_header" .}}
+{{template "success_alert" .}}
+{{template "error_alert" .}}
 <div class="admin-data-card">
   <div class="admin-table-toolbar">
     <span class="admin-table-count">{{.Total}} notification{{if ne .Total 1}}s{{end}}</span>
@@ -34,7 +36,26 @@
             {{end}}
           </td>
           <td>{{template "status_toggle" (dict "BasePath" $.BasePath "ID" .NotificationID "Status" .Status "ListQuery" $.ListQuery)}}</td>
-          {{template "row_actions" (dict "BasePath" $.BasePath "ID" .NotificationID "ListQuery" $.ListQuery)}}
+          <td class="admin-col-actions">
+            <div class="admin-row-actions">
+              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.NotificationID}}{{if $.ListQuery}}{{$.ListQuery}}{{end}}" data-turbo-frame="_top" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="{{$.BasePath}}/{{.NotificationID}}/test" class="admin-inline-form" data-turbo-frame="_top">
+                {{csrfField}}
+                <input type="hidden" name="return" value="list">
+                <button type="submit" class="btn-admin-icon" title="Test Now">
+                  <i class="bi bi-send"></i>
+                </button>
+              </form>
+              <form method="post" action="{{$.BasePath}}/{{.NotificationID}}/delete{{if $.ListQuery}}{{$.ListQuery}}{{end}}" class="admin-inline-form" onsubmit="return confirm('Delete this record?')">
+                {{csrfField}}
+                <button type="submit" class="btn-admin-icon btn-admin-icon-danger" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
         </tr>
         {{else}}
         <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-bell" "Title" "No notifications yet" "Message" "System notifications and alerts will appear here.")}}</td></tr>

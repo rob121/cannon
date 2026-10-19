@@ -3,7 +3,7 @@
   <div class="admin-form-card-body">
     {{template "success_alert" .}}
     {{template "error_alert" .}}
-    <form method="post">
+    <form method="post" data-turbo-frame="_top">
       {{csrfField}}
       <div class="row g-3">
         <div class="col-md-6">
@@ -43,7 +43,14 @@
         </div>
         {{if or (not .IsNew) .Row.LastError .LastSentLabel}}
         <div class="col-12">
-          <label class="admin-form-label">Delivery</label>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <label class="admin-form-label mb-0">Delivery</label>
+            {{if not .IsNew}}
+            <button type="submit" class="btn-admin-outline btn-admin-sm" formaction="{{.BasePath}}/{{.Row.NotificationID}}/test" formmethod="post" formnovalidate>
+              <i class="bi bi-send"></i> Test Now
+            </button>
+            {{end}}
+          </div>
           {{if .LastSentLabel}}
           <p class="admin-form-help mb-1">Last sent {{.LastSentLabel}}</p>
           {{end}}
@@ -55,7 +62,7 @@
           {{else if .LastSentLabel}}
           <p class="admin-form-help mb-0">No recent delivery errors.</p>
           {{else}}
-          <p class="admin-form-help mb-0">Save, then use Test Now to verify this destination.</p>
+          <p class="admin-form-help mb-0">Use <strong>Test Now</strong> (page header or here) to verify the saved delivery target.</p>
           {{end}}
         </div>
         {{end}}
@@ -103,15 +110,8 @@
       </div>
       <div class="admin-form-actions">
         <button type="submit" class="btn-admin-primary">Save</button>
-        <a class="btn-admin-outline" href="{{.BasePath}}">Cancel</a>
+        <a class="btn-admin-outline" href="{{.BasePath}}" data-turbo-frame="_top">Cancel</a>
       </div>
     </form>
-    {{if not .IsNew}}
-    <form method="post" action="{{.BasePath}}/{{.Row.NotificationID}}/test" class="admin-form-actions mt-2">
-      {{csrfField}}
-      <button type="submit" class="btn-admin-outline">Test Now</button>
-      <p class="admin-form-help mb-0">Sends a sample message using the saved delivery target (save first if you changed settings).</p>
-    </form>
-    {{end}}
   </div>
 </div>

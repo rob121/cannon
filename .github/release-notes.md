@@ -1,1 +1,1 @@
-Use the real Shoutrrr library for Layer 1 destinations (Pushover, Discord, Telegram, and other services), and add a Test Now button on saved notification destinations.
+Fix notification save redirects under Turbo, and move Test Now into the page header, Delivery section, and notifications list.

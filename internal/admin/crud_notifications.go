@@ -74,6 +74,12 @@ func (h *Handler) notificationList(w http.ResponseWriter, r *http.Request) {
 		listRows = append(listRows, item)
 	}
 	data["Rows"] = listRows
+	if r.URL.Query().Get("tested") == "1" {
+		data["Success"] = "Test message sent."
+	}
+	if r.URL.Query().Get("test_error") == "1" {
+		data["Error"] = "Test message failed. Open the notification to see the delivery error."
+	}
 	h.render(w, r, "Notifications", "admin/notifications.html", data)
 }
 
@@ -218,6 +224,11 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		"SiteMailTo":         siteMailTo,
 		"Success":            notificationFormSuccessMessage(r),
 	})
+	if !isNew && row.NotificationID > 0 {
+		data["PageSecondaryActionPostURL"] = notificationsBase + "/" + strconv.FormatUint(uint64(row.NotificationID), 10) + "/test"
+		data["PageSecondaryActionLabel"] = "Test Now"
+		data["PageSecondaryActionIcon"] = "bi-send"
+	}
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
@@ -258,7 +269,11 @@ func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, idStr
 		h.notFound(w, r)
 		return
 	}
+	_ = r.ParseForm()
 	dest := notificationsBase + "/" + idStr
+	if strings.TrimSpace(r.FormValue("return")) == "list" {
+		dest = notificationsBase
+	}
 	if err := notifications.SendTest(r.Context(), id); err != nil {
 		redirectList(w, r, dest+"?test_error=1")
 		return
