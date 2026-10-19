@@ -3,6 +3,7 @@ package extension
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 // WireRequest is the JSON payload Cannon POSTs to capability handlers.
@@ -15,19 +16,26 @@ type WireRequest struct {
 	CSRF   string              `json:"csrf,omitempty"` // session CSRF token for forms and mutating requests
 	SiteID string              `json:"site_id"`
 	// Settings carries allowlisted site settings for extensions (e.g. date_format).
-	Settings     map[string]string `json:"settings,omitempty"`
-	BlockSpace   string            `json:"block_space,omitempty"`
-	BlockItem    string            `json:"block_item,omitempty"`
-	BlockData    map[string]any    `json:"block_data,omitempty"`
-	PageItem     string            `json:"page_item,omitempty"`
-	PageData     map[string]any    `json:"page_data,omitempty"`
-	EndpointItem string            `json:"endpoint_item,omitempty"`
-	EndpointData map[string]any    `json:"endpoint_data,omitempty"`
-	DataPath     string            `json:"data_path,omitempty"`
-	CaptchaContext string          `json:"captcha_context,omitempty"`
-	CaptchaAction  string          `json:"captcha_action,omitempty"`
-	CaptchaToken   string          `json:"captcha_token,omitempty"`
-	CaptchaRemoteIP string         `json:"captcha_remote_ip,omitempty"`
+	Settings        map[string]string `json:"settings,omitempty"`
+	BlockSpace      string            `json:"block_space,omitempty"`
+	BlockItem       string            `json:"block_item,omitempty"`
+	BlockData       map[string]any    `json:"block_data,omitempty"`
+	PageItem        string            `json:"page_item,omitempty"`
+	PageData        map[string]any    `json:"page_data,omitempty"`
+	EndpointItem    string            `json:"endpoint_item,omitempty"`
+	EndpointData    map[string]any    `json:"endpoint_data,omitempty"`
+	DataPath        string            `json:"data_path,omitempty"`
+	CaptchaContext  string            `json:"captcha_context,omitempty"`
+	CaptchaAction   string            `json:"captcha_action,omitempty"`
+	CaptchaToken    string            `json:"captcha_token,omitempty"`
+	CaptchaRemoteIP string            `json:"captcha_remote_ip,omitempty"`
+}
+
+// EmitEvent is a host hook an extension asks Cannon to fire after handling a request.
+// Only events in hooks.EmittableEvents are accepted by the host.
+type EmitEvent struct {
+	Event     string         `json:"event"`
+	Arguments map[string]any `json:"arguments,omitempty"`
 }
 
 // WireResponse is the JSON payload capability handlers return to Cannon.
@@ -37,6 +45,7 @@ type WireResponse struct {
 	Body       string              `json:"body"`
 	Updated    *WireRequest        `json:"updated_request,omitempty"`
 	Stop       bool                `json:"stop"`
+	EmitEvents []EmitEvent         `json:"emit_events,omitempty"`
 }
 
 // Handler handles a Cannon wire request.
@@ -87,6 +96,20 @@ func Redirect(status int, location string) WireResponse {
 			"Location": {location},
 		},
 	}
+}
+
+// WithEmit appends an allowlisted host event for Cannon to fire after this response.
+// Firing is best-effort on the host and does not affect the browser response.
+func WithEmit(resp WireResponse, event string, args map[string]any) WireResponse {
+	event = strings.TrimSpace(event)
+	if event == "" {
+		return resp
+	}
+	if args == nil {
+		args = map[string]any{}
+	}
+	resp.EmitEvents = append(resp.EmitEvents, EmitEvent{Event: event, Arguments: args})
+	return resp
 }
 
 // DecodeWireRequest reads a wire request from an HTTP request body.

@@ -137,6 +137,7 @@ func (m *Manager) ServeExtensionData(ctx context.Context, w http.ResponseWriter,
 	if err != nil {
 		return true, err
 	}
+	FireEmitEvents(ctx, out)
 	WriteHTTPResponse(w, out)
 	return true, nil
 }

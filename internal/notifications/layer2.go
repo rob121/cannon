@@ -6,6 +6,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/mail"
 )
 
@@ -41,9 +42,21 @@ func dispatchLayer2(ctx context.Context, event string, args map[string]any) {
 
 func formatEmail(event string, args map[string]any) (subject, body string) {
 	vars := FlattenArgs(args)
-	subject = "Cannon: " + event
+	switch event {
+	case hooks.OnSubmissionAfterCreate:
+		title := vars["title"]
+		if title == "" {
+			title = "untitled"
+		}
+		subject = "New submission: " + title
+	default:
+		subject = "Cannon: " + event
+	}
 	lines := []string{"Event: " + event}
-	for _, key := range []string{"username", "email", "user_id", "item_id", "comment_id", "title", "status"} {
+	for _, key := range []string{
+		"username", "email", "user_id", "item_id", "comment_id", "title", "status",
+		"submission_id", "contributor_name", "contributor_email", "admin_url",
+	} {
 		if v := vars[key]; v != "" {
 			lines = append(lines, fmt.Sprintf("%s: %s", key, v))
 		}

@@ -18,6 +18,7 @@ var SubscribableEvents = []string{
 	hooks.OnUserLogout,
 	hooks.OnItemAfterSave,
 	hooks.OnCommentAfterSave,
+	hooks.OnSubmissionAfterCreate,
 }
 
 // NotificationEvents lists hooks available for Layer 1 admin destinations.
@@ -28,6 +29,7 @@ var NotificationEvents = []string{
 	hooks.OnUserLocked,
 	hooks.OnItemAfterSave,
 	hooks.OnCommentAfterSave,
+	hooks.OnSubmissionAfterCreate,
 }
 
 // EventGroups returns subscribable events grouped for display.
@@ -53,6 +55,11 @@ func EventGroups() []EventGroup {
 			ID:     "comments",
 			Label:  "Comments",
 			Events: []string{hooks.OnCommentAfterSave},
+		},
+		{
+			ID:     "submissions",
+			Label:  "Submissions",
+			Events: []string{hooks.OnSubmissionAfterCreate},
 		},
 	}
 }

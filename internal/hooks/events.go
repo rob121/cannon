@@ -61,6 +61,28 @@ const (
 	OnBeforeMailSend = "onBeforeMailSend"
 )
 
+// Extension / contribution hook events.
+const (
+	// OnSubmissionAfterCreate fires when the submission extension accepts a new tip.
+	OnSubmissionAfterCreate = "onSubmissionAfterCreate"
+)
+
+// EmittableEvents lists hook names extensions may request via WireResponse.emit_events.
+// These are after-the-fact notify-safe events only (not login/abort hooks).
+var EmittableEvents = []string{
+	OnSubmissionAfterCreate,
+}
+
+// IsEmittable reports whether an extension may ask the host to fire this event.
+func IsEmittable(event string) bool {
+	for _, name := range EmittableEvents {
+		if name == event {
+			return true
+		}
+	}
+	return false
+}
+
 // AllEvents lists every hook name Cannon may dispatch.
 var AllEvents = []string{
 	OnBeforeRoute,
@@ -104,4 +126,5 @@ var AllEvents = []string{
 	OnCommentBeforeSave,
 	OnCommentAfterSave,
 	OnBeforeMailSend,
+	OnSubmissionAfterCreate,
 }

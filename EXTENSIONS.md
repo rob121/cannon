@@ -271,6 +271,26 @@ s.HandleData("contact/submit", func(req extension.WireRequest) extension.WireRes
 })
 ```
 
+#### Emitting host notification events
+
+After a successful data (or endpoint) response, extensions may ask Cannon to fire an **allowlisted** host hook via `emit_events`. This integrates with System → Notifications (Layer 1 destinations) and role/user email subscriptions (Layer 2).
+
+```go
+resp := extension.Redirect(http.StatusSeeOther, "/submit-news?submitted=1")
+return extension.WithEmit(resp, "onSubmissionAfterCreate", map[string]any{
+    "submission_id": id,
+    "title":         title,
+    "admin_url":     "/admin/extension-apps/cannon-ext-submission/submissions/" + strconv.FormatUint(uint64(id), 10),
+})
+```
+
+Only events listed in `hooks.EmittableEvents` are accepted (today: `onSubmissionAfterCreate`). Unsafe hooks such as login/abort events are ignored. Emit failures are logged and never change the browser response.
+
+To receive alerts after deploy:
+
+1. **Layer 1:** `/admin/notifications` → destination subscribed to `onSubmissionAfterCreate`
+2. **Layer 2:** Roles → enable the Submissions event for Administrators (or a reviewer role); site mail must be configured
+
 Helpers:
 
 ```go

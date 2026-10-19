@@ -71,7 +71,10 @@ func RenderEventMessage(templatesJSON, event string, args map[string]any) (subje
 
 func defaultMessageBody(event string, vars map[string]string) string {
 	parts := []string{"Cannon: " + event}
-	for _, key := range []string{"username", "email", "user_id", "item_id", "comment_id", "status", "title"} {
+	for _, key := range []string{
+		"username", "email", "user_id", "item_id", "comment_id", "status", "title",
+		"submission_id", "contributor_name", "contributor_email", "admin_url",
+	} {
 		if v := vars[key]; v != "" {
 			parts = append(parts, fmt.Sprintf("%s=%s", key, v))
 		}

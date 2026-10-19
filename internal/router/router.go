@@ -222,6 +222,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		extensions.FireEmitEvents(ctx, out)
 		extensions.WriteHTTPResponse(w, out)
 	case models.RouteTypeController:
 		userCtx, _ := userContext(ctx)
