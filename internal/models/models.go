@@ -268,6 +268,7 @@ func All() []any {
 		&Notification{},
 		&NotificationEvent{},
 		&NotificationSubscription{},
+		&ExtensionNotificationEvent{},
 		&Permission{},
 		&RolePermission{},
 		&RoleInheritance{},

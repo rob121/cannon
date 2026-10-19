@@ -174,7 +174,7 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		"SelectedDeniedPermKeys":         selectedDenied,
 		"SelectedParentIDs":              parentIDs,
 		"SelectedRoleNotificationEvents": selectedRoleEvents,
-		"SubscribableGroups":             notifications.EventGroups(),
+		"SubscribableGroups":             notifications.EventGroupsFor(r.Context()),
 		"ItemNotificationFilters":        itemFilters,
 		"Protected":                      !isNew && row.SystemRole,
 	})

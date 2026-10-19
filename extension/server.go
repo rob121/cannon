@@ -19,9 +19,10 @@ const (
 	defaultDataPath     = "/data"
 	defaultAdminPath    = "/admin"
 	defaultHelpPath     = "/help"
-	defaultHookPath     = "/hooks"
-	defaultTemplatePath = "/templates"
-	defaultCaptchaPath  = "/captcha"
+	defaultHookPath         = "/hooks"
+	defaultTemplatePath     = "/templates"
+	defaultCaptchaPath      = "/captcha"
+	defaultNotificationPath = "/notifications"
 )
 
 // Server is a Cannon extension HTTP server over a Unix socket.
@@ -35,9 +36,10 @@ type Server struct {
 	endpointPath string
 	dataPath     string
 	adminPath    string
-	hookPath     string
-	templatePath string
-	captchaPath  string
+	hookPath         string
+	templatePath     string
+	captchaPath      string
+	notificationPath string
 
 	blocks            map[string]blockEntry
 	blockListProvider BlockListProvider
@@ -68,6 +70,8 @@ type Server struct {
 
 	hookHandlers map[string]HookHandler
 
+	notificationEvents map[string]NotificationEventDefinition
+
 	custom map[string]http.HandlerFunc
 }
 
@@ -84,8 +88,9 @@ func New(info Info) *Server {
 		blocks:       make(map[string]blockEntry),
 		pages:        make(map[string]pageEntry),
 		endpoints:    make(map[string]endpointEntry),
-		dataHandlers: make(map[string]Handler),
-		hookHandlers: make(map[string]HookHandler),
+		dataHandlers:       make(map[string]Handler),
+		hookHandlers:       make(map[string]HookHandler),
+		notificationEvents: make(map[string]NotificationEventDefinition),
 	}
 }
 
@@ -355,6 +360,7 @@ func (s *Server) mux() *http.ServeMux {
 	s.registerEndpointRoutes(mux)
 	s.registerDataRoutes(mux)
 	s.registerHookRoutes(mux)
+	s.registerNotificationRoutes(mux)
 	s.registerCaptchaRoutes(mux)
 	if s.adminHandler != nil {
 		mux.HandleFunc(s.adminPath, s.serveWire(s.adminHandler))
@@ -425,6 +431,13 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.captcha != nil {
 		caps["captcha"] = s.captchaPath
+	}
+	if len(s.notificationEvents) > 0 {
+		path := s.notificationPath
+		if path == "" {
+			path = defaultNotificationPath
+		}
+		caps["notifications"] = path
 	}
 	writeJSON(w, http.StatusOK, capabilitiesResponse{
 		Capabilities: caps,

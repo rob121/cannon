@@ -31,7 +31,7 @@ func LoadUserProfileState(ctx context.Context, userID uint) (UserProfileState, e
 		return UserProfileState{}, err
 	}
 	checked := map[string]bool{}
-	for _, event := range SubscribableEvents {
+	for _, event := range SubscribableEventsFor(ctx) {
 		if row, ok := userSubs[event]; ok {
 			checked[event] = row.Status == models.StatusActive
 			continue
@@ -39,7 +39,7 @@ func LoadUserProfileState(ctx context.Context, userID uint) (UserProfileState, e
 		checked[event] = roleDefaults[event]
 	}
 	return UserProfileState{
-		Groups:       EventGroups(),
+		Groups:       EventGroupsFor(ctx),
 		Checked:      checked,
 		RoleDefaults: roleDefaults,
 	}, nil
@@ -58,12 +58,12 @@ func SaveUserSubscriptions(ctx context.Context, userID uint, selected []string) 
 	selectedSet := map[string]struct{}{}
 	for _, event := range selected {
 		event = strings.TrimSpace(event)
-		if !isSubscribableEvent(event) {
+		if !isSubscribableEvent(ctx, event) {
 			continue
 		}
 		selectedSet[event] = struct{}{}
 	}
-	for _, event := range SubscribableEvents {
+	for _, event := range SubscribableEventsFor(ctx) {
 		_, wants := selectedSet[event]
 		hasRoleDefault := roleDefaults[event]
 		switch {
@@ -111,7 +111,7 @@ func ReplaceRoleSubscriptionsWithFilters(db *gorm.DB, roleID uint, events []stri
 	}
 	for _, event := range events {
 		event = strings.TrimSpace(event)
-		if !isSubscribableEvent(event) {
+		if !isKnownSubscriptionEvent(db, event) {
 			continue
 		}
 		roleIDCopy := roleID

@@ -2,6 +2,20 @@ package models
 
 import "time"
 
+// ExtensionNotificationEvent is a notification event advertised by an extension capability.
+type ExtensionNotificationEvent struct {
+	ExtensionNotificationEventID uint   `gorm:"primaryKey"`
+	ExtensionName                string `gorm:"size:128;not null;uniqueIndex:idx_ext_notif_evt,priority:1;index"`
+	Event                        string `gorm:"size:128;not null;uniqueIndex:idx_ext_notif_evt,priority:2;uniqueIndex"`
+	Label                        string `gorm:"size:256"`
+	GroupID                      string `gorm:"size:64;not null;default:extensions"`
+	GroupLabel                   string `gorm:"size:128"`
+	Description                  string `gorm:"type:text"`
+	PlaceholdersJSON             string `gorm:"type:text"`
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
+}
+
 // Notification sends messages via a shoutrrr service URL when hooks fire.
 type Notification struct {
 	NotificationID uint   `gorm:"primaryKey"`

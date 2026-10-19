@@ -2,12 +2,10 @@ package notifications
 
 import (
 	"testing"
-
-	"github.com/rob121/cannon/internal/hooks"
 )
 
 func TestFormatEmailSubmission(t *testing.T) {
-	subject, body := formatEmail(hooks.OnSubmissionAfterCreate, map[string]any{
+	subject, body := formatEmail("onSubmissionAfterCreate", map[string]any{
 		"title":             "Road closure",
 		"submission_id":     7,
 		"contributor_name":  "Jane",

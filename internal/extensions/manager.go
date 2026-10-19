@@ -43,6 +43,7 @@ type Capabilities struct {
 	Hooks         string `json:"hooks"`
 	Templates     string `json:"templates"`
 	Captcha       string `json:"captcha"`
+	Notifications string `json:"notifications"`
 }
 
 type CapabilitiesResponse struct {
@@ -66,6 +67,7 @@ type Runtime struct {
 	Pages                []extension.PageDefinition
 	Endpoints            []extension.EndpointDefinition
 	Templates            []extension.TemplateDefinition
+	NotificationEvents   []extension.NotificationEventDefinition
 	Hooks                []string
 	DefaultAdminMenuName string
 	Meta                 Meta
@@ -114,6 +116,9 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 		return err
 	}
 	if err := m.deactivateMissingBinaries(db); err != nil {
+		return err
+	}
+	if err := m.clearInactiveNotificationEvents(ctx, db); err != nil {
 		return err
 	}
 	var rows []models.Extension
@@ -290,6 +295,7 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 	rt.Pages = nil
 	rt.Endpoints = nil
 	rt.Templates = nil
+	rt.NotificationEvents = nil
 	rt.Hooks = nil
 	if payload.Capabilities.Block != "" {
 		if blocks, err := m.fetchBlocks(socketPath, payload.Capabilities.Block); err == nil {
@@ -311,6 +317,14 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 		if templates, err := m.fetchTemplates(socketPath, payload.Capabilities.Templates); err == nil {
 			rt.Templates = templates
 		}
+	}
+	if payload.Capabilities.Notifications != "" {
+		if events, err := m.fetchNotificationEvents(socketPath, payload.Capabilities.Notifications); err == nil {
+			rt.NotificationEvents = events
+			_ = m.syncNotificationEvents(ctx, rt.Model.Name, events)
+		}
+	} else {
+		_ = m.syncNotificationEvents(ctx, rt.Model.Name, nil)
 	}
 	if err := m.applyDefaultMenuName(ctx, &rt.Model, payload.Defaults.Admin.MenuName); err != nil {
 		return err
@@ -701,6 +715,9 @@ func (m *Manager) Stop(name string) {
 	if !ok || rt.cmd == nil || rt.cmd.Process == nil {
 		m.suppressed[name] = true
 		m.mu.Unlock()
+		if m.site != nil {
+			_ = m.syncNotificationEvents(sites.WithContext(context.Background(), m.site), name, nil)
+		}
 		return
 	}
 	proc := rt.cmd.Process
@@ -708,6 +725,9 @@ func (m *Manager) Stop(name string) {
 	m.suppressed[name] = true
 	m.mu.Unlock()
 	_ = proc.Kill()
+	if m.site != nil {
+		_ = m.syncNotificationEvents(sites.WithContext(context.Background(), m.site), name, nil)
+	}
 }
 
 func (m *Manager) isSuppressed(name string) bool {

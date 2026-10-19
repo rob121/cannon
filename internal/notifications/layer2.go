@@ -6,7 +6,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/mail"
 )
 
@@ -43,7 +42,7 @@ func dispatchLayer2(ctx context.Context, event string, args map[string]any) {
 func formatEmail(event string, args map[string]any) (subject, body string) {
 	vars := FlattenArgs(args)
 	switch event {
-	case hooks.OnSubmissionAfterCreate:
+	case "onSubmissionAfterCreate":
 		title := vars["title"]
 		if title == "" {
 			title = "untitled"

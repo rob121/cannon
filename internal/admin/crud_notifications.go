@@ -1,10 +1,12 @@
 package admin
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/mail"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/notifications"
@@ -149,7 +151,7 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 
 func notificationTemplatesFromForm(r *http.Request) map[string]notifications.EventTemplate {
 	out := map[string]notifications.EventTemplate{}
-	for _, event := range notifications.NotificationEvents {
+	for _, event := range notifications.NotificationEventsFor(r.Context()) {
 		subject := strings.TrimSpace(r.FormValue("template_subject_" + event))
 		body := strings.TrimSpace(r.FormValue("template_body_" + event))
 		if subject == "" && body == "" {
@@ -199,10 +201,11 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		"IsNew":              isNew,
 		"BasePath":           notificationsBase,
 		"SelectedEvents":     selected,
-		"HookEvents":         notifications.NotificationEvents,
-		"SubscribableGroups": notifications.EventGroups(),
+		"HookEvents":         notifications.NotificationEventsFor(r.Context()),
+		"SubscribableGroups": notifications.EventGroupsFor(r.Context()),
 		"Templates":          templates,
-		"TemplateEvents":     notifications.NotificationEvents,
+		"TemplateEvents":     notifications.NotificationEventsFor(r.Context()),
+		"EventPlaceholders":  notificationPlaceholdersMap(r.Context()),
 		"LastSentLabel":      formatNotificationTime(row.LastSentAt),
 		"LastErrorLabel":     formatNotificationTime(row.LastErrorAt),
 		"MailConfigured":     mailCfg.Configured(),
@@ -238,4 +241,18 @@ func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idS
 
 func (h *Handler) notificationToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
 	h.postToggleModel(w, r, idStr, &models.Notification{}, notificationsBase, nil)
+}
+
+func notificationPlaceholdersMap(ctx context.Context) map[string][]extension.NotificationPlaceholder {
+	out := map[string][]extension.NotificationPlaceholder{}
+	infos, err := notifications.ExtensionEventInfos(ctx)
+	if err != nil {
+		return out
+	}
+	for _, info := range infos {
+		if len(info.Placeholders) > 0 {
+			out[info.Event] = info.Placeholders
+		}
+	}
+	return out
 }

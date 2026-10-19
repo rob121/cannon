@@ -104,8 +104,9 @@ Capabilities map a role to an HTTP path on the extension socket:
 | `help` | Help articles aggregated into `/admin/help` |
 | `templates` | Lists embedded extension templates that can be copied into site overrides |
 | `captcha` | Renders and verifies captcha widgets for protected forms |
+| `notifications` | Advertises events (and placeholders) for System → Notifications and role/user email subscriptions |
 
-Register handlers with `HandleRequest`, `HandlePage`, `RegisterPage`, `HandleData`, `RegisterEndpoint`, `RegisterBlock`, `HandleAdmin`, `OnHook`, `OnConfiguration`, and `RegisterCaptcha`. Paths default to `/request`, `/page`, `/data`, `/endpoint`, `/block`, `/hooks`, `/admin`, and `/captcha` but can be customized.
+Register handlers with `HandleRequest`, `HandlePage`, `RegisterPage`, `HandleData`, `RegisterEndpoint`, `RegisterBlock`, `HandleAdmin`, `OnHook`, `OnConfiguration`, `RegisterCaptcha`, and `RegisterNotificationEvent`. Paths default to `/request`, `/page`, `/data`, `/endpoint`, `/block`, `/hooks`, `/admin`, `/captcha`, and `/notifications` but can be customized.
 
 ### Permissions
 
@@ -271,9 +272,25 @@ s.HandleData("contact/submit", func(req extension.WireRequest) extension.WireRes
 })
 ```
 
-#### Emitting host notification events
+#### Notification events (define + emit)
 
-After a successful data (or endpoint) response, extensions may ask Cannon to fire an **allowlisted** host hook via `emit_events`. This integrates with System → Notifications (Layer 1 destinations) and role/user email subscriptions (Layer 2).
+Extensions that should appear in System → Notifications and role/user subscription checklists register events with the **notifications** capability. Cannon fetches `GET /notifications` when the extension starts (and on metadata refresh) and persists the catalog for the admin UI.
+
+```go
+s.RegisterNotificationEvent(extension.NotificationEventDefinition{
+    Event:       "onSubmissionAfterCreate",
+    Label:       "News tip submitted",
+    Group:       "submissions",
+    GroupLabel:  "Submissions",
+    Description: "Fired after a public tip is saved to the review queue.",
+    Placeholders: []extension.NotificationPlaceholder{
+        {Key: "title", Label: "Title"},
+        {Key: "admin_url", Label: "Admin URL", Description: "Link to review the tip"},
+    },
+})
+```
+
+After a successful data (or endpoint) response, emit a registered event via `emit_events`:
 
 ```go
 resp := extension.Redirect(http.StatusSeeOther, "/submit-news?submitted=1")
@@ -284,12 +301,13 @@ return extension.WithEmit(resp, "onSubmissionAfterCreate", map[string]any{
 })
 ```
 
-Only events listed in `hooks.EmittableEvents` are accepted (today: `onSubmissionAfterCreate`). Unsafe hooks such as login/abort events are ignored. Emit failures are logged and never change the browser response.
+Only events registered through `RegisterNotificationEvent` (or rare core `hooks.EmittableEvents`) are accepted. Unsafe hooks such as login/abort events are ignored. Emit failures are logged and never change the browser response. Stopping or deactivating an extension clears its catalog entries.
 
 To receive alerts after deploy:
 
-1. **Layer 1:** `/admin/notifications` → destination subscribed to `onSubmissionAfterCreate`
-2. **Layer 2:** Roles → enable the Submissions event for Administrators (or a reviewer role); site mail must be configured
+1. Activate the extension so Cannon syncs its notification catalog
+2. **Layer 1:** `/admin/notifications` → destination subscribed to the extension event
+3. **Layer 2:** Roles → enable the event group for Administrators (or a reviewer role); site mail must be configured
 
 Helpers:
 

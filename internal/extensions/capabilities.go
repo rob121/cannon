@@ -84,6 +84,12 @@ var capabilityCatalog = []struct {
 		desc:  "Renders and verifies captcha widgets for protected forms. Only one extension is active per site.",
 		get:   func(c Capabilities) string { return c.Captcha },
 	},
+	{
+		key:   "notifications",
+		label: "Notifications",
+		desc:  "Advertises notification events and payload placeholders for System → Notifications and role/user subscriptions.",
+		get:   func(c Capabilities) string { return c.Notifications },
+	},
 }
 
 // CapabilitiesSummary returns capability details for a running extension.

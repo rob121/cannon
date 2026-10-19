@@ -31,8 +31,9 @@ type WireRequest struct {
 	CaptchaRemoteIP string            `json:"captcha_remote_ip,omitempty"`
 }
 
-// EmitEvent is a host hook an extension asks Cannon to fire after handling a request.
-// Only events in hooks.EmittableEvents are accepted by the host.
+// EmitEvent is a host notification event an extension asks Cannon to fire after handling a request.
+// The host accepts events registered via RegisterNotificationEvent (notifications capability)
+// or rare core hooks.EmittableEvents entries.
 type EmitEvent struct {
 	Event     string         `json:"event"`
 	Arguments map[string]any `json:"arguments,omitempty"`

@@ -61,19 +61,13 @@ const (
 	OnBeforeMailSend = "onBeforeMailSend"
 )
 
-// Extension / contribution hook events.
-const (
-	// OnSubmissionAfterCreate fires when the submission extension accepts a new tip.
-	OnSubmissionAfterCreate = "onSubmissionAfterCreate"
-)
+// EmittableEvents is reserved for rare core-owned emit-safe hooks.
+// Extension notification events are registered via the notifications capability
+// and validated with notifications.CanEmit.
+var EmittableEvents = []string{}
 
-// EmittableEvents lists hook names extensions may request via WireResponse.emit_events.
-// These are after-the-fact notify-safe events only (not login/abort hooks).
-var EmittableEvents = []string{
-	OnSubmissionAfterCreate,
-}
-
-// IsEmittable reports whether an extension may ask the host to fire this event.
+// IsEmittable reports whether a core-owned event may be requested via emit_events.
+// Extension events are checked separately through the notifications catalog.
 func IsEmittable(event string) bool {
 	for _, name := range EmittableEvents {
 		if name == event {
@@ -126,5 +120,4 @@ var AllEvents = []string{
 	OnCommentBeforeSave,
 	OnCommentAfterSave,
 	OnBeforeMailSend,
-	OnSubmissionAfterCreate,
 }

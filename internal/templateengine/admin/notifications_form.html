@@ -74,8 +74,15 @@
           <div class="vstack gap-3">
             {{range .TemplateEvents}}
             {{$tmpl := index $.Templates .}}
+            {{$placeholders := index $.EventPlaceholders .}}
             <div class="admin-notif-template">
               <p class="admin-form-label mb-2"><code class="admin-code">{{.}}</code></p>
+              {{if $placeholders}}
+              <p class="admin-form-help mb-2">
+                Placeholders:
+                {{range $i, $p := $placeholders}}{{if $i}}, {{end}}<code class="admin-code">{{"{{"}}{{$p.Key}}{{"}}"}}</code>{{if $p.Description}} ({{$p.Description}}){{end}}{{end}}
+              </p>
+              {{end}}
               <div class="row g-2">
                 <div class="col-md-4">
                   <label class="admin-form-label" for="template-subject-{{.}}">Subject</label>

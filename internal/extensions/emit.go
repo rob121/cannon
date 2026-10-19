@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/hooks"
+	"github.com/rob121/cannon/internal/notifications"
 )
 
-// FireEmitEvents fires allowlisted host hooks requested by an extension wire response.
+// FireEmitEvents dispatches allowlisted notification events requested by an extension wire response.
+// Events must be registered via the extension notifications capability (or rare core EmittableEvents).
 // Failures are logged and never returned to the browser.
 func FireEmitEvents(ctx context.Context, wire WireResponse) {
 	if len(wire.EmitEvents) == 0 {
@@ -23,16 +25,17 @@ func FireEmitEvents(ctx context.Context, wire WireResponse) {
 		if event == "" {
 			continue
 		}
-		if !hooks.IsEmittable(event) {
-			log.Printf("extensions: ignore non-emittable event %q", event)
+		if !notifications.CanEmit(ctx, event) {
+			log.Printf("extensions: ignore unregistered emit event %q", event)
 			continue
 		}
 		args := item.Arguments
 		if args == nil {
 			args = map[string]any{}
 		}
+		notifications.DispatchEvent(ctx, event, args)
 		if _, err := hooks.Fire(ctx, event, args); err != nil {
-			log.Printf("extensions: emit %s: %v", event, err)
+			log.Printf("extensions: emit hook %q: %v", event, err)
 		}
 	}
 }
