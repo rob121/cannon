@@ -46,11 +46,14 @@ else
     if [[ ! -f "$ext_dir/go.mod" ]]; then
       echo "Skipping $name: no go.mod found."
       continue
+
     fi
+
 
     echo "Building $name -> $EXTENSIONS_DIR/$name"
     (
       cd "$ext_dir"
+      go mod tidy
       go build -o "$EXTENSIONS_DIR/$name" .
     )
   done

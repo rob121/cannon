@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/TobiEiss/go-jsonforms v1.1.8
 	github.com/centrifugal/centrifuge v0.38.0
+	github.com/containrrr/shoutrrr v0.8.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/go-webauthn/webauthn v0.12.1
@@ -39,7 +40,6 @@ require (
 	github.com/centrifugal/protocol v0.17.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
-	github.com/containrrr/shoutrrr v0.8.0 // indirect
 	github.com/cyphar/filepath-securejoin v0.6.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/dolthub/maphash v0.1.0 // indirect
