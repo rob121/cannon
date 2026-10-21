@@ -8,6 +8,7 @@ import (
 	"github.com/rob121/cannon/internal/database"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
@@ -132,6 +133,9 @@ func TestResolveEmailRecipients(t *testing.T) {
 	optInUser := createTestUser(t, db, "optin", "optin@example.com")
 	assignRole(t, db, roleUser.UserID, role.RoleID)
 	assignRole(t, db, optOutUser.UserID, role.RoleID)
+	if err := security.SaveRolePermissions(db, role.RoleID, []string{security.PermAdminAccess}, nil); err != nil {
+		t.Fatal(err)
+	}
 	if err := ReplaceRoleSubscriptions(db, role.RoleID, []string{hooks.OnUserSignup}); err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +145,18 @@ func TestResolveEmailRecipients(t *testing.T) {
 	if err := SaveUserSubscriptions(ctx, optInUser.UserID, []string{hooks.OnUserSignup}); err != nil {
 		t.Fatal(err)
 	}
+	publicUser := createTestUser(t, db, "public", "public@example.com")
+	if err := SaveUserSubscriptions(ctx, publicUser.UserID, []string{hooks.OnUserSignup}); err != nil {
+		t.Fatal(err)
+	}
+	adminRole := models.Role{Name: "admin-access", Status: models.StatusActive}
+	if err := db.Create(&adminRole).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := security.SaveRolePermissions(db, adminRole.RoleID, []string{security.PermAdminAccess}, nil); err != nil {
+		t.Fatal(err)
+	}
+	assignRole(t, db, optInUser.UserID, adminRole.RoleID)
 
 	recipients, err := resolveEmailRecipients(ctx, hooks.OnUserSignup, nil)
 	if err != nil {
@@ -158,6 +174,9 @@ func TestResolveEmailRecipients(t *testing.T) {
 	}
 	if _, ok := emails["optout@example.com"]; ok {
 		t.Fatal("expected opt-out user to be excluded")
+	}
+	if _, ok := emails["public@example.com"]; ok {
+		t.Fatal("expected non-admin subscriber to be excluded")
 	}
 }
 

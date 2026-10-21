@@ -8,6 +8,7 @@ import (
 	"github.com/rob121/cannon/internal/controllers/auth"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/notifications"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/user"
@@ -27,6 +28,13 @@ func (h *Handler) users(w http.ResponseWriter, r *http.Request, path string) {
 		h.userDelete(w, r, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
 		h.userToggleStatus(w, r, parts[0])
+	case len(parts) >= 2 && parts[1] == "notifications":
+		id, ok := parseID(parts[0])
+		if !ok {
+			h.notFound(w, r)
+			return
+		}
+		h.userNotifications(w, r, id, parts[2:])
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -222,6 +230,14 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 		if preview, err := effectivePermissionPreview(r.Context(), row.UserID); err == nil {
 			data["EffectivePermissions"] = preview
 		}
+		var notes []models.Notification
+		if db, err := sites.DB(r.Context()); err == nil {
+			db.Preload("Events").Where("user_id = ?", row.UserID).Order("name asc").Find(&notes)
+		}
+		data["Notifications"] = notes
+		data["NotificationsBase"] = userNotificationsBase(row.UserID)
+		adminUser, _ := notifications.UserHasAdminAccess(r.Context(), row.UserID)
+		data["NotificationRecipient"] = adminUser
 	}
 	h.render(w, r, title, "admin/users_form.html", data)
 }

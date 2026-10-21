@@ -215,6 +215,43 @@ func TestRenderFormDefaultPlaceholdersForIntegerAndTextarea(t *testing.T) {
 	}
 }
 
+func TestFormDataFromRequestKeepsDigitStrings(t *testing.T) {
+	schema := []byte(`{
+	  "type":"object",
+	  "properties":{
+	    "from_number_live":{"type":"string"},
+	    "account_sid_live":{"type":"string"},
+	    "retries":{"type":"integer"}
+	  }
+	}`)
+	form := url.Values{
+		"#/properties/from_number_live": {"+18635786442"},
+		"#/properties/account_sid_live": {"18635786442"},
+		"#/properties/retries":          {"3"},
+	}
+	r := &http.Request{Form: form}
+	data := settings.FormDataFromRequest(r, schema, nil)
+	if got, ok := data["from_number_live"].(string); !ok || got != "+18635786442" {
+		t.Fatalf("from_number_live: %#v", data["from_number_live"])
+	}
+	if got, ok := data["account_sid_live"].(string); !ok || got != "18635786442" {
+		t.Fatalf("account_sid_live: %#v", data["account_sid_live"])
+	}
+	// integers may still arrive as int from go-jsonforms
+	switch v := data["retries"].(type) {
+	case int:
+		if v != 3 {
+			t.Fatalf("retries int: %v", v)
+		}
+	case float64:
+		if int(v) != 3 {
+			t.Fatalf("retries float: %v", v)
+		}
+	default:
+		t.Fatalf("retries type: %T %v", data["retries"], data["retries"])
+	}
+}
+
 func TestFormDataFromRequestEnumFields(t *testing.T) {
 	def, ok, err := settings.GlobalDefinition("general")
 	if err != nil || !ok {

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"gorm.io/gorm"
 )
@@ -220,6 +221,13 @@ func resolveEmailRecipients(ctx context.Context, event string, args map[string]a
 	seen := map[string]struct{}{}
 	out := make([]recipient, 0, len(users))
 	for _, u := range users {
+		admin, err := userHasAdminAccess(ctx, u.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if !admin {
+			continue
+		}
 		email := strings.TrimSpace(strings.ToLower(u.Email))
 		if email == "" {
 			continue
@@ -231,6 +239,23 @@ func resolveEmailRecipients(ctx context.Context, event string, args map[string]a
 		out = append(out, recipient{UserID: u.UserID, Email: strings.TrimSpace(u.Email)})
 	}
 	return out, nil
+}
+
+// UserHasAdminAccess reports whether the user can open the admin (core.admin.access).
+func UserHasAdminAccess(ctx context.Context, userID uint) (bool, error) {
+	return userHasAdminAccess(ctx, userID)
+}
+
+func userHasAdminAccess(ctx context.Context, userID uint) (bool, error) {
+	if userID == 0 {
+		return false, nil
+	}
+	// Resolve this user explicitly. Request context may already hold another user's permissions.
+	perms, err := security.ResolveEffective(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return security.CheckPermission(perms, security.PermAdminAccess), nil
 }
 
 func userIDsWithRole(db *gorm.DB, roleID uint) (map[uint]struct{}, error) {

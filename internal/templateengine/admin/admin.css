@@ -80,6 +80,111 @@ body.admin-accent-dark-gray {
   --admin-sidebar-active: rgba(82, 82, 91, 0.1);
 }
 
+/* Follow the browser color scheme. Accent classes are restated so buttons stay readable. */
+@media (prefers-color-scheme: dark) {
+  :root,
+  .admin-body {
+    color-scheme: dark;
+    --admin-background: #09090b;
+    --admin-foreground: #fafafa;
+    --admin-card: #18181b;
+    --admin-muted: #27272a;
+    --admin-muted-fg: #a1a1aa;
+    --admin-border: #3f3f46;
+    --admin-input: #3f3f46;
+    --admin-primary: #10b981;
+    --admin-primary-hover: #34d399;
+    --admin-primary-fg: #052e16;
+    --admin-primary-soft: rgba(16, 185, 129, 0.18);
+    --admin-accent: #27272a;
+    --admin-accent-fg: #fafafa;
+    --admin-sidebar: #09090b;
+    --admin-sidebar-fg: #e4e4e7;
+    --admin-sidebar-muted: #71717a;
+    --admin-sidebar-border: #27272a;
+    --admin-sidebar-accent: #27272a;
+    --admin-sidebar-active: rgba(16, 185, 129, 0.16);
+    --admin-sidebar-primary: #10b981;
+    --admin-success: #4ade80;
+    --admin-danger: #f87171;
+    --admin-danger-hover: #fca5a5;
+    --admin-danger-soft: rgba(248, 113, 113, 0.14);
+    --admin-danger-border: rgba(248, 113, 113, 0.45);
+    --admin-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --admin-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+
+  body.admin-accent-black {
+    --admin-primary: #fafafa;
+    --admin-primary-hover: #e4e4e7;
+    --admin-primary-fg: #18181b;
+    --admin-primary-soft: rgba(250, 250, 250, 0.12);
+    --admin-sidebar-primary: #fafafa;
+    --admin-sidebar-active: rgba(250, 250, 250, 0.1);
+  }
+  body.admin-accent-blue {
+    --admin-primary: #60a5fa;
+    --admin-primary-hover: #93c5fd;
+    --admin-primary-fg: #172554;
+    --admin-primary-soft: rgba(96, 165, 250, 0.18);
+    --admin-sidebar-primary: #60a5fa;
+    --admin-sidebar-active: rgba(96, 165, 250, 0.16);
+  }
+  body.admin-accent-red {
+    --admin-primary: #f87171;
+    --admin-primary-hover: #fca5a5;
+    --admin-primary-fg: #450a0a;
+    --admin-primary-soft: rgba(248, 113, 113, 0.18);
+    --admin-sidebar-primary: #f87171;
+    --admin-sidebar-active: rgba(248, 113, 113, 0.16);
+  }
+  body.admin-accent-brown {
+    --admin-primary: #d97706;
+    --admin-primary-hover: #fbbf24;
+    --admin-primary-fg: #1c1917;
+    --admin-primary-soft: rgba(217, 119, 6, 0.2);
+    --admin-sidebar-primary: #d97706;
+    --admin-sidebar-active: rgba(217, 119, 6, 0.16);
+  }
+  body.admin-accent-purple {
+    --admin-primary: #a78bfa;
+    --admin-primary-hover: #c4b5fd;
+    --admin-primary-fg: #2e1065;
+    --admin-primary-soft: rgba(167, 139, 250, 0.18);
+    --admin-sidebar-primary: #a78bfa;
+    --admin-sidebar-active: rgba(167, 139, 250, 0.16);
+  }
+  body.admin-accent-dark-gray {
+    --admin-primary: #d4d4d8;
+    --admin-primary-hover: #f4f4f5;
+    --admin-primary-fg: #18181b;
+    --admin-primary-soft: rgba(212, 212, 216, 0.14);
+    --admin-sidebar-primary: #d4d4d8;
+    --admin-sidebar-active: rgba(212, 212, 216, 0.12);
+  }
+
+  .admin-badge-active {
+    color: #86efac;
+  }
+
+  .admin-badge-warning,
+  .admin-alert-warning {
+    background: rgba(249, 115, 22, 0.16);
+    border-color: rgba(249, 115, 22, 0.4);
+    color: #fdba74;
+  }
+
+  .admin-item-form [data-sidebar-panel="media"] .admin-repeat-section > .d-flex .btn-admin-outline,
+  .admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-outline,
+  .admin-item-form .admin-media-field-actions .btn-admin-outline,
+  .admin-item-form [data-sidebar-panel="media"] .admin-repeat-row .btn-admin-ghost,
+  .admin-item-form .admin-media-field-actions .btn-admin-ghost {
+    background: var(--admin-card);
+    color: var(--admin-foreground);
+    border-color: var(--admin-border);
+  }
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 
 .admin-body [hidden] {
@@ -431,7 +536,7 @@ body.admin-sidebar-collapsed .admin-main { margin-left: var(--admin-sidebar-coll
 
 .admin-topbar {
   height: var(--admin-topbar-height);
-  background: rgba(255, 255, 255, 0.8);
+  background: color-mix(in srgb, var(--admin-card) 82%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--admin-border);
@@ -4682,6 +4787,7 @@ select.admin-form-control {
   align-items: center;
   justify-content: center;
   background: var(--admin-background);
+  color: var(--admin-foreground);
   padding: 2rem 1.5rem;
 }
 

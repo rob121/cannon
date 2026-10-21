@@ -17,8 +17,10 @@ type ExtensionNotificationEvent struct {
 }
 
 // Notification sends messages via a shoutrrr service URL when hooks fire.
+// A notification belongs to one administrative user and subscribes to hook events.
 type Notification struct {
 	NotificationID uint   `gorm:"primaryKey"`
+	UserID         uint   `gorm:"index"`
 	Name           string `gorm:"size:128;not null"`
 	ShoutrrURL     string `gorm:"size:1024;not null"`
 	Status         Status `gorm:"size:16;not null;default:active"`

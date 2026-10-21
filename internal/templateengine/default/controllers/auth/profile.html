@@ -177,6 +177,7 @@
         </div>
       </section>
 
+      {{if .ShowAdminNotifications}}
       <section class="site-profile-card card shadow-sm mb-4" id="profile-notifications" aria-labelledby="profile-notifications-heading">
         <div class="card-body">
           <div class="site-profile-card__header mb-4">
@@ -210,6 +211,7 @@
           </form>
         </div>
       </section>
+      {{end}}
 
       {{template "accountSecurity" .}}
     </div>

@@ -60,11 +60,8 @@ func DispatchEvent(ctx context.Context, event string, args map[string]any) {
 	if event == "" {
 		return
 	}
-	var rows []models.Notification
-	if err := db.Preload("Events").
-		Joins("JOIN notification_events ON notification_events.notification_id = notifications.notification_id").
-		Where("notification_events.event = ? AND notifications.status = ?", event, models.StatusActive).
-		Find(&rows).Error; err != nil {
+	rows, err := notificationsForEvent(ctx, event)
+	if err != nil {
 		log.Printf("notifications: load for %s: %v", event, err)
 	} else if len(rows) > 0 {
 		for _, row := range rows {
@@ -78,6 +75,39 @@ func DispatchEvent(ctx context.Context, event string, args map[string]any) {
 		}
 	}
 	dispatchLayer2(ctx, event, args)
+}
+
+// notificationsForEvent returns active notifications subscribed to event.
+// Rows owned by a user are included only when that user can access the admin.
+// Rows with no user still send so existing destinations keep working until they are assigned.
+func notificationsForEvent(ctx context.Context, event string) ([]models.Notification, error) {
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var rows []models.Notification
+	if err := db.Preload("Events").
+		Joins("JOIN notification_events ON notification_events.notification_id = notifications.notification_id").
+		Where("notification_events.event = ? AND notifications.status = ?", event, models.StatusActive).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]models.Notification, 0, len(rows))
+	for _, row := range rows {
+		if row.UserID == 0 {
+			out = append(out, row)
+			continue
+		}
+		admin, err := userHasAdminAccess(ctx, row.UserID)
+		if err != nil {
+			return nil, err
+		}
+		if !admin {
+			continue
+		}
+		out = append(out, row)
+	}
+	return out, nil
 }
 
 func recordDeliverySuccess(db *gorm.DB, notificationID uint) error {

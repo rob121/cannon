@@ -131,6 +131,10 @@ func (h *Handler) authGetNotifications(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if admin, err := notifications.UserHasAdminAccess(ctx, userID); err != nil || !admin {
+		writeError(w, http.StatusForbidden, "forbidden", "notification subscriptions are limited to administrative accounts")
+		return
+	}
 	state, err := notifications.LoadUserProfileState(ctx, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "server_error", err.Error())
@@ -153,6 +157,10 @@ func (h *Handler) authPutNotifications(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID, ok := h.requireJWT(w, r)
 	if !ok {
+		return
+	}
+	if admin, err := notifications.UserHasAdminAccess(ctx, userID); err != nil || !admin {
+		writeError(w, http.StatusForbidden, "forbidden", "notification subscriptions are limited to administrative accounts")
 		return
 	}
 	var req notificationsPutRequest

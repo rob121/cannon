@@ -9,9 +9,51 @@ import (
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/database"
+	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 )
+
+func TestNotificationsForEventFollowsUserSubscription(t *testing.T) {
+	db, ctx := subscriptionsTestDB(t)
+	role := models.Role{Name: "admins", Status: models.StatusActive}
+	if err := db.Create(&role).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := security.SaveRolePermissions(db, role.RoleID, []string{security.PermAdminAccess}, nil); err != nil {
+		t.Fatal(err)
+	}
+	admin := createTestUser(t, db, "ada", "ada@example.com")
+	assignRole(t, db, admin.UserID, role.RoleID)
+	public := createTestUser(t, db, "pat", "pat@example.com")
+
+	adminNote := models.Notification{UserID: admin.UserID, Name: "Ada signup", ShoutrrURL: "slack://example", Status: models.StatusActive}
+	publicNote := models.Notification{UserID: public.UserID, Name: "Pat signup", ShoutrrURL: "slack://example", Status: models.StatusActive}
+	other := models.Notification{UserID: admin.UserID, Name: "Ada login", ShoutrrURL: "slack://example", Status: models.StatusActive}
+	for _, row := range []*models.Notification{&adminNote, &publicNote, &other} {
+		if err := db.Create(row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Create(&models.NotificationEvent{NotificationID: adminNote.NotificationID, Event: hooks.OnUserSignup}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.NotificationEvent{NotificationID: publicNote.NotificationID, Event: hooks.OnUserSignup}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&models.NotificationEvent{NotificationID: other.NotificationID, Event: hooks.OnUserAfterLogin}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := notificationsForEvent(ctx, hooks.OnUserSignup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].NotificationID != adminNote.NotificationID {
+		t.Fatalf("signup notifications = %+v", rows)
+	}
+}
 
 func TestRecordDeliverySuccessAndFailure(t *testing.T) {
 	site := &config.SiteConfig{

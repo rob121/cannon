@@ -5,6 +5,7 @@ import (
 
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 )
 
 func TestResolveEmailRecipientsAppliesRoleFilters(t *testing.T) {
@@ -15,6 +16,9 @@ func TestResolveEmailRecipientsAppliesRoleFilters(t *testing.T) {
 	}
 	user := createTestUser(t, db, "editor", "editor@example.com")
 	assignRole(t, db, user.UserID, role.RoleID)
+	if err := security.SaveRolePermissions(db, role.RoleID, []string{security.PermAdminAccess}, nil); err != nil {
+		t.Fatal(err)
+	}
 	if err := ReplaceRoleSubscriptionsWithFilters(db, role.RoleID, []string{hooks.OnItemAfterSave}, map[string]SubscriptionFilters{
 		hooks.OnItemAfterSave: {Status: "pending"},
 	}); err != nil {

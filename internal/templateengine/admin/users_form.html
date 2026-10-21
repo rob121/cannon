@@ -198,3 +198,46 @@
   </div>
   {{end}}
 </form>
+
+{{if not .IsNew}}
+<div class="admin-form-card mt-4">
+  <div class="admin-form-card-header d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div class="admin-form-card-heading">
+      <h2 class="admin-form-card-title">Notifications</h2>
+      <p class="admin-form-card-desc">Notifications belong to this account. Each one subscribes to hook events and delivers them to its target.</p>
+    </div>
+    <a class="btn-admin-primary btn-admin-sm" href="{{.NotificationsBase}}/new" data-turbo-frame="_top">Add Notification</a>
+  </div>
+  <div class="admin-form-card-body">
+    {{if not .NotificationRecipient}}
+    <p class="admin-form-help">This account cannot access the admin, so its notifications are not sent.</p>
+    {{end}}
+    <div class="admin-table-scroll">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Events</th>
+            <th>Status</th>
+            <th class="admin-col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .Notifications}}
+          <tr>
+            <td><a href="{{$.NotificationsBase}}/{{.NotificationID}}" data-turbo-frame="_top">{{.Name}}</a></td>
+            <td>{{range .Events}}<span class="admin-badge admin-badge-inactive">{{.Event}}</span> {{else}}<span class="admin-cell-muted">No events</span>{{end}}</td>
+            <td>{{if eq .Status "active"}}<span class="admin-badge admin-badge-active"><span class="admin-badge-dot"></span>Active</span>{{else}}<span class="admin-badge admin-badge-inactive"><span class="admin-badge-dot"></span>Inactive</span>{{end}}</td>
+            <td class="admin-col-actions">
+              <a class="btn-admin-icon" href="{{$.NotificationsBase}}/{{.NotificationID}}" data-turbo-frame="_top" title="Edit"><i class="bi bi-pencil"></i></a>
+            </td>
+          </tr>
+          {{else}}
+          <tr><td colspan="4" class="admin-table-empty-cell">No notifications for this account.</td></tr>
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{end}}

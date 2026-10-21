@@ -534,12 +534,25 @@ func loginHTML(ctx context.Context, token, errMsg string) string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    (function () {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      function applyTheme() {
+        var dark = mq.matches;
+        document.documentElement.setAttribute("data-bs-theme", dark ? "dark" : "light");
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      }
+      applyTheme();
+      mq.addEventListener("change", applyTheme);
+    })();
+  </script>
   <title>Sign In - Cannon Admin</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="/admin/assets/admin.css?v=57" rel="stylesheet">
+  <link href="/admin/assets/admin.css?v=62" rel="stylesheet">
   <style>
     .admin-login-oauth { margin-top: 1.25rem; }
     .admin-login-oauth-divider {

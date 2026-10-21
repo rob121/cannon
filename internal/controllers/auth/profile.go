@@ -159,6 +159,9 @@ func (c *Controller) profilePasswordPost(ctx *controllers.Context, u *models.Use
 }
 
 func (c *Controller) profileNotificationsPost(ctx *controllers.Context, u *models.User, profileInputs []models.ContentField, profileValues map[uint]string, authorProfileName string) controllers.Result {
+	if ok, err := notifications.UserHasAdminAccess(ctx.GoContext(), u.UserID); err != nil || !ok {
+		return profileError(ctx, u, profileInputs, profileValues, authorProfileName, "Notification subscriptions are available for administrative accounts.")
+	}
 	if err := ctx.Request.ParseForm(); err != nil {
 		return profileError(ctx, u, profileInputs, profileValues, authorProfileName, "Invalid form submission.")
 	}
@@ -179,6 +182,7 @@ func renderProfilePage(ctx *controllers.Context, u *models.User, profileInputs [
 	db, _ := sites.DB(ctx.GoContext())
 	hasLocalPassword := user.HasLocalPassword(db, u)
 	notificationState, _ := notifications.LoadUserProfileState(ctx.GoContext(), u.UserID)
+	showNotifications, _ := notifications.UserHasAdminAccess(ctx.GoContext(), u.UserID)
 	data := map[string]any{
 		"Title":             "Account Profile",
 		"CSRF":              csrf.HiddenField(token),
@@ -192,6 +196,7 @@ func renderProfilePage(ctx *controllers.Context, u *models.User, profileInputs [
 		"Saved":             flags.Saved,
 		"PasswordSaved":     flags.PasswordSaved,
 		"NotificationsSaved": flags.NotificationsSaved,
+		"ShowAdminNotifications": showNotifications,
 		"NotificationGroups": notificationState.Groups,
 		"NotificationChecked": notificationState.Checked,
 		"NotificationRoleDefaults": notificationState.RoleDefaults,

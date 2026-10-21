@@ -1,6 +1,9 @@
 {{template "page_header" .}}
 {{template "success_alert" .}}
 {{template "error_alert" .}}
+{{if .AccountURL}}
+<p class="admin-form-help mb-3"><a href="{{.AccountURL}}" data-turbo-frame="_top">Back to {{.AccountLabel}}</a></p>
+{{end}}
 <div class="admin-data-card">
   <div class="admin-table-toolbar">
     <span class="admin-table-count">{{.Total}} notification{{if ne .Total 1}}s{{end}}</span>
@@ -10,6 +13,7 @@
       <thead>
         <tr>
           {{template "sort_th" (dict "Root" $ "Key" "name" "Label" "Name")}}
+          {{if not .AccountURL}}<th>Account</th>{{end}}
           <th>Events</th>
           <th>Delivery</th>
           {{template "sort_th" (dict "Root" $ "Key" "status" "Label" "Status")}}
@@ -20,9 +24,10 @@
         {{range .Rows}}
         <tr>
           <td>
-            {{template "row_edit_link" (dict "BasePath" $.BasePath "ID" .NotificationID "ListQuery" $.ListQuery "Label" .Name)}}
+            {{template "row_edit_link" (dict "BasePath" .EditBase "ID" .NotificationID "ListQuery" $.ListQuery "Label" .Name)}}
             <div class="admin-cell-muted text-truncate" style="max-width:18rem"><code class="admin-code">{{.ShoutrrURL}}</code></div>
           </td>
+          {{if not $.AccountURL}}<td>{{if .OwnerLabel}}{{.OwnerLabel}}{{else}}<span class="admin-cell-muted">Unassigned</span>{{end}}</td>{{end}}
           <td>{{range .Events}}<span class="admin-badge admin-badge-inactive">{{.Event}}</span> {{end}}</td>
           <td>
             {{if .DeliveryError}}
@@ -38,7 +43,7 @@
           <td>{{template "status_toggle" (dict "BasePath" $.BasePath "ID" .NotificationID "Status" .Status "ListQuery" $.ListQuery)}}</td>
           <td class="admin-col-actions">
             <div class="admin-row-actions">
-              <a class="btn-admin-icon" href="{{$.BasePath}}/{{.NotificationID}}{{if $.ListQuery}}{{$.ListQuery}}{{end}}" data-turbo-frame="_top" title="Edit">
+              <a class="btn-admin-icon" href="{{.EditBase}}/{{.NotificationID}}{{if $.ListQuery}}{{$.ListQuery}}{{end}}" data-turbo-frame="_top" title="Edit">
                 <i class="bi bi-pencil"></i>
               </a>
               <form method="post" action="{{$.BasePath}}/{{.NotificationID}}/test" class="admin-inline-form" data-turbo-frame="_top">
@@ -58,7 +63,7 @@
           </td>
         </tr>
         {{else}}
-        <tr><td colspan="5" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-bell" "Title" "No notifications yet" "Message" "System notifications and alerts will appear here.")}}</td></tr>
+        <tr><td colspan="{{if .AccountURL}}5{{else}}6{{end}}" class="admin-table-empty-cell">{{template "table_empty_state" (dict "Icon" "bi-bell" "Title" "No notifications yet" "Message" "Add a notification on an account. It subscribes to events for that account.")}}</td></tr>
         {{end}}
       </tbody>
     </table>

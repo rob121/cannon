@@ -6,6 +6,22 @@
     <form method="post" data-turbo-frame="_top">
       {{csrfField}}
       <div class="row g-3">
+        <div class="col-12">
+          <label class="admin-form-label" for="notification-user">Account</label>
+          {{if .LockOwner}}
+          <input type="hidden" name="user_id" value="{{.Owner.UserID}}">
+          <input class="admin-form-control" id="notification-user" value="{{.Owner.Username}}{{if .Owner.Email}} ({{.Owner.Email}}){{end}}" disabled>
+          <p class="admin-form-help mb-0">This notification belongs to this account. Subscribed events are delivered through the target below.</p>
+          {{else}}
+          <select class="admin-form-control" id="notification-user" name="user_id" required>
+            <option value="">Select an account</option>
+            {{range .Accounts}}
+            <option value="{{.UserID}}" {{if eq $.Row.UserID .UserID}}selected{{end}}>{{.Username}}{{if .Email}} ({{.Email}}){{end}}</option>
+            {{end}}
+          </select>
+          <p class="admin-form-help mb-0">The account that owns this notification. Delivery runs only for accounts that can access the admin.</p>
+          {{end}}
+        </div>
         <div class="col-md-6">
           <label class="admin-form-label">Name</label>
           <input class="admin-form-control" name="name" value="{{.Row.Name}}" required>
@@ -67,7 +83,8 @@
         </div>
         {{end}}
         <div class="col-12">
-          <label class="admin-form-label">Hook Events</label>
+          <label class="admin-form-label">Subscription Events</label>
+          <p class="admin-form-help mb-2">When one of these events is emitted, this notification is included.</p>
           {{range .SubscribableGroups}}
           <div class="mb-3">
             <p class="admin-form-help mb-2"><strong>{{.Label}}</strong></p>

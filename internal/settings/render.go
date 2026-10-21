@@ -71,8 +71,63 @@ func FormDataFromRequest(r *http.Request, schema, uiSchema json.RawMessage) map[
 			data = parsed
 		}
 	}
+	// go-jsonforms Atoi-coerces digit strings (and values like "+1863…") into numbers.
+	// Restore schema-typed string fields from the raw form so phones/tokens stay strings.
+	data = ApplyStringFormDefaults(schema, data, r.Form)
 	data = ApplyBooleanFormDefaults(schema, data, r.Form)
 	return ApplyCategoryFormDefaults(schema, uiSchema, data, r.Form)
+}
+
+// ApplyStringFormDefaults keeps JSON Schema string properties as Go strings using
+// the posted form value (preserving leading "+" and avoiding scientific notation).
+func ApplyStringFormDefaults(schema json.RawMessage, data map[string]any, form url.Values) map[string]any {
+	if data == nil {
+		data = map[string]any{}
+	}
+	for _, key := range stringPropertyKeys(schema) {
+		formKey := "#/properties/" + key
+		if !form.Has(formKey) {
+			continue
+		}
+		data[key] = form.Get(formKey)
+	}
+	return data
+}
+
+func stringPropertyKeys(schema json.RawMessage) []string {
+	var doc struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if err := json.Unmarshal(schema, &doc); err != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(doc.Properties))
+	for key, raw := range doc.Properties {
+		if schemaPropertyIsString(raw) {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
+func schemaPropertyIsString(raw json.RawMessage) bool {
+	var prop struct {
+		Type any `json:"type"`
+	}
+	if err := json.Unmarshal(raw, &prop); err != nil {
+		return false
+	}
+	switch t := prop.Type.(type) {
+	case string:
+		return t == "string"
+	case []any:
+		for _, item := range t {
+			if s, ok := item.(string); ok && s == "string" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func normalizeFormHTML(html string, section extension.ConfigurationSection, renderCtx *FormRenderContext) string {

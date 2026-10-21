@@ -20,49 +20,94 @@ type notificationListRow struct {
 	DeliveryLabel string
 	DeliveryTime  string
 	DeliveryError bool
+	OwnerLabel    string
+	EditBase      string
 }
 
 const notificationsBase = "/admin/notifications"
 
+func userNotificationsBase(userID uint) string {
+	return usersBase + "/" + strconv.FormatUint(uint64(userID), 10) + "/notifications"
+}
+
 func (h *Handler) notifications(w http.ResponseWriter, r *http.Request, path string) {
-	parts := pathParts("/notifications", path)
+	h.notificationRoutes(w, r, nil, notificationsBase, pathParts("/notifications", path))
+}
+
+func (h *Handler) userNotifications(w http.ResponseWriter, r *http.Request, userID uint, parts []string) {
+	db, err := sites.DB(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var owner models.User
+	if err := db.First(&owner, userID).Error; err != nil {
+		h.notFound(w, r)
+		return
+	}
+	h.notificationRoutes(w, r, &owner, userNotificationsBase(userID), parts)
+}
+
+func (h *Handler) notificationRoutes(w http.ResponseWriter, r *http.Request, owner *models.User, base string, parts []string) {
 	switch {
 	case len(parts) == 0:
-		h.notificationList(w, r)
+		h.notificationList(w, r, owner, base)
 	case parts[0] == "new":
-		h.notificationForm(w, r, 0)
+		h.notificationForm(w, r, owner, base, 0)
 	case len(parts) == 2 && parts[1] == "delete":
-		h.notificationDelete(w, r, parts[0])
+		h.notificationDelete(w, r, owner, base, parts[0])
 	case len(parts) == 2 && parts[1] == "toggle-status":
-		h.notificationToggleStatus(w, r, parts[0])
+		h.notificationToggleStatus(w, r, owner, base, parts[0])
 	case len(parts) == 2 && parts[1] == "test":
-		h.notificationTest(w, r, parts[0])
+		h.notificationTest(w, r, owner, base, parts[0])
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
 			h.notFound(w, r)
 			return
 		}
-		h.notificationForm(w, r, id)
+		h.notificationForm(w, r, owner, base, id)
 	}
 }
 
-func (h *Handler) notificationList(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) notificationList(w http.ResponseWriter, r *http.Request, owner *models.User, base string) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
+	countQ := db.Model(&models.Notification{})
+	listQ := db.Model(&models.Notification{}).Preload("Events")
+	if owner != nil {
+		countQ = countQ.Where("user_id = ?", owner.UserID)
+		listQ = listQ.Where("user_id = ?", owner.UserID)
+	}
 	var total int64
-	db.Model(&models.Notification{}).Count(&total)
-	data := listPage(r, page, total, notificationsBase,
-		"Send alerts via shoutrrr when user lifecycle hooks fire.",
-		"Add Notification", map[string]any{"ActiveNav": "notifications"})
+	countQ.Count(&total)
+	activeNav := "notifications"
+	subtitle := "Each notification belongs to an account and subscribes to hook events."
+	addLabel := "Add Notification"
+	if owner != nil {
+		activeNav = "accounts"
+		subtitle = "Notifications for " + notificationOwnerLabel(*owner) + ". Subscribed events are delivered to this notification."
+	}
+	data := listPage(r, page, total, base, subtitle, addLabel, map[string]any{"ActiveNav": activeNav})
+	if owner != nil {
+		data["AccountURL"] = usersBase + "/" + strconv.FormatUint(uint64(owner.UserID), 10)
+		data["AccountLabel"] = notificationOwnerLabel(*owner)
+	}
 	order := applyListSort(r, data, map[string]string{
 		"name": "name", "status": "status",
 	}, "name")
 	var rows []models.Notification
-	db.Preload("Events").Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
+	listQ.Offset((page - 1) * pageSizeFor(r)).Limit(pageSizeFor(r)).Order(order).Find(&rows)
+	owners := notificationOwnerNames(db, rows)
 	listRows := make([]notificationListRow, 0, len(rows))
 	for _, row := range rows {
-		item := notificationListRow{Notification: row}
+		item := notificationListRow{Notification: row, OwnerLabel: owners[row.UserID]}
+		if row.UserID > 0 {
+			item.EditBase = userNotificationsBase(row.UserID)
+		} else {
+			item.EditBase = notificationsBase
+			item.OwnerLabel = "Unassigned"
+		}
 		if strings.TrimSpace(row.LastError) != "" {
 			item.DeliveryLabel = "Error"
 			item.DeliveryError = true
@@ -90,7 +135,7 @@ func formatNotificationTime(t *time.Time) string {
 	return t.Local().Format("2006-01-02 15:04")
 }
 
-func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id uint) {
+func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, owner *models.User, base string, id uint) {
 	db, _ := sites.DB(r.Context())
 	isNew := id == 0
 	var row models.Notification
@@ -99,8 +144,19 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 			h.notFound(w, r)
 			return
 		}
+		if owner != nil && row.UserID != owner.UserID {
+			h.notFound(w, r)
+			return
+		}
+		if owner == nil && row.UserID > 0 && r.Method == http.MethodGet {
+			http.Redirect(w, r, userNotificationsBase(row.UserID)+"/"+strconv.FormatUint(uint64(row.NotificationID), 10), http.StatusSeeOther)
+			return
+		}
 	} else {
 		row.Status = models.StatusActive
+		if owner != nil {
+			row.UserID = owner.UserID
+		}
 	}
 	selectedEvents := notificationEventSet(row.Events)
 	templates := notifications.ParseTemplatesJSON(row.TemplatesJSON)
@@ -119,6 +175,13 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 		}
 		row.Name = formString(r, "name")
 		row.Status = formStatus(r)
+		if owner != nil {
+			row.UserID = owner.UserID
+		} else if userID, ok := parseID(r.FormValue("user_id")); ok {
+			row.UserID = userID
+		} else {
+			row.UserID = 0
+		}
 		selectedEvents = r.Form["events"]
 		templates = notificationTemplatesFromForm(r)
 		row.TemplatesJSON = notifications.TemplatesToJSON(templates)
@@ -127,15 +190,24 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 		if useSiteMail {
 			built, err := mail.ShoutrrSMTPURL(mailCfg, siteMailTo)
 			if err != nil {
-				h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
+				h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
 				return
 			}
 			row.ShoutrrURL = built
 		} else {
 			row.ShoutrrURL = formString(r, "shoutrr_url")
 		}
+		if row.UserID == 0 {
+			h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "Choose the account this notification belongs to.")
+			return
+		}
+		var account models.User
+		if err := db.First(&account, row.UserID).Error; err != nil {
+			h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "Account not found.")
+			return
+		}
 		if row.Name == "" || row.ShoutrrURL == "" {
-			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "Name and shoutrrr URL are required.")
+			h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, "Name and shoutrrr URL are required.")
 			return
 		}
 		var saveErr error
@@ -145,17 +217,21 @@ func (h *Handler) notificationForm(w http.ResponseWriter, r *http.Request, id ui
 			saveErr = db.Save(&row).Error
 		}
 		if saveErr != nil {
-			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, saveErr.Error())
+			h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, saveErr.Error())
 			return
 		}
 		if err := replaceNotificationEvents(db, row.NotificationID, r.Form["events"]); err != nil {
-			h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
+			h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, err.Error())
 			return
 		}
-		redirectList(w, r, notificationsBase+"/"+strconv.FormatUint(uint64(row.NotificationID), 10)+"?saved=1")
+		editorBase := userNotificationsBase(row.UserID)
+		redirectList(w, r, editorBase+"/"+strconv.FormatUint(uint64(row.NotificationID), 10)+"?saved=1")
 		return
 	}
-	h.renderNotificationForm(w, r, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, notificationFormErrorMessage(r, ""))
+	if isNew && owner != nil && strings.TrimSpace(siteMailTo) == "" {
+		siteMailTo = strings.TrimSpace(owner.Email)
+	}
+	h.renderNotificationForm(w, r, owner, base, row, selectedEvents, templates, useSiteMail, siteMailTo, isNew, notificationFormErrorMessage(r, ""))
 }
 
 func notificationTemplatesFromForm(r *http.Request) map[string]notifications.EventTemplate {
@@ -195,7 +271,7 @@ func notificationEventSet(events []models.NotificationEvent) []string {
 	return out
 }
 
-func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request, row models.Notification, selected []string, templates map[string]notifications.EventTemplate, useSiteMail bool, siteMailTo string, isNew bool, errMsg string) {
+func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request, owner *models.User, base string, row models.Notification, selected []string, templates map[string]notifications.EventTemplate, useSiteMail bool, siteMailTo string, isNew bool, errMsg string) {
 	title := "Add Notification"
 	if !isNew {
 		title = "Edit Notification"
@@ -204,11 +280,22 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		templates = map[string]notifications.EventTemplate{}
 	}
 	mailCfg, _ := mail.LoadSettings(r.Context())
+	db, _ := sites.DB(r.Context())
+	activeNav := "notifications"
+	if owner != nil || row.UserID > 0 {
+		activeNav = "accounts"
+	}
+	if base == "" {
+		base = notificationsBase
+	}
 	data := formData(map[string]any{
-		"ActiveNav":          "notifications",
+		"ActiveNav":          activeNav,
 		"Row":                row,
 		"IsNew":              isNew,
-		"BasePath":           notificationsBase,
+		"BasePath":           base,
+		"LockOwner":          owner != nil,
+		"Owner":              owner,
+		"Accounts":           notificationAccountChoices(db),
 		"SelectedEvents":     selected,
 		"HookEvents":         notifications.NotificationEventsFor(r.Context()),
 		"SubscribableGroups": notifications.EventGroupsFor(r.Context()),
@@ -225,7 +312,7 @@ func (h *Handler) renderNotificationForm(w http.ResponseWriter, r *http.Request,
 		"Success":            notificationFormSuccessMessage(r),
 	})
 	if !isNew && row.NotificationID > 0 {
-		data["PageSecondaryActionPostURL"] = notificationsBase + "/" + strconv.FormatUint(uint64(row.NotificationID), 10) + "/test"
+		data["PageSecondaryActionPostURL"] = base + "/" + strconv.FormatUint(uint64(row.NotificationID), 10) + "/test"
 		data["PageSecondaryActionLabel"] = "Test Now"
 		data["PageSecondaryActionIcon"] = "bi-send"
 	}
@@ -259,7 +346,7 @@ func notificationFormErrorMessage(r *http.Request, errMsg string) string {
 	return ""
 }
 
-func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, idStr string) {
+func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, owner *models.User, base, idStr string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -269,10 +356,14 @@ func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, idStr
 		h.notFound(w, r)
 		return
 	}
+	if !notificationOwnedBy(r, owner, id) {
+		h.notFound(w, r)
+		return
+	}
 	_ = r.ParseForm()
-	dest := notificationsBase + "/" + idStr
+	dest := base + "/" + idStr
 	if strings.TrimSpace(r.FormValue("return")) == "list" {
-		dest = notificationsBase
+		dest = base
 	}
 	if err := notifications.SendTest(r.Context(), id); err != nil {
 		redirectList(w, r, dest+"?test_error=1")
@@ -281,13 +372,17 @@ func (h *Handler) notificationTest(w http.ResponseWriter, r *http.Request, idStr
 	redirectList(w, r, dest+"?tested=1")
 }
 
-func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idStr string) {
+func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, owner *models.User, base, idStr string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	id, ok := parseID(idStr)
 	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	if !notificationOwnedBy(r, owner, id) {
 		h.notFound(w, r)
 		return
 	}
@@ -297,11 +392,81 @@ func (h *Handler) notificationDelete(w http.ResponseWriter, r *http.Request, idS
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	redirectList(w, r, notificationsBase)
+	redirectList(w, r, base)
 }
 
-func (h *Handler) notificationToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
-	h.postToggleModel(w, r, idStr, &models.Notification{}, notificationsBase, nil)
+func (h *Handler) notificationToggleStatus(w http.ResponseWriter, r *http.Request, owner *models.User, base, idStr string) {
+	id, ok := parseID(idStr)
+	if !ok || !notificationOwnedBy(r, owner, id) {
+		h.notFound(w, r)
+		return
+	}
+	h.postToggleModel(w, r, idStr, &models.Notification{}, base, nil)
+}
+
+func notificationOwnedBy(r *http.Request, owner *models.User, id uint) bool {
+	if owner == nil {
+		return true
+	}
+	db, err := sites.DB(r.Context())
+	if err != nil {
+		return false
+	}
+	var row models.Notification
+	if err := db.Select("notification_id", "user_id").First(&row, id).Error; err != nil {
+		return false
+	}
+	return row.UserID == owner.UserID
+}
+
+func notificationOwnerLabel(u models.User) string {
+	name := strings.TrimSpace(strings.TrimSpace(u.GivenName + " " + u.FamilyName))
+	if name == "" {
+		name = u.Username
+	}
+	if email := strings.TrimSpace(u.Email); email != "" && email != name {
+		return name + " (" + email + ")"
+	}
+	return name
+}
+
+func notificationOwnerNames(db *gorm.DB, rows []models.Notification) map[uint]string {
+	out := map[uint]string{}
+	if db == nil || len(rows) == 0 {
+		return out
+	}
+	ids := make([]uint, 0, len(rows))
+	seen := map[uint]struct{}{}
+	for _, row := range rows {
+		if row.UserID == 0 {
+			continue
+		}
+		if _, ok := seen[row.UserID]; ok {
+			continue
+		}
+		seen[row.UserID] = struct{}{}
+		ids = append(ids, row.UserID)
+	}
+	if len(ids) == 0 {
+		return out
+	}
+	var users []models.User
+	if err := db.Where("user_id IN ?", ids).Find(&users).Error; err != nil {
+		return out
+	}
+	for _, u := range users {
+		out[u.UserID] = notificationOwnerLabel(u)
+	}
+	return out
+}
+
+func notificationAccountChoices(db *gorm.DB) []models.User {
+	if db == nil {
+		return nil
+	}
+	var users []models.User
+	db.Where("status = ?", models.StatusActive).Order("username asc").Find(&users)
+	return users
 }
 
 func notificationPlaceholdersMap(ctx context.Context) map[string][]extension.NotificationPlaceholder {
