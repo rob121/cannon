@@ -71,7 +71,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if handled, err := d.ext.ServeExtensionData(ctx, w, r, userCtx); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		d.renderFrontendError(w, r, http.StatusInternalServerError, err.Error())
 		return
 	} else if handled {
 		return
