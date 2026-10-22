@@ -45,8 +45,8 @@ func TestOpenSiteSQLiteUsesSharedRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sqlDB.Stats().MaxOpenConnections != 1 {
-		t.Fatalf("expected sqlite max open conns 1")
+	if got := sqlDB.Stats().MaxOpenConnections; got != database.SQLiteMaxOpenConns {
+		t.Fatalf("expected sqlite max open conns %d, got %d", database.SQLiteMaxOpenConns, got)
 	}
 	if !database.IsSQLite(site.Database.Type) {
 		t.Fatal("expected sqlite site")
