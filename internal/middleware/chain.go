@@ -249,20 +249,24 @@ func (c *Chain) Session(next http.Handler) http.Handler {
 				SameSite: http.SameSiteLaxMode,
 			})
 		}
-		// Clear legacy Goth session cookie from older Cannon builds.
-		http.SetCookie(w, &http.Cookie{
-			Name:     "_gothic_session",
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-		})
 
 		svc, err := user.NewService(store, sessionID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		// Drop the Goth cookie left by older builds once, when the browser
+		// still sends it. Clearing it on every response sets Set-Cookie and
+		// keeps the anonymous page cache from storing the page.
+		if _, err := r.Cookie("_gothic_session"); err == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     "_gothic_session",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
 		}
 		ctx := user.WithContext(r.Context(), svc)
 		if userID, ok := svc.CurrentID(); ok {

@@ -376,19 +376,22 @@ When starting an extension, the extension can read teh sites.json and determine 
 
 SQLite Requirements
 SQLite can be opened by both the parent Cannon process and extension processes, but it only supports one writer at a time. Configure SQLite consistently in both Cannon and extensions.
-For SQLite DSNs, use WAL mode, busy timeout, and foreign keys:
-dsn := "file:" + path + "?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on"
-After opening GORM for SQLite, limit the connection pool:
+For SQLite DSNs, use WAL mode, synchronous=NORMAL, an immediate write lock, busy timeout, and foreign keys:
+dsn := "file:" + path + "?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on&_synchronous=NORMAL&_txlock=immediate"
+After opening GORM for SQLite, use a small pool so readers are not stuck on one connection. SQLite still allows one writer:
 sqlDB, err := db.DB()
 if err == nil {
-    sqlDB.SetMaxOpenConns(1)
+    sqlDB.SetMaxOpenConns(4)
+    sqlDB.SetMaxIdleConns(2)
 }
 Implementation Notes
 Update Cannon’s SQLite database open logic in internal/database/database.go so SQLite always uses:
 _journal_mode=WAL
 _busy_timeout=5000
 _foreign_keys=on
-SetMaxOpenConns(1)
+_synchronous=NORMAL
+_txlock=immediate
+SetMaxOpenConns(4)
 Extensions that open the SQLite DB directly must use the same settings.
 Extension Table Ownership
 Extensions should own their own tables and avoid mutating Cannon core tables unless explicitly designed.

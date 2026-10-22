@@ -18,7 +18,7 @@ func TestConfigurePoolSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := sqlDB.Stats().MaxOpenConnections; got != 1 {
-		t.Fatalf("expected max open conns 1, got %d", got)
+	if got := sqlDB.Stats().MaxOpenConnections; got != sqliteMaxOpenConns {
+		t.Fatalf("expected max open conns %d, got %d", sqliteMaxOpenConns, got)
 	}
 }

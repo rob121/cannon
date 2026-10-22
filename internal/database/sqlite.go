@@ -11,6 +11,15 @@ const (
 	sqliteJournalMode = "WAL"
 	sqliteBusyTimeout = "5000"
 	sqliteForeignKeys = "on"
+	// NORMAL is the SQLite-recommended mode with WAL: commits return after the
+	// WAL write, without an fsync on every transaction, so writers release the
+	// lock sooner. A crash can drop the last uncheckpointed commit; the file
+	// does not corrupt.
+	sqliteSynchronous = "NORMAL"
+	// IMMEDIATE takes the write lock at BEGIN. With more than one connection,
+	// a deferred BEGIN can upgrade to a write later and hit SQLITE_BUSY in the
+	// middle of a transaction. Busy timeout then waits up front instead.
+	sqliteTxLock = "immediate"
 )
 
 // IsSQLite reports whether the database config uses SQLite.
@@ -29,8 +38,8 @@ func SQLiteDSN(path string) string {
 		return mergeSQLiteParams(path)
 	}
 	clean := filepath.ToSlash(path)
-	return fmt.Sprintf("file:%s?_journal_mode=%s&_busy_timeout=%s&_foreign_keys=%s",
-		clean, sqliteJournalMode, sqliteBusyTimeout, sqliteForeignKeys)
+	return fmt.Sprintf("file:%s?_journal_mode=%s&_busy_timeout=%s&_foreign_keys=%s&_synchronous=%s&_txlock=%s",
+		clean, sqliteJournalMode, sqliteBusyTimeout, sqliteForeignKeys, sqliteSynchronous, sqliteTxLock)
 }
 
 func mergeSQLiteParams(dsn string) string {
@@ -42,6 +51,8 @@ func mergeSQLiteParams(dsn string) string {
 	setDefault(q, "_journal_mode", sqliteJournalMode)
 	setDefault(q, "_busy_timeout", sqliteBusyTimeout)
 	setDefault(q, "_foreign_keys", sqliteForeignKeys)
+	setDefault(q, "_synchronous", sqliteSynchronous)
+	setDefault(q, "_txlock", sqliteTxLock)
 	u.RawQuery = q.Encode()
 	return u.String()
 }

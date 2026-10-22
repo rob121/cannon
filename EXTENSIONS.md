@@ -990,7 +990,7 @@ cfg, err := extension.SiteConfig()
 siteID := extension.SiteID()
 ```
 
-SQLite connections use WAL mode, busy timeout, foreign keys, and `MaxOpenConns(1)` — the same rules as the CMS. Extensions should own their tables and keep writes short.
+SQLite connections use WAL mode, `synchronous=NORMAL`, an immediate write lock, a 5 second busy timeout, foreign keys, and a small pool (`MaxOpenConns(4)`) — the same rules as the CMS. SQLite still allows one writer; the extra connections let readers run together. Extensions should own their tables and keep writes short.
 
 ### Namespacing database tables
 

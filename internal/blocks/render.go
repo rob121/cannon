@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rob121/cannon/internal/cache"
@@ -21,6 +22,12 @@ import (
 
 // FragmentRenderer executes a frontend template fragment without layout.
 type FragmentRenderer func(name string, data map[string]any) (string, error)
+
+// blockRenderParallel is how many blocks in one template space may render at once.
+// Matches the SQLite reader pool so content queries and extension calls overlap
+// instead of waiting on each other. GET/HEAD only; other methods stay in order
+// because they share a request body.
+const blockRenderParallel = 4
 
 // RenderSpace renders all active blocks assigned to a template space.
 func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) (string, error) {
@@ -42,20 +49,69 @@ func RenderSpace(ctx context.Context, extMgr *extensions.Manager, space string, 
 		return "", nil
 	}
 
-	var parts []string
-	for _, row := range rows {
-		html, err := renderOne(ctx, extMgr, row, space, r, userCtx, render)
-		if err != nil {
-			// Skip a broken block instead of taking down the whole page.
-			log.Printf("blocks: space %q block_id=%d type=%s extension=%q: %v",
-				space, row.BlockID, row.Type, row.ExtensionName, err)
-			continue
-		}
+	parts := renderRows(ctx, extMgr, rows, space, r, userCtx, render)
+	return strings.Join(parts, "\n"), nil
+}
+
+func renderRows(ctx context.Context, extMgr *extensions.Manager, rows []models.Block, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) []string {
+	if len(rows) < 2 || !readOnlyRequest(r) {
+		return renderRowsSequential(ctx, extMgr, rows, space, r, userCtx, render)
+	}
+
+	parts := make([]string, len(rows))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, blockRenderParallel)
+	for i, row := range rows {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, row models.Block) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			parts[i] = renderRowHTML(ctx, extMgr, row, space, r, userCtx, render)
+		}(i, row)
+	}
+	wg.Wait()
+
+	out := make([]string, 0, len(parts))
+	for _, html := range parts {
 		if strings.TrimSpace(html) != "" {
+			out = append(out, html)
+		}
+	}
+	return out
+}
+
+func renderRowsSequential(ctx context.Context, extMgr *extensions.Manager, rows []models.Block, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) []string {
+	parts := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if html := renderRowHTML(ctx, extMgr, row, space, r, userCtx, render); strings.TrimSpace(html) != "" {
 			parts = append(parts, html)
 		}
 	}
-	return strings.Join(parts, "\n"), nil
+	return parts
+}
+
+func renderRowHTML(ctx context.Context, extMgr *extensions.Manager, row models.Block, space string, r *http.Request, userCtx map[string]any, render FragmentRenderer) string {
+	html, err := renderOne(ctx, extMgr, row, space, r, userCtx, render)
+	if err != nil {
+		// Skip a broken block instead of taking down the whole page.
+		log.Printf("blocks: space %q block_id=%d type=%s extension=%q: %v",
+			space, row.BlockID, row.Type, row.ExtensionName, err)
+		return ""
+	}
+	return html
+}
+
+func readOnlyRequest(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		return true
+	default:
+		return false
+	}
 }
 
 // ListForSpace returns active blocks for a template space ordered by sort then id.
