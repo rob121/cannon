@@ -138,10 +138,12 @@ type MenuItem struct {
 	Name       string     `gorm:"size:128;not null"`
 	RouteID    *uint      `gorm:"index"`
 	Route      *Route     `gorm:"foreignKey:RouteID;references:RouteID;constraint:-"`
-	Class      string     `gorm:"size:256"`
-	Target     string     `gorm:"size:64"`
-	Status     Status     `gorm:"size:16;not null;default:active"`
-	Sort       int        `gorm:"not null;default:0"`
+	Class        string     `gorm:"size:256"`
+	Target       string     `gorm:"size:64"`
+	Status       Status     `gorm:"size:16;not null;default:active"`
+	PublishStart *time.Time `gorm:"index"`
+	PublishEnd   *time.Time `gorm:"index"`
+	Sort         int        `gorm:"not null;default:0"`
 	Groups     []Group    `gorm:"many2many:menu_item_groups;"`
 }
 

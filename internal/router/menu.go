@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/cache"
 	"github.com/rob121/cannon/internal/groups"
@@ -108,6 +109,25 @@ func loadActiveMenuItemsForViewer(ctx context.Context, menuName string, viewerGr
 		return nil, err
 	}
 
+	return filterPublicMenuItems(items, viewerGroups, time.Now()), nil
+}
+
+// MenuItemVisibleAt reports whether an item should appear in public menus at now.
+// Inactive items are hidden. Active items are hidden before publish start or after publish end.
+func MenuItemVisibleAt(item models.MenuItem, now time.Time) bool {
+	if item.Status != models.StatusActive {
+		return false
+	}
+	if t := item.PublishStart; t != nil && !t.IsZero() && now.Before(*t) {
+		return false
+	}
+	if t := item.PublishEnd; t != nil && !t.IsZero() && now.After(*t) {
+		return false
+	}
+	return true
+}
+
+func filterPublicMenuItems(items []models.MenuItem, viewerGroups []uint, now time.Time) []models.MenuItem {
 	byID := make(map[uint]models.MenuItem, len(items))
 	for _, item := range items {
 		byID[item.MenuItemID] = item
@@ -115,20 +135,20 @@ func loadActiveMenuItemsForViewer(ctx context.Context, menuName string, viewerGr
 
 	viewable := make([]models.MenuItem, 0, len(items))
 	for _, item := range items {
-		if item.Status != models.StatusActive {
+		if !MenuItemVisibleAt(item, now) {
 			continue
 		}
-		if menuItemHasInactiveAncestor(item, byID) {
+		if menuItemHasHiddenAncestor(item, byID, now) {
 			continue
 		}
 		if groups.CanView(viewerGroups, item.Groups) {
 			viewable = append(viewable, item)
 		}
 	}
-	return viewable, nil
+	return viewable
 }
 
-func menuItemHasInactiveAncestor(item models.MenuItem, byID map[uint]models.MenuItem) bool {
+func menuItemHasHiddenAncestor(item models.MenuItem, byID map[uint]models.MenuItem, now time.Time) bool {
 	seen := make(map[uint]struct{})
 	for item.ParentID != nil && *item.ParentID != 0 {
 		parentID := *item.ParentID
@@ -140,7 +160,7 @@ func menuItemHasInactiveAncestor(item models.MenuItem, byID map[uint]models.Menu
 		if !ok {
 			return false
 		}
-		if parent.Status != models.StatusActive {
+		if !MenuItemVisibleAt(parent, now) {
 			return true
 		}
 		item = parent

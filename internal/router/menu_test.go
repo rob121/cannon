@@ -2,6 +2,7 @@ package router
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rob121/cannon/internal/models"
 )
@@ -49,6 +50,49 @@ func TestMenuItemParentOptionsExcludesDescendants(t *testing.T) {
 	opts = MenuItemParentOptions(items, 5, 2)
 	if len(opts) != 1 || opts[0].MenuItemID != 1 {
 		t.Fatalf("expected About as parent option, got %+v", opts)
+	}
+}
+
+func TestMenuItemPublishWindowHidesLikeInactive(t *testing.T) {
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	future := now.Add(2 * time.Hour)
+	past := now.Add(-2 * time.Hour)
+	openStart := now.Add(-time.Hour)
+	openEnd := now.Add(time.Hour)
+	parentID := uint(1)
+	public := []models.Group{{GroupID: 9, Name: "public", Kind: models.GroupKindFrontend, Status: models.StatusActive}}
+
+	items := []models.MenuItem{
+		{MenuItemID: 1, Name: "Scheduled", Status: models.StatusActive, PublishStart: &future, Groups: public},
+		{MenuItemID: 2, Name: "Expired", Status: models.StatusActive, PublishEnd: &past, Groups: public},
+		{MenuItemID: 3, Name: "Open", Status: models.StatusActive, PublishStart: &openStart, PublishEnd: &openEnd, Groups: public},
+		{MenuItemID: 4, Name: "Always", Status: models.StatusActive, Groups: public},
+		{MenuItemID: 5, Name: "Child", Status: models.StatusActive, ParentID: &parentID, Groups: public},
+		{MenuItemID: 6, Name: "Off", Status: models.StatusInactive, Groups: public},
+	}
+
+	got := filterPublicMenuItems(items, []uint{9}, now)
+	names := make([]string, 0, len(got))
+	for _, item := range got {
+		names = append(names, item.Name)
+	}
+	want := []string{"Open", "Always"}
+	if len(names) != len(want) {
+		t.Fatalf("visible = %v, want %v", names, want)
+	}
+	for i := range want {
+		if names[i] != want[i] {
+			t.Fatalf("visible = %v, want %v", names, want)
+		}
+	}
+	if MenuItemVisibleAt(items[2], now) != true {
+		t.Fatal("expected item inside the window to be visible")
+	}
+	if MenuItemVisibleAt(items[2], openEnd) != true {
+		t.Fatal("expected item to stay visible at the publish end")
+	}
+	if MenuItemVisibleAt(items[2], openEnd.Add(time.Second)) {
+		t.Fatal("expected item to hide just after the publish end")
 	}
 }
 

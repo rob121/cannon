@@ -34,7 +34,7 @@
             {{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" false)}}
           </td>
           <td>{{if index $.MenuNames .Item.MenuID}}{{index $.MenuNames .Item.MenuID}}{{else}}—{{end}}</td>
-          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .Item.MenuItemID "Status" .Item.Status "ListQuery" $.ListQuery)}}</td>
+          <td>{{template "status_toggle" (dict "Root" $ "BasePath" $.BasePath "ID" .Item.MenuItemID "Status" .Item.Status "ListQuery" $.ListQuery)}}{{if .ScheduleNote}}<div class="admin-cell-muted">{{.ScheduleNote}}</div>{{end}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
           <td>{{template "sort_controls" (dict "Root" $ "ID" .Item.MenuItemID "CanMoveUp" .CanMoveUp "CanMoveDown" .CanMoveDown)}}</td>

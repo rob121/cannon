@@ -33,6 +33,16 @@
           </select>
         </div>
         <div class="col-md-6">
+          <label class="admin-form-label" for="menu-item-publish-start">Publish Start</label>
+          <input class="admin-form-control" id="menu-item-publish-start" type="datetime-local" name="publish_start" value="{{if .Row.PublishStart}}{{.Row.PublishStart.Format "2006-01-02T15:04"}}{{end}}">
+          <p class="admin-form-help">Optional. Hidden before this time, the same way a content item is.</p>
+        </div>
+        <div class="col-md-6">
+          <label class="admin-form-label" for="menu-item-publish-end">Publish End</label>
+          <input class="admin-form-control" id="menu-item-publish-end" type="datetime-local" name="publish_end" value="{{if .Row.PublishEnd}}{{.Row.PublishEnd.Format "2006-01-02T15:04"}}{{end}}">
+          <p class="admin-form-help">Optional. Hidden after this time. Leave both dates empty to follow status only.</p>
+        </div>
+        <div class="col-md-6">
           <label class="admin-form-label">Parent Item</label>
           <select class="admin-form-control" name="parent_id" id="menu-item-parent"{{if not .IsNew}} data-menu-id="{{.Row.MenuID}}"{{end}}>
             <option value="">— Top level —</option>
@@ -98,7 +108,7 @@
         {{range .MenuItemRows}}
         <tr{{if .IsCurrent}} class="is-current-menu-item"{{end}}>
           <td>{{template "menu_item_tree_name" (dict "Depth" .Depth "Label" .Item.Name "BasePath" $.BasePath "ID" .Item.MenuItemID "ListQuery" $.ListQuery "Current" .IsCurrent)}}</td>
-          <td>{{template "status_badge" .Item.Status}}</td>
+          <td>{{template "status_badge" .Item.Status}}{{if .ScheduleNote}}<div class="admin-cell-muted">{{.ScheduleNote}}</div>{{end}}</td>
           <td>{{if .ParentName}}{{.ParentName}}{{else}}—{{end}}</td>
           <td>{{if .Item.Route}}{{.Item.Route.Name}} <span class="admin-cell-muted">({{.Item.Route.Path}})</span>{{else}}—{{end}}</td>
           <td>{{.Item.Sort}}</td>

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/router"
@@ -15,12 +16,13 @@ import (
 const menuItemsBase = "/admin/menu-items"
 
 type menuItemListRow struct {
-	Item        models.MenuItem
-	Depth       int
-	ParentName  string
-	CanMoveUp   bool
-	CanMoveDown bool
-	IsCurrent   bool
+	Item         models.MenuItem
+	Depth        int
+	ParentName   string
+	ScheduleNote string
+	CanMoveUp    bool
+	CanMoveDown  bool
+	IsCurrent    bool
 }
 
 func (h *Handler) menuItems(w http.ResponseWriter, r *http.Request, path string) {
@@ -106,11 +108,12 @@ func (h *Handler) menuItemList(w http.ResponseWriter, r *http.Request) {
 		for _, item := range rows {
 			pos := positions[item.MenuItemID]
 			treeRows = append(treeRows, menuItemListRow{
-				Item:        item,
-				Depth:       depths[item.MenuItemID],
-				ParentName:  parentNames[item.MenuItemID],
-				CanMoveUp:   pos.canMoveUp,
-				CanMoveDown: pos.canMoveDown,
+				Item:         item,
+				Depth:        depths[item.MenuItemID],
+				ParentName:   parentNames[item.MenuItemID],
+				ScheduleNote: menuItemScheduleNote(item),
+				CanMoveUp:    pos.canMoveUp,
+				CanMoveDown:  pos.canMoveDown,
 			})
 		}
 	}
@@ -148,6 +151,12 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 		row.Class = formString(r, "class")
 		row.Target = formString(r, "target")
 		row.Status = formStatus(r)
+		row.PublishStart = formTimePtr(r, "publish_start")
+		row.PublishEnd = formTimePtr(r, "publish_end")
+		if row.PublishStart != nil && row.PublishEnd != nil && row.PublishEnd.Before(*row.PublishStart) {
+			h.renderMenuItemForm(w, r, row, allGroups, isNew, "Publish end must be after publish start.")
+			return
+		}
 		row.Sort = formInt(r, "sort", 0)
 		row.ParentID = formUintPtr(r, "parent_id")
 		if isNew {
@@ -374,10 +383,11 @@ func appendMenuItemTreeRows(out []menuItemListRow, items []models.MenuItem, byID
 			continue
 		}
 		row := menuItemListRow{
-			Item:       item,
-			Depth:      opt.Depth,
-			ParentName: parentNames[item.MenuItemID],
-			IsCurrent:  currentID != 0 && item.MenuItemID == currentID,
+			Item:         item,
+			Depth:        opt.Depth,
+			ParentName:   parentNames[item.MenuItemID],
+			ScheduleNote: menuItemScheduleNote(item),
+			IsCurrent:    currentID != 0 && item.MenuItemID == currentID,
 		}
 		if positions != nil {
 			pos := positions[item.MenuItemID]
@@ -526,6 +536,20 @@ func menuNamesByID(db *gorm.DB, rows []models.MenuItem) map[uint]string {
 type menuItemSortPosition struct {
 	canMoveUp   bool
 	canMoveDown bool
+}
+
+func menuItemScheduleNote(item models.MenuItem) string {
+	now := time.Now()
+	if item.Status != models.StatusActive || router.MenuItemVisibleAt(item, now) {
+		return ""
+	}
+	if item.PublishStart != nil && !item.PublishStart.IsZero() && now.Before(*item.PublishStart) {
+		return "Hidden until " + item.PublishStart.Format("Jan 2, 2006 3:04 PM")
+	}
+	if item.PublishEnd != nil && !item.PublishEnd.IsZero() && now.After(*item.PublishEnd) {
+		return "Hidden since " + item.PublishEnd.Format("Jan 2, 2006 3:04 PM")
+	}
+	return "Hidden by schedule"
 }
 
 func menuItemSiblingKey(row models.MenuItem) string {

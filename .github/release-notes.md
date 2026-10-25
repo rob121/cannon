@@ -1,1 +1,1 @@
-Extension admin forms can use the visual editor. Fields marked for it are initialized when the extension page loads, and their content is included when the form is saved.
+Menu items can use a publish start and publish end. Outside that window they stay out of public menus, the same way content items do, while the stored status is left unchanged.
