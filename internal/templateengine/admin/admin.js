@@ -1433,6 +1433,7 @@
     initUserForm();
     initItemEditors();
     initCategoryEditors();
+    initExtensionRichText();
     initTemplateEditors();
     initMediaPicker();
     initTemplateBrowser();
@@ -2730,11 +2731,26 @@
     ]);
   }
 
+  function initExtensionRichText() {
+    var root = document.querySelector('.admin-extension-app');
+    if (!root) {
+      return;
+    }
+    initLazyCKEditors(root);
+    root.querySelectorAll('form').forEach(function (form) {
+      if (form.dataset.ckEditorSubmitBound || !form.querySelector('textarea[data-ckeditor]')) {
+        return;
+      }
+      form.dataset.ckEditorSubmitBound = '1';
+      form.addEventListener('submit', syncCKEditors);
+    });
+  }
+
   if (!document.body.dataset.ckEditorSubmitBound) {
     document.body.dataset.ckEditorSubmitBound = '1';
     document.addEventListener('turbo:submit-start', function (e) {
       var target = e.target;
-      if (target && (target.id === 'item-form' || target.id === 'category-form' || target.id === 'user-form')) {
+      if (target && (target.id === 'item-form' || target.id === 'category-form' || target.id === 'user-form' || (target.querySelector && target.querySelector('textarea[data-ckeditor]')))) {
         syncCKEditors();
       }
     });
@@ -3579,6 +3595,9 @@
     destroyTemplateEditors();
     document.querySelectorAll('[data-bound]').forEach(function (el) {
       delete el.dataset.bound;
+    });
+    document.querySelectorAll('form[data-ck-editor-submit-bound]').forEach(function (form) {
+      delete form.dataset.ckEditorSubmitBound;
     });
     document.querySelectorAll('[data-media-rows-bound]').forEach(function (el) {
       delete el.dataset.mediaRowsBound;
