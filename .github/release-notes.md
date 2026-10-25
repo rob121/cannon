@@ -1,1 +1,1 @@
-Active extensions now start in batches of five, including the binary metadata probe, so site startup no longer waits on each extension one at a time.
+Extension admin forms can use the visual editor. Fields marked for it are initialized when the extension page loads, and their content is included when the form is saved.
