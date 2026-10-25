@@ -702,7 +702,14 @@
       });
     }
 
+    var routeForm = document.getElementById('route-form');
+    if (routeForm && !routeForm.dataset.ckEditorSubmitBound) {
+      routeForm.dataset.ckEditorSubmitBound = '1';
+      routeForm.addEventListener('submit', syncCKEditors);
+    }
+
     function syncPageDataFields() {
+      syncCKEditors();
       var extensionVisible = typeEl.value === 'Extension' && extEl && !extEl.hidden;
       if (!extensionVisible || !extSelect || !pageSelect) {
         dataFields.forEach(function (field) {
@@ -722,6 +729,14 @@
           input.disabled = !matches;
         });
       });
+      initVisibleRouteEditors();
+    }
+
+    function initVisibleRouteEditors() {
+      document.querySelectorAll('.route-data-field:not([hidden])').forEach(function (field) {
+        initLazyCKEditors(field);
+      });
+      refreshCKEditors();
     }
 
     function syncEndpointDataFields() {

@@ -79,7 +79,7 @@
             {{$pageID := .ID}}
             {{range .Fields}}
             {{$fieldName := .Name}}
-            <div class="{{if eq .Type "textarea"}}col-12{{else}}col-md-6{{end}} route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
+            <div class="{{if or (eq .Type "textarea") (eq .Type "rich_text") (eq .Type "wysiwyg")}}col-12{{else}}col-md-6{{end}} route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
               <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
               {{if eq .Type "item"}}
               <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>
@@ -111,8 +111,8 @@
               </select>
               {{else if eq .Type "number"}}
               <input class="admin-form-control" name="page_data_{{.Name}}" type="number" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
-              {{else if eq .Type "textarea"}}
-              <textarea class="admin-form-control" name="page_data_{{.Name}}" rows="4" {{if .Required}}required{{end}}>{{index $.PageData .Name}}</textarea>
+              {{else if or (eq .Type "textarea") (eq .Type "rich_text") (eq .Type "wysiwyg")}}
+              <textarea class="admin-form-control" id="page-data-{{$extName}}-{{$pageID}}-{{.Name}}" name="page_data_{{.Name}}" rows="{{if or (eq .Type "rich_text") (eq .Type "wysiwyg")}}8{{else}}4{{end}}" {{if or (eq .Type "rich_text") (eq .Type "wysiwyg")}}data-ckeditor="page-data-{{$extName}}-{{$pageID}}-{{.Name}}"{{end}} {{if .Required}}required{{end}}>{{index $.PageData .Name}}</textarea>
               {{else}}
               <input class="admin-form-control" name="page_data_{{.Name}}" value="{{index $.PageData .Name}}" {{if .Required}}required{{end}}>
               {{end}}
