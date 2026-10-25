@@ -2970,6 +2970,9 @@ textarea.admin-template-editor {
 }
 
 .admin-richtext-field .ck.ck-editor__main > .ck-editor__editable {
+  --ck-color-base-background: var(--admin-card);
+  --ck-color-base-text: var(--admin-foreground);
+  --ck-color-text: var(--admin-foreground);
   background: var(--admin-card);
   color: var(--admin-foreground);
   border-color: var(--admin-input);

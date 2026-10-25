@@ -2735,7 +2735,7 @@
 
   function initItemEditors() {
     initRichTextForm('item-form', [
-      { id: 'item-intro', key: 'intro', config: ckEditorConfig('intro') },
+      { id: 'item-intro', key: 'intro', config: ckEditorConfig('body') },
       { id: 'item-body', key: 'body', config: ckEditorConfig('body') }
     ]);
   }
