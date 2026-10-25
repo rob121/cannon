@@ -81,6 +81,11 @@ const DefaultIPCTimeout = 3 * time.Second
 // InstallIPCTimeout is used for slower install/bootstrap calls.
 const InstallIPCTimeout = 30 * time.Second
 
+// extensionStartParallelism is how many extension processes boot at once.
+// Five overlaps process startup and the socket handshake. A higher limit
+// mostly waits on the site database, which still has a single writer.
+const extensionStartParallelism = 5
+
 type Manager struct {
 	app          *config.App
 	site         *config.SiteConfig
@@ -91,6 +96,9 @@ type Manager struct {
 	clientsMu    sync.Mutex
 	clients      map[string]*http.Client // socket path -> pooled unix client
 	mu           sync.RWMutex
+	startMu      sync.Mutex
+	starts       map[string]*sync.Mutex
+	permMu       sync.Mutex
 }
 
 func NewManager(app *config.App, site *config.SiteConfig) *Manager {
@@ -101,6 +109,7 @@ func NewManager(app *config.App, site *config.SiteConfig) *Manager {
 		suppressed:   make(map[string]bool),
 		updateClient: &http.Client{Timeout: 30 * time.Second},
 		clients:      make(map[string]*http.Client),
+		starts:       make(map[string]*sync.Mutex),
 	}
 }
 
@@ -125,15 +134,19 @@ func (m *Manager) Bootstrap(ctx context.Context) error {
 	if err := db.Where("status = ?", models.StatusActive).Order("sort asc").Find(&rows).Error; err != nil {
 		return err
 	}
+	active := make([]models.Extension, 0, len(rows))
 	for _, row := range rows {
 		if m.isSuppressed(row.Name) {
 			continue
 		}
+		active = append(active, row)
+	}
+	runParallel(extensionStartParallelism, len(active), func(i int) {
+		row := active[i]
 		if err := m.start(ctx, row); err != nil {
 			m.disableFailedExtension(ctx, row.Name, err)
-			continue
 		}
-	}
+	})
 	m.startUpdateChecker()
 	return nil
 }
@@ -223,6 +236,7 @@ func (m *Manager) cleanupRuntime(name string) {
 	m.mu.Unlock()
 	if ok && rt.cmd != nil && rt.cmd.Process != nil && rt.cmd.ProcessState == nil {
 		_ = rt.cmd.Process.Kill()
+		_ = rt.cmd.Wait()
 	}
 }
 
@@ -236,13 +250,39 @@ func (m *Manager) binaryPath(name string) string {
 	return filepath.Join(m.app.Extensions.Dir, name)
 }
 
+func (m *Manager) extensionStartLock(name string) *sync.Mutex {
+	m.startMu.Lock()
+	defer m.startMu.Unlock()
+	lock, ok := m.starts[name]
+	if !ok {
+		lock = &sync.Mutex{}
+		m.starts[name] = lock
+	}
+	return lock
+}
+
+func runtimeRunning(rt *Runtime) bool {
+	return rt != nil && rt.cmd != nil && rt.cmd.Process != nil && rt.cmd.ProcessState == nil
+}
+
 func (m *Manager) start(ctx context.Context, row models.Extension) error {
+	lock := m.extensionStartLock(row.Name)
+	lock.Lock()
+	defer lock.Unlock()
+
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	if rt, ok := m.runtimes[row.Name]; ok && rt.cmd != nil && rt.cmd.Process != nil && rt.cmd.ProcessState == nil {
-		rt.Model = row
+	if rt, ok := m.runtimes[row.Name]; ok && runtimeRunning(rt) {
+		m.mu.Unlock()
 		_ = m.refreshRuntimeMetadata(ctx, rt, row.Socket)
+		m.mu.Lock()
+		rt.Model = row
+		m.mu.Unlock()
 		return nil
+	}
+	m.mu.Unlock()
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	_ = os.Remove(row.Socket)
 	cmd := exec.Command(m.binaryPath(row.Name), "--site="+m.site.ID, "--socket="+row.Socket)
@@ -254,27 +294,76 @@ func (m *Manager) start(ctx context.Context, row models.Extension) error {
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start extension %s: %w", row.Name, err)
 	}
+	fail := func(err error) error {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+		return err
+	}
 	rt := &Runtime{Model: row, cmd: cmd}
-	m.runtimes[row.Name] = rt
+	socketReady := false
 	for i := 0; i < 20; i++ {
 		if _, err := os.Stat(row.Socket); err == nil {
+			socketReady = true
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
+		timer := time.NewTimer(100 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return fail(ctx.Err())
+		case <-timer.C:
+		}
+	}
+	if !socketReady {
+		return fail(fmt.Errorf("start extension %s: socket %s did not appear", row.Name, row.Socket))
 	}
 	if err := m.refreshRuntimeMetadata(ctx, rt, row.Socket); err != nil {
-		return err
+		return fail(err)
 	}
 	if !row.Installed {
 		if err := m.runInstall(ctx, row.Socket); err != nil {
-			return fmt.Errorf("install extension %s: %w", row.Name, err)
+			return fail(fmt.Errorf("install extension %s: %w", row.Name, err))
 		}
 		if err := m.markInstalled(ctx, row.Name); err != nil {
-			return err
+			return fail(err)
 		}
 		rt.Model.Installed = true
 	}
+	m.mu.Lock()
+	if m.suppressed[row.Name] {
+		m.mu.Unlock()
+		return fail(fmt.Errorf("extension %s start cancelled", row.Name))
+	}
+	m.runtimes[row.Name] = rt
+	m.mu.Unlock()
 	return nil
+}
+
+// runParallel runs fn for each index, with at most limit calls in flight.
+func runParallel(limit, n int, fn func(i int)) {
+	if n <= 0 {
+		return
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > n {
+		limit = n
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			fn(i)
+		}(i)
+	}
+	wg.Wait()
 }
 
 func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socketPath string) error {
@@ -286,10 +375,7 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 	rt.DefaultAdminMenuName = strings.TrimSpace(payload.Defaults.Admin.MenuName)
 	rt.Permissions = append([]extension.PermissionDef(nil), payload.Permissions...)
 	if len(payload.Permissions) > 0 {
-		security.RegisterExtensionPermissions(rt.Model.Name, payload.Permissions)
-		if db, err := sites.DB(ctx); err == nil {
-			_ = security.SyncToDB(db)
-		}
+		m.syncExtensionPermissions(ctx, rt.Model.Name, payload.Permissions)
 	}
 	rt.Blocks = nil
 	rt.Pages = nil
@@ -339,6 +425,17 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 		}
 	}
 	return nil
+}
+
+func (m *Manager) syncExtensionPermissions(ctx context.Context, name string, perms []extension.PermissionDef) {
+	m.permMu.Lock()
+	defer m.permMu.Unlock()
+	security.RegisterExtensionPermissions(name, perms)
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return
+	}
+	_ = security.SyncToDB(db)
 }
 
 func (m *Manager) applyCachedMeta(ctx context.Context, row *models.Extension, meta Meta) error {
@@ -720,11 +817,14 @@ func (m *Manager) Stop(name string) {
 		}
 		return
 	}
-	proc := rt.cmd.Process
+	cmd := rt.cmd
 	delete(m.runtimes, name)
 	m.suppressed[name] = true
 	m.mu.Unlock()
-	_ = proc.Kill()
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}
 	if m.site != nil {
 		_ = m.syncNotificationEvents(sites.WithContext(context.Background(), m.site), name, nil)
 	}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rob121/cannon/internal/models"
@@ -101,14 +102,19 @@ func (m *Manager) enrichBinaryMeta(ctx context.Context, db *gorm.DB) error {
 	if err := db.Find(&rows).Error; err != nil {
 		return err
 	}
-	for i := range rows {
+	var mu sync.Mutex
+	var first error
+	runParallel(extensionStartParallelism, len(rows), func(i int) {
+		if ctx.Err() != nil {
+			return
+		}
 		row := &rows[i]
 		if _, err := os.Stat(m.binaryPath(row.Name)); err != nil {
-			continue
+			return
 		}
 		probed, err := m.ProbeBinaryMeta(row.Name)
 		if err != nil {
-			continue
+			return
 		}
 		if err := m.applyCachedMeta(ctx, row, Meta{
 			Name:          probed.Name,
@@ -117,11 +123,20 @@ func (m *Manager) enrichBinaryMeta(ctx context.Context, db *gorm.DB) error {
 			Version:       probed.Version,
 			UpdateURLBase: probed.UpdateURLBase,
 		}); err != nil {
-			return err
+			mu.Lock()
+			if first == nil {
+				first = err
+			}
+			mu.Unlock()
+			return
 		}
 		if err := m.applyDefaultMenuName(ctx, row, probed.AdminMenuName); err != nil {
-			return err
+			mu.Lock()
+			if first == nil {
+				first = err
+			}
+			mu.Unlock()
 		}
-	}
-	return nil
+	})
+	return first
 }

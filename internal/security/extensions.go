@@ -2,11 +2,15 @@ package security
 
 import (
 	"context"
+	"sync"
 
 	"github.com/rob121/cannon/extension"
 )
 
-var extensionAdminPermissions = map[string][]string{}
+var (
+	extensionPermMu           sync.Mutex
+	extensionAdminPermissions = map[string][]string{}
+)
 
 // RegisterExtensionPermissions registers extension-owned permissions with a namespace prefix.
 func RegisterExtensionPermissions(extensionName string, perms []extension.PermissionDef) {
@@ -33,11 +37,15 @@ func RegisterExtensionPermissions(extensionName string, perms []extension.Permis
 			Dangerous:   p.Dangerous,
 		})
 	}
+	extensionPermMu.Lock()
 	extensionAdminPermissions[extensionName] = ids
+	extensionPermMu.Unlock()
 }
 
 // ExtensionAdminPermissionIDs returns registered permission ids for an extension admin UI.
 func ExtensionAdminPermissionIDs(extensionName string) []string {
+	extensionPermMu.Lock()
+	defer extensionPermMu.Unlock()
 	return append([]string(nil), extensionAdminPermissions[extensionName]...)
 }
 
@@ -55,7 +63,9 @@ func HasExtensionAdminAccess(effective EffectivePermissions, extensionName strin
 	if CheckPermission(effective, PermWildcardAll) {
 		return true
 	}
-	permIDs := extensionAdminPermissions[extensionName]
+	extensionPermMu.Lock()
+	permIDs := append([]string(nil), extensionAdminPermissions[extensionName]...)
+	extensionPermMu.Unlock()
 	if len(permIDs) > 0 {
 		for _, id := range permIDs {
 			if CheckPermission(effective, id) {

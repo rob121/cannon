@@ -1,1 +1,1 @@
-SQLite readers no longer share one connection. Pages render several blocks in a template space at the same time, and the anonymous page cache is no longer blocked by a leftover session cookie.
+Active extensions now start in batches of five, including the binary metadata probe, so site startup no longer waits on each extension one at a time.
