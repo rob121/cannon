@@ -452,6 +452,13 @@
               <span class="admin-permission-copy">
                 <span class="admin-permission-name">{{.DisplayName}}</span>
                 <code class="admin-permission-key">{{.ID}}</code>
+                {{if and (not (containsString $.SelectedPermKeys .ID)) (not (containsString $.SelectedDeniedPermKeys .ID))}}
+                {{if containsString $.InheritedDenyKeys .ID}}
+                <span class="admin-permission-inherited is-deny">Denied by a parent</span>
+                {{else if containsString $.InheritedAllowKeys .ID}}
+                <span class="admin-permission-inherited">Inherited</span>
+                {{end}}
+                {{end}}
               </span>
             </td>
             <td class="admin-permission-effect-col">

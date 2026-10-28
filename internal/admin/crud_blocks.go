@@ -380,6 +380,7 @@ func blockFormData(ctx context.Context, db *gorm.DB, row models.Block, meta bloc
 		"RouteSelected":    len(selectedRouteIDs),
 		"ExtensionOptions": extOptions,
 		"BlockData":        blocks.MetadataStringMap(row.Metadata),
+		"BlockDataRaw":     blockDataRawMap(row.Metadata),
 		"IsNew":            isNew,
 		"BasePath":         blocksBase,
 		"SpaceFilter":      spaceFilter,
@@ -644,6 +645,14 @@ func blockReorder(db *gorm.DB, id uint, space string, direction int) error {
 		}
 	}
 	return nil
+}
+
+func blockDataRawMap(raw string) map[string]any {
+	out, err := blocks.MetadataMap(raw)
+	if err != nil || out == nil {
+		return map[string]any{}
+	}
+	return out
 }
 
 func wrapperOptionContains(options []blocks.WrapperOption, path string) bool {

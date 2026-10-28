@@ -66,6 +66,8 @@ func testAdminFuncs() map[string]any {
 		"fieldOptions":       func(string) []map[string]string { return nil },
 		"fieldValueContains": func(string, string) bool { return false },
 		"formatBytes":        func(int64) string { return "0 B" },
+		"blockMetaSelected":    func(map[string]any, string, string) bool { return false },
+		"blockMetaTruthy":      func(map[string]any, string) bool { return false },
 	}
 	for k, v := range lang.TestFuncMap() {
 		funcs[k] = v

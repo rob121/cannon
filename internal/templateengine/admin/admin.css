@@ -3053,12 +3053,27 @@ textarea.admin-form-control {
   resize: vertical;
 }
 
+textarea.admin-form-control.admin-form-control-short {
+  min-height: 4.25rem;
+}
+
 select.admin-form-control {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2371717a' viewBox='0 0 16 16'%3E%3Cpath d='M8 11 3 6h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.75rem center;
   padding-right: 2rem;
+}
+
+select.admin-form-control-multiselect {
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+select.admin-form-control-multiselect option:checked {
+  font-weight: 600;
 }
 
 .admin-form-help {
@@ -3210,10 +3225,43 @@ select.admin-form-control {
   gap: 0.5rem 1rem;
 }
 
-.admin-role-inherit-grid {
+.admin-role-form .admin-form-section-body > .admin-form-actions {
+  margin-top: 1.5rem;
+}
+
+.admin-role-status-lock {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
+  align-items: center;
+  min-height: 2.25rem;
+}
+
+.admin-role-event-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.admin-role-event-group-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--admin-foreground);
+}
+
+.admin-role-filter-panel {
+  margin-top: 1.5rem;
+  padding: 1rem 1.125rem 1.125rem;
+  border: 1px solid var(--admin-border);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--admin-muted) 72%, transparent);
+}
+
+.admin-role-filter-panel > .admin-form-help {
+  margin-bottom: 1rem;
+}
+
+.admin-toggle-grid-wide {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
 }
 
 .admin-permission-picker {
@@ -3315,6 +3363,22 @@ select.admin-form-control {
   border-collapse: collapse;
 }
 
+.admin-permission-table th,
+.admin-permission-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-permission-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--admin-muted-fg);
+  background: color-mix(in srgb, var(--admin-muted) 55%, transparent);
+  border-bottom: 1px solid var(--admin-border);
+}
+
 .admin-permission-row {
   border-top: 1px solid var(--admin-border);
 }
@@ -3353,8 +3417,8 @@ select.admin-form-control {
 }
 
 .admin-permission-info {
-  padding: 0;
-  vertical-align: top;
+  padding: 0.75rem 1rem;
+  vertical-align: middle;
 }
 
 .admin-permission-name {
@@ -3425,9 +3489,31 @@ select.admin-form-control {
 }
 
 .admin-permission-effect-col {
-  width: 4.5rem;
+  width: 5.5rem;
   text-align: center;
   vertical-align: middle;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.admin-permission-inherited {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+
+.admin-permission-inherited.is-deny {
+  background: var(--admin-danger-soft);
+  color: var(--admin-danger);
 }
 
 .admin-permission-effect {

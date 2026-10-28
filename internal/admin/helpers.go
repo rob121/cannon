@@ -511,3 +511,80 @@ func RoleDisplayName(name string) string {
 	name = strings.ReplaceAll(name, "-", " ")
 	return cases.Title(language.English, cases.NoLower).String(name)
 }
+
+func blockMetaSelected(meta map[string]any, field, value string) bool {
+	if meta == nil || field == "" || value == "" {
+		return false
+	}
+	raw, ok := meta[field]
+	if !ok || raw == nil {
+		return false
+	}
+	switch typed := raw.(type) {
+	case []any:
+		for _, item := range typed {
+			if blockMetaValueEqual(item, value) {
+				return true
+			}
+		}
+	case []int:
+		for _, item := range typed {
+			if blockMetaValueEqual(item, value) {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range typed {
+			if item == value {
+				return true
+			}
+		}
+	default:
+		return blockMetaValueEqual(typed, value)
+	}
+	return false
+}
+
+func blockMetaTruthy(meta map[string]any, field string) bool {
+	if meta == nil || field == "" {
+		return false
+	}
+	raw, ok := meta[field]
+	if !ok || raw == nil {
+		return false
+	}
+	switch typed := raw.(type) {
+	case bool:
+		return typed
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "1", "true", "yes", "on":
+			return true
+		default:
+			return false
+		}
+	case float64:
+		return int(typed) != 0
+	case int:
+		return typed != 0
+	case int64:
+		return typed != 0
+	default:
+		return false
+	}
+}
+
+func blockMetaValueEqual(item any, value string) bool {
+	switch v := item.(type) {
+	case string:
+		return v == value
+	case float64:
+		return strconv.FormatInt(int64(v), 10) == value
+	case int:
+		return strconv.Itoa(v) == value
+	case int64:
+		return strconv.FormatInt(v, 10) == value
+	default:
+		return fmt.Sprint(item) == value
+	}
+}

@@ -201,8 +201,8 @@
               {{$blockID := .ID}}
               {{range .Fields}}
               {{$fieldName := .Name}}
-              <div class="col-md-6 block-data-field" data-extension-name="{{$extName}}" data-block-id="{{$blockID}}">
-                <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
+              <div class="{{if or (eq .Type "textarea") (eq .Type "multiselect") (eq .Type "toggle")}}col-12{{else}}col-md-6{{end}} block-data-field" data-extension-name="{{$extName}}" data-block-id="{{$blockID}}">
+                <label class="admin-form-label" {{if eq .Type "multiselect"}}for="block-data-{{$extName}}-{{$blockID}}-{{.Name}}"{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
                 {{if eq .Type "select"}}
                 <select class="admin-form-control" name="block_data_{{.Name}}" {{if .Required}}required{{end}}>
                   <option value="">Select {{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</option>
@@ -210,12 +210,26 @@
                   <option value="{{.Value}}" {{if eq (index $.BlockData $fieldName) .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
                   {{end}}
                 </select>
+                {{else if eq .Type "multiselect"}}
+                <select class="admin-form-control admin-form-control-multiselect" id="block-data-{{$extName}}-{{$blockID}}-{{.Name}}" name="block_data_{{.Name}}" multiple size="1" {{if .Required}}required{{end}}>
+                  {{range .Options}}
+                  <option value="{{.Value}}" {{if blockMetaSelected $.BlockDataRaw $fieldName .Value}}selected{{end}}>{{if .Label}}{{.Label}}{{else}}{{.Value}}{{end}}</option>
+                  {{end}}
+                </select>
+                {{else if eq .Type "textarea"}}
+                <textarea class="admin-form-control" id="block-data-{{$extName}}-{{$blockID}}-{{.Name}}" name="block_data_{{.Name}}" rows="3" {{if .Required}}required{{end}}>{{index $.BlockData .Name}}</textarea>
+                {{else if eq .Type "toggle"}}
+                <label class="admin-form-toggle admin-form-toggle-inline">
+                  <input type="checkbox" class="admin-form-toggle-input" name="block_data_{{.Name}}" value="1" {{if or (eq (index $.BlockData $fieldName) "1") (blockMetaTruthy $.BlockDataRaw $fieldName)}}checked{{end}}>
+                  <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+                  <span class="admin-form-toggle-label">{{if .Help}}{{.Help}}{{else}}Enabled{{end}}</span>
+                </label>
                 {{else if eq .Type "number"}}
                 <input class="admin-form-control" name="block_data_{{.Name}}" type="number" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
                 {{else}}
                 <input class="admin-form-control" name="block_data_{{.Name}}" value="{{index $.BlockData .Name}}" {{if .Required}}required{{end}}>
                 {{end}}
-                {{if .Help}}<p class="admin-form-help">{{.Help}}</p>{{end}}
+                {{if and .Help (ne .Type "toggle")}}<p class="admin-form-help">{{.Help}}</p>{{end}}
               </div>
               {{end}}
               {{end}}

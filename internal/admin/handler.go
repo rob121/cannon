@@ -264,6 +264,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 				}
 				return false
 			},
+			"blockMetaSelected": blockMetaSelected,
+			"blockMetaTruthy":   blockMetaTruthy,
 			"groupName":   GroupDisplayName,
 			"roleName":    RoleDisplayName,
 			"formatBytes": formatBytes,

@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -231,6 +232,30 @@ func SaveRolePermissions(db *gorm.DB, roleID uint, allows, denies []string) erro
 		}
 	}
 	return nil
+}
+
+// ParentPermissionKeys returns allow and deny keys granted by parent roles, including their own parents.
+func ParentPermissionKeys(db *gorm.DB, parentRoleIDs []uint) (allows []string, denies []string, err error) {
+	if len(parentRoleIDs) == 0 {
+		return nil, nil, nil
+	}
+	expanded, err := expandRoleInheritance(db, parentRoleIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	perms, err := loadRolePermissions(db, expanded)
+	if err != nil {
+		return nil, nil, err
+	}
+	for key := range perms.Allow {
+		allows = append(allows, key)
+	}
+	for key := range perms.Deny {
+		denies = append(denies, key)
+	}
+	sort.Strings(allows)
+	sort.Strings(denies)
+	return allows, denies, nil
 }
 
 // LoadRolePermissionKeys returns allowed permission keys directly on a role (not inherited).

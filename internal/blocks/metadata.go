@@ -147,6 +147,12 @@ func MetadataFromFormValues(blockType, content string, values url.Values) (strin
 			if name == "" {
 				continue
 			}
+			if len(vals) > 1 {
+				if parsed := blockDataValues(vals); parsed != nil {
+					meta[name] = parsed
+				}
+				continue
+			}
 			value := strings.TrimSpace(vals[0])
 			if value == "" {
 				continue
@@ -258,4 +264,31 @@ func parseRouteIDsFromForm(values url.Values) []uint {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+func blockDataValues(vals []string) any {
+	trimmed := make([]string, 0, len(vals))
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			trimmed = append(trimmed, v)
+		}
+	}
+	if len(trimmed) == 0 {
+		return nil
+	}
+	ints := make([]int, 0, len(trimmed))
+	allInt := true
+	for _, v := range trimmed {
+		id, err := strconv.Atoi(v)
+		if err != nil {
+			allInt = false
+			break
+		}
+		ints = append(ints, id)
+	}
+	if allInt {
+		return ints
+	}
+	return trimmed
 }

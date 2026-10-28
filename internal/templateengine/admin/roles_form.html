@@ -1,97 +1,113 @@
 {{template "page_header" .}}
-<div class="admin-form-card">
-  <div class="admin-form-card-body">
-    {{template "error_alert" .}}
-    <form method="post">
-      {{csrfField}}
+<form method="post" class="admin-form-stack admin-role-form">
+  {{csrfField}}
+  {{template "error_alert" .}}
+
+  <div class="admin-form-card">
+    <div class="admin-form-card-header">
+      <div class="admin-form-card-heading">
+        <h2 class="admin-form-card-title">Role</h2>
+        <p class="admin-form-card-desc">Name, status, and a short description of what this role is for.</p>
+      </div>
+    </div>
+    <div class="admin-form-card-body">
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="admin-form-label">Name</label>
-          <input class="admin-form-control" name="name" value="{{if .Protected}}{{roleName .Row.Name}}{{else}}{{.Row.Name}}{{end}}" required {{if .Protected}}readonly{{end}}>
-          {{if .Protected}}<p class="admin-form-help">System role names cannot be changed.</p>{{end}}
+          <label class="admin-form-label" for="role-name">Name</label>
+          <input class="admin-form-control" id="role-name" name="name" value="{{if .Protected}}{{roleName .Row.Name}}{{else}}{{.Row.Name}}{{end}}" required {{if .Protected}}readonly{{end}}>
+          {{if .Protected}}<p class="admin-form-help mb-0">System role names cannot be changed.</p>{{end}}
         </div>
         <div class="col-md-6">
-          <label class="admin-form-label">Status</label>
+          <label class="admin-form-label" for="role-status">Status</label>
           {{if .Protected}}
-          {{template "status_badge" .Row.Status}}
-          <input type="hidden" name="status" value="{{.Row.Status}}">
-          <p class="admin-form-help">System roles cannot be deactivated.</p>
+          <div class="admin-role-status-lock">
+            {{template "status_badge" .Row.Status}}
+          </div>
+          <input type="hidden" name="status" value="{{if .Row.Status}}{{.Row.Status}}{{else}}active{{end}}">
+          <p class="admin-form-help mb-0">System roles stay active.</p>
           {{else}}
-          <select class="admin-form-control" name="status">
-            <option value="active" {{if eq .Row.Status "active"}}selected{{end}}>Active</option>
+          <select class="admin-form-control" id="role-status" name="status">
+            <option value="active" {{if ne .Row.Status "inactive"}}selected{{end}}>Active</option>
             <option value="inactive" {{if eq .Row.Status "inactive"}}selected{{end}}>Inactive</option>
           </select>
+          <p class="admin-form-help mb-0">New roles are active unless you choose inactive.</p>
           {{end}}
         </div>
         <div class="col-12">
-          <label class="admin-form-label">Description</label>
-          <textarea class="admin-form-control" name="description" rows="2">{{.Row.Description}}</textarea>
-        </div>
-        <div class="col-12"><div class="admin-form-divider"></div></div>
-        <div class="col-12">
-          <label class="admin-form-label">Inherits Roles</label>
-          <p class="admin-form-help mb-3">This role receives all permissions from the selected parent roles.</p>
-          <div class="admin-role-inherit-grid">
-            {{range .AllRoles}}
-            {{if ne .RoleID $.Row.RoleID}}
-            <label class="admin-form-toggle admin-form-toggle-inline">
-              <input type="checkbox" class="admin-form-toggle-input" name="parent_role_ids" value="{{.RoleID}}" {{if containsUint $.SelectedParentIDs .RoleID}}checked{{end}}>
-              <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
-              <span class="admin-form-toggle-label">{{roleName .Name}}</span>
-            </label>
-            {{end}}
-            {{else}}
-            <p class="admin-cell-muted">No other roles available.</p>
-            {{end}}
-          </div>
-        </div>
-        <div class="col-12"><div class="admin-form-divider"></div></div>
-        <div class="col-12">
-          <label class="admin-form-label">Default Email Notifications</label>
-          <p class="admin-form-help mb-3">Administrative users with this role receive email for the selected events unless they opt out on their admin account.</p>
-          {{range .SubscribableGroups}}
-          <div class="mb-3">
-            <p class="admin-form-label mb-2">{{.Label}}</p>
-            {{template "toggle_value_grid" (dict "InputName" "role_notification_events" "Values" .Events "Selected" $.SelectedRoleNotificationEvents)}}
-          </div>
-          {{end}}
-          <div class="admin-notif-filters mt-3">
-            <p class="admin-form-label mb-2">Filters for <code class="admin-code">onItemAfterSave</code></p>
-            <p class="admin-form-help mb-3">Optional. Applied when that event is selected above. Leave status empty for all saves.</p>
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label class="admin-form-label" for="role-notif-filter-status">Item Status</label>
-                <select class="admin-form-control" id="role-notif-filter-status" name="role_notif_filter_status_onItemAfterSave">
-                  <option value="">Any status</option>
-                  <option value="draft" {{if eq .ItemNotificationFilters.Status "draft"}}selected{{end}}>Draft</option>
-                  <option value="pending" {{if eq .ItemNotificationFilters.Status "pending"}}selected{{end}}>Pending</option>
-                  <option value="published" {{if eq .ItemNotificationFilters.Status "published"}}selected{{end}}>Published</option>
-                  <option value="archived" {{if eq .ItemNotificationFilters.Status "archived"}}selected{{end}}>Archived</option>
-                </select>
-              </div>
-              <div class="col-md-4">
-                <label class="admin-form-label" for="role-notif-filter-category">Category ID or Slug</label>
-                <input class="admin-form-control" id="role-notif-filter-category" name="role_notif_filter_category_onItemAfterSave" value="{{.ItemNotificationFilters.Category}}" placeholder="news">
-              </div>
-              <div class="col-md-4">
-                <label class="admin-form-label">Author</label>
-                <label class="admin-form-toggle">
-                  <input type="checkbox" name="role_notif_filter_author_self_onItemAfterSave" value="1" {{if .ItemNotificationFilters.AuthorSelf}}checked{{end}}>
-                  <span class="admin-form-toggle-ui" aria-hidden="true"></span>
-                  <span class="admin-form-toggle-label">Only items authored by the recipient</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12"><div class="admin-form-divider"></div></div>
-        <div class="col-12">
-          <label class="admin-form-label">Permissions</label>
-          <p class="admin-form-help mb-3">Grant permissions with <strong>Allow</strong> or block them with <strong>Deny</strong>. Explicit denies override inherited allows.</p>
-          {{template "permission_picker" .}}
+          <label class="admin-form-label" for="role-description">Description</label>
+          <textarea class="admin-form-control admin-form-control-short" id="role-description" name="description" rows="2">{{.Row.Description}}</textarea>
         </div>
       </div>
-      {{template "form_actions" .}}
-    </form>
+    </div>
   </div>
-</div>
+
+  <div class="admin-form-section-card">
+    {{template "form_section_header" (dict "Title" "Inherits Roles" "Description" "This role receives every permission from the selected parent roles. Leave them all off to grant only the permissions below.")}}
+    <div class="admin-form-section-body">
+      <div class="admin-toggle-grid">
+        {{range .AllRoles}}
+        {{if ne .RoleID $.Row.RoleID}}
+        <label class="admin-form-toggle admin-form-toggle-inline">
+          <input type="checkbox" class="admin-form-toggle-input" name="parent_role_ids" value="{{.RoleID}}" {{if containsUint $.SelectedParentIDs .RoleID}}checked{{end}}>
+          <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+          <span class="admin-form-toggle-label">{{roleName .Name}}</span>
+        </label>
+        {{end}}
+        {{else}}
+        <p class="admin-cell-muted mb-0">No other roles available.</p>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-form-section-card">
+    {{template "form_section_header" (dict "Title" "Default Email Notifications" "Description" "People with this role get email for the selected events unless they opt out on their account. With nothing selected, this role does not send mail.")}}
+    <div class="admin-form-section-body">
+      <div class="admin-role-event-groups">
+        {{range .SubscribableGroups}}
+        <section class="admin-role-event-group">
+          <h3 class="admin-role-event-group-title">{{.Label}}</h3>
+          {{template "toggle_value_grid" (dict "Class" "admin-toggle-grid-wide" "InputName" "role_notification_events" "Values" .Events "Selected" $.SelectedRoleNotificationEvents)}}
+        </section>
+        {{end}}
+      </div>
+      <div class="admin-role-filter-panel">
+        <h3 class="admin-role-event-group-title">Item save filters</h3>
+        <p class="admin-form-help">Used only when <code class="admin-code">onItemAfterSave</code> is selected. Blank fields match every save.</p>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="admin-form-label" for="role-notif-filter-status">Item Status</label>
+            {{$status := .ItemNotificationFilters.Status}}
+            <select class="admin-form-control" id="role-notif-filter-status" name="role_notif_filter_status_onItemAfterSave">
+              <option value="" {{if not (or (eq $status "draft") (eq $status "pending") (eq $status "published") (eq $status "archived"))}}selected{{end}}>Any status</option>
+              <option value="draft" {{if eq $status "draft"}}selected{{end}}>Draft</option>
+              <option value="pending" {{if eq $status "pending"}}selected{{end}}>Pending</option>
+              <option value="published" {{if eq $status "published"}}selected{{end}}>Published</option>
+              <option value="archived" {{if eq $status "archived"}}selected{{end}}>Archived</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="admin-form-label" for="role-notif-filter-category">Category ID or Slug</label>
+            <input class="admin-form-control" id="role-notif-filter-category" name="role_notif_filter_category_onItemAfterSave" value="{{.ItemNotificationFilters.Category}}" placeholder="All categories">
+          </div>
+          <div class="col-md-4">
+            <span class="admin-form-label">Author</span>
+            {{template "form_toggle" (dict "Name" "role_notif_filter_author_self_onItemAfterSave" "Checked" .ItemNotificationFilters.AuthorSelf "OnLabel" "Only their items" "OffLabel" "Any author")}}
+            <p class="admin-form-help mb-0">Off matches items from every author.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-form-section-card">
+    {{template "form_section_header" (dict "Title" "Permissions" "Description" "Allow grants a permission. Deny blocks it, including permissions inherited from a parent. Leave both off to keep the inherited default, or no access when nothing is inherited.")}}
+    <div class="admin-form-section-body">
+      {{template "permission_picker" .}}
+      <div class="admin-form-actions">
+        <button type="submit" class="btn-admin-primary">Save</button>
+        <a class="btn-admin-outline" href="{{.BasePath}}">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>

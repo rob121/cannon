@@ -47,6 +47,8 @@ func testAdminFuncs() template.FuncMap {
 		"fieldValueContains": func(string, string) bool { return false },
 		"formatBytes":        func(int64) string { return "0 B" },
 		"initials":           func(parts ...string) string { return "?" },
+		"blockMetaSelected":    func(map[string]any, string, string) bool { return false },
+		"blockMetaTruthy":      func(map[string]any, string) bool { return false },
 	}
 	for k, v := range lang.TestFuncMap() {
 		funcs[k] = v

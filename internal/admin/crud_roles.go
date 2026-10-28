@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/notifications"
@@ -161,6 +162,15 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		roleFilters = map[string]notifications.SubscriptionFilters{}
 	}
 	itemFilters := roleFilters["onItemAfterSave"]
+	inheritedAllows, inheritedDenies := []string{}, []string{}
+	if errMsg == "" {
+		row, parentIDs, selectedPerms = applyUnsetRoleDefaults(row, allRoles, parentIDs, selectedPerms, selectedDenied)
+		if db, err := sites.DB(r.Context()); err == nil {
+			if keys, denies, err := security.ParentPermissionKeys(db, parentIDs); err == nil {
+				inheritedAllows, inheritedDenies = keys, denies
+			}
+		}
+	}
 	data := formData(map[string]any{
 		"ActiveNav":                      "roles",
 		"Row":                            row,
@@ -173,6 +183,8 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		"SelectedPermKeys":               selectedPerms,
 		"SelectedDeniedPermKeys":         selectedDenied,
 		"SelectedParentIDs":              parentIDs,
+		"InheritedAllowKeys":             inheritedAllows,
+		"InheritedDenyKeys":              inheritedDenies,
 		"SelectedRoleNotificationEvents": selectedRoleEvents,
 		"SubscribableGroups":             notifications.EventGroupsFor(r.Context()),
 		"ItemNotificationFilters":        itemFilters,
@@ -182,6 +194,38 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		data["Error"] = errMsg
 	}
 	h.render(w, r, title, "admin/roles_form.html", data)
+}
+
+// applyUnsetRoleDefaults fills blank system-role fields from the built-in definition.
+// A custom role with an empty status still defaults to active.
+func applyUnsetRoleDefaults(row models.Role, allRoles []models.Role, parentIDs []uint, allows, denies []string) (models.Role, []uint, []string) {
+	if row.Status == "" {
+		row.Status = models.StatusActive
+	}
+	def, ok := security.RoleDefByName(row.Name)
+	if !ok {
+		return row, parentIDs, allows
+	}
+	if strings.TrimSpace(row.Description) == "" && def.Description != "" {
+		row.Description = def.Description
+	}
+	if len(parentIDs) == 0 && len(def.Inherits) > 0 {
+		byName := map[string]uint{}
+		for _, role := range allRoles {
+			byName[role.Name] = role.RoleID
+		}
+		for _, name := range def.Inherits {
+			id, ok := byName[name]
+			if !ok || id == 0 || id == row.RoleID {
+				continue
+			}
+			parentIDs = append(parentIDs, id)
+		}
+	}
+	if len(allows) == 0 && len(denies) == 0 && len(def.Permissions) > 0 {
+		allows = append([]string(nil), def.Permissions...)
+	}
+	return row, parentIDs, allows
 }
 
 func (h *Handler) roleDelete(w http.ResponseWriter, r *http.Request, idStr string) {

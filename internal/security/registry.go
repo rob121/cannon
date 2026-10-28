@@ -53,6 +53,14 @@ func RegisteredPermissions() []Permission {
 	return out
 }
 
+// RoleDefByName returns a built-in role definition by its stored name.
+func RoleDefByName(name string) (RoleDef, bool) {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+	def, ok := roleDefs[name]
+	return def, ok
+}
+
 // RegisteredRoleDefs returns a copy of all registered role definitions.
 func RegisteredRoleDefs() []RoleDef {
 	registryMu.RLock()
