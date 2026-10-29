@@ -12,7 +12,7 @@ import (
 )
 
 func TestItemsBulkFormOwnership(t *testing.T) {
-	funcs := testAdminFuncs()
+	funcs := TestAdminFuncs()
 	funcs["csrfField"] = func() template.HTML { return `<input type="hidden" name="csrf_token" value="test-token">` }
 	e := New(&config.SiteConfig{}, themes.Selection{}, nil, nil, funcs)
 	tmpl, err := e.parse("admin/items.html")

@@ -20,7 +20,7 @@ func TestResolveErrorTemplate(t *testing.T) {
 }
 
 func TestResolveAdminErrorTemplate(t *testing.T) {
-	e := New(nil, themes.Selection{}, nil, nil, testAdminFuncs())
+	e := New(nil, themes.Selection{}, nil, nil, TestAdminFuncs())
 	if got := e.ResolveAdminErrorTemplate(404); got != "admin/error/404.html" {
 		t.Fatalf("admin 404 template = %q", got)
 	}
@@ -49,7 +49,7 @@ func TestErrorTemplate404(t *testing.T) {
 }
 
 func TestAdminErrorTemplate404(t *testing.T) {
-	e := New(nil, themes.Selection{}, nil, nil, testAdminFuncs())
+	e := New(nil, themes.Selection{}, nil, nil, TestAdminFuncs())
 	tmpl, err := e.parseAdmin("admin/error/404.html")
 	if err != nil {
 		t.Fatal(err)

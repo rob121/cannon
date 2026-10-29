@@ -9,7 +9,7 @@ import (
 )
 
 func TestFormToggleLabels(t *testing.T) {
-	eng := New(nil, themes.Selection{}, nil, nil, testAdminFuncs())
+	eng := New(nil, themes.Selection{}, nil, nil, TestAdminFuncs())
 	set, err := eng.parseAdmin("admin/layout.html")
 	if err != nil {
 		t.Fatal(err)

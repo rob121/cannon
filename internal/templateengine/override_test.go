@@ -20,7 +20,7 @@ func TestAdminThemeOverrideVisible(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(themeDir, "dashboard.html"), []byte("<h1>"+marker+"</h1>"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Admin: "myadmin"}, nil, nil, testAdminFuncs())
+	e := New(&config.SiteConfig{TemplateDir: dir}, themes.Selection{Admin: "myadmin"}, nil, nil, TestAdminFuncs())
 	tmpl, err := e.ParseNested("admin/dashboard.html")
 	if err != nil {
 		t.Fatal(err)

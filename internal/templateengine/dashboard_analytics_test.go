@@ -15,7 +15,7 @@ func TestLiveAnalyticsBlockRealtimeConfigNotEscaped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := New(&config.SiteConfig{ID: "example"}, themes.Selection{}, nil, nil, testAdminFuncs())
+	e := New(&config.SiteConfig{ID: "example"}, themes.Selection{}, nil, nil, TestAdminFuncs())
 	tmpl, err := e.parse("admin/dashboard_block_live_analytics.html")
 	if err != nil {
 		t.Fatal(err)
