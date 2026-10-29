@@ -36,6 +36,27 @@ func effectivePermissionPreview(ctx context.Context, userID uint) (EffectivePerm
 	if err != nil {
 		return out, err
 	}
+	return effectivePermissionPreviewFromResolved(ctx, effective)
+}
+
+func roleEffectivePermissionPreview(ctx context.Context, roleID uint) (EffectivePermissionPreview, error) {
+	out := EffectivePermissionPreview{ByCategory: map[string][]EffectivePermissionRow{}}
+	if roleID == 0 {
+		return out, nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return out, err
+	}
+	effective, err := security.ResolveRoleEffective(db, roleID)
+	if err != nil {
+		return out, err
+	}
+	return effectivePermissionPreviewFromResolved(ctx, effective)
+}
+
+func effectivePermissionPreviewFromResolved(ctx context.Context, effective security.EffectivePermissions) (EffectivePermissionPreview, error) {
+	out := EffectivePermissionPreview{ByCategory: map[string][]EffectivePermissionRow{}}
 	labels := permissionLabelIndex(ctx)
 	rows := make([]EffectivePermissionRow, 0, len(effective.Allow)+len(effective.Deny))
 	for key := range effective.Deny {

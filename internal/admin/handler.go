@@ -268,7 +268,8 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			"blockMetaTruthy":      blockMetaTruthy,
 			"blockTypeOptionLabel": blockTypeOptionLabel,
 			"groupName":   GroupDisplayName,
-			"roleName":    RoleDisplayName,
+			"roleName":       RoleDisplayName,
+			"categoryLabel": PermissionCategoryLabel,
 			"formatBytes": formatBytes,
 		}))
 	return eng, nil

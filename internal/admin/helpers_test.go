@@ -23,6 +23,18 @@ func TestThemeTypeLabel(t *testing.T) {
 	}
 }
 
+func TestPermissionCategoryLabel(t *testing.T) {
+	if got := PermissionCategoryLabel("content frontend"); got != "Content Frontend" {
+		t.Fatalf("got %q", got)
+	}
+	if got := PermissionCategoryLabel("stripe_billing"); got != "Stripe Billing" {
+		t.Fatalf("got %q", got)
+	}
+	if got := PermissionCategoryLabel(""); got != "General" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestRoleDisplayName(t *testing.T) {
 	if got := RoleDisplayName("administrator"); got != "Administrator" {
 		t.Fatalf("got %q", got)

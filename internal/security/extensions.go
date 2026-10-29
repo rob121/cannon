@@ -2,6 +2,7 @@ package security
 
 import (
 	"context"
+	"strings"
 	"sync"
 
 	"github.com/rob121/cannon/extension"
@@ -40,6 +41,24 @@ func RegisterExtensionPermissions(extensionName string, perms []extension.Permis
 	extensionPermMu.Lock()
 	extensionAdminPermissions[extensionName] = ids
 	extensionPermMu.Unlock()
+}
+
+// UnregisterExtensionPermissions removes an extension's permissions from the in-memory catalog.
+func UnregisterExtensionPermissions(extensionName string) {
+	extensionName = strings.TrimSpace(extensionName)
+	if extensionName == "" {
+		return
+	}
+	extensionPermMu.Lock()
+	ids := append([]string(nil), extensionAdminPermissions[extensionName]...)
+	delete(extensionAdminPermissions, extensionName)
+	extensionPermMu.Unlock()
+
+	registryMu.Lock()
+	defer registryMu.Unlock()
+	for _, id := range ids {
+		delete(registry, id)
+	}
 }
 
 // ExtensionAdminPermissionIDs returns registered permission ids for an extension admin UI.

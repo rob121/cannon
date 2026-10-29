@@ -23,6 +23,11 @@ const (
 	PermRolesManage       = "core.roles.manage"
 	PermGroupsManage      = "core.groups.manage"
 	PermPermissionsRead   = "core.permissions.read"
+
+	PermAdminUsersProfileWrite    = "core.admin.users.profile.write"
+	PermAdminUsersMembershipWrite = "core.admin.users.membership.write"
+	PermAdminUsersSecurityWrite   = "core.admin.users.security.write"
+
 	PermWildcardAll       = "*"
 	PermWildcardCore      = "core.*"
 	PermWildcardCoreAdmin = "core.admin.*"
@@ -198,6 +203,26 @@ func registerCorePermissions() {
 		DisplayName: "Delete Users",
 		Description: "Allows deleting user accounts.",
 		Category:    "Users",
+		Dangerous:   true,
+	})
+	RegisterPermission(Permission{
+		ID:          PermAdminUsersProfileWrite,
+		DisplayName: "Manage User Profiles",
+		Description: "Allows editing names, email, username, password, avatar, and profile fields in admin.",
+		Category:    "Admin",
+	})
+	RegisterPermission(Permission{
+		ID:          PermAdminUsersMembershipWrite,
+		DisplayName: "Manage User Roles & Groups",
+		Description: "Allows assigning direct roles and group membership in admin. Cannot grant roles or groups the editor does not hold.",
+		Category:    "Admin",
+		Dangerous:   true,
+	})
+	RegisterPermission(Permission{
+		ID:          PermAdminUsersSecurityWrite,
+		DisplayName: "Manage User Account Security",
+		Description: "Allows changing account status, lock, and email verification in admin.",
+		Category:    "Admin",
 		Dangerous:   true,
 	})
 	RegisterPermission(Permission{

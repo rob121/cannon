@@ -68,6 +68,11 @@ func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write 
 			return security.Can(ctx, userID, security.AdminPermissionForPath("/extension-apps", true))
 		}
 		return security.Can(ctx, userID, security.PermAdminExtensionAppsRead)
+	case "/users":
+		if write {
+			return CanModifyUsersAdmin(ctx, userID)
+		}
+		return security.Can(ctx, userID, security.AdminPermissionForPath("/users", false))
 	}
 	perm := security.AdminPermissionForPath(section, write)
 	return security.Can(ctx, userID, perm)

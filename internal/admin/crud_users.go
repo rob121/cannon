@@ -54,6 +54,10 @@ func (h *Handler) userList(w http.ResponseWriter, r *http.Request) {
 	data := listPage(r, page, total, usersBase,
 		"Manage accounts, group membership, and role assignments.",
 		"Add Account", map[string]any{"ActiveNav": "accounts"})
+	if canCreate, _ := CanCreateAdminUser(r.Context(), actorUserID(r)); !canCreate {
+		data["PageActionURL"] = ""
+		data["PageActionLabel"] = ""
+	}
 	order := applyListSort(r, data, map[string]string{
 		"username": "username",
 		"email":    "email",
@@ -84,7 +88,17 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+		actorID := actorUserID(r)
+		canProfile, canMembership, canSecurity, canCreate, _, err := userAccessFlags(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if isNew {
+			if !canCreate {
+				h.forbidden(w, r)
+				return
+			}
 			u, err := user.CreateLocalUser(r.Context(),
 				formString(r, "given_name"), formString(r, "family_name"),
 				formString(r, "email"), formString(r, "username"), r.FormValue("password"))
@@ -99,35 +113,54 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			if err := db.First(&prior, id).Error; err == nil {
 				wasLocked = prior.Locked
 			}
-			row.GivenName = formString(r, "given_name")
-			row.FamilyName = formString(r, "family_name")
-			row.Email = formString(r, "email")
-			row.Username = formString(r, "username")
-			row.Status = formStatus(r)
-			row.Locked = r.FormValue("locked") == "1"
-			row.Validated = r.FormValue("validated") == "1"
-			row.AvatarURL = formString(r, "avatar_url")
-			if pw := r.FormValue("password"); pw != "" {
-				hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+			if canProfile {
+				row.GivenName = formString(r, "given_name")
+				row.FamilyName = formString(r, "family_name")
+				row.Email = formString(r, "email")
+				row.Username = formString(r, "username")
+				row.AvatarURL = formString(r, "avatar_url")
+				if pw := r.FormValue("password"); pw != "" {
+					hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						return
+					}
+					row.Hash = string(hash)
+				}
+			}
+			if canSecurity {
+				row.Status = formStatus(r)
+				row.Locked = r.FormValue("locked") == "1"
+				row.Validated = r.FormValue("validated") == "1"
+			}
+			if canProfile || canSecurity {
+				if err := db.Save(&row).Error; err != nil {
+					h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 					return
 				}
-				row.Hash = string(hash)
-			}
-			if err := db.Save(&row).Error; err != nil {
-				h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
-				return
-			}
-			if row.Locked && !wasLocked {
-				_, _ = hooks.Fire(r.Context(), hooks.OnUserLocked, map[string]any{
-					"user_id":  row.UserID,
-					"username": row.Username,
-					"email":    row.Email,
-				})
+				if canSecurity && row.Locked && !wasLocked {
+					_, _ = hooks.Fire(r.Context(), hooks.OnUserLocked, map[string]any{
+						"user_id":  row.UserID,
+						"username": row.Username,
+						"email":    row.Email,
+					})
+				}
 			}
 		}
 		groupIDs := formUintList(r, "group_ids")
+		roleIDs := formUintList(r, "role_ids")
+		if !isNew && !canMembership {
+			groupIDs, _ = loadUserGroupIDs(db, row.UserID)
+			roleIDs, _ = loadUserRoleIDs(db, row.UserID)
+		} else if canMembership {
+			if err := validateMembershipAssignment(r.Context(), actorID, roleIDs, groupIDs); err != nil {
+				h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
+				return
+			}
+		} else if isNew {
+			groupIDs = nil
+			roleIDs = nil
+		}
 		var selected []models.Group
 		if len(groupIDs) > 0 {
 			db.Where("group_id IN ?", groupIDs).Find(&selected)
@@ -136,7 +169,6 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderUserForm(w, r, row, allGroups, allRoles, isNew, err.Error())
 			return
 		}
-		roleIDs := formUintList(r, "role_ids")
 		var selectedRoles []models.Role
 		if len(roleIDs) > 0 {
 			db.Where("role_id IN ?", roleIDs).Find(&selectedRoles)
@@ -146,7 +178,7 @@ func (h *Handler) userForm(w http.ResponseWriter, r *http.Request, id uint) {
 			return
 		}
 		security.InvalidateSiteUser(r.Context(), row.UserID)
-		if !isNew {
+		if !isNew && canProfile {
 			if profileID, err := content.AuthorProfileID(r.Context()); err == nil && profileID > 0 {
 				fields, _ := content.ActiveProfileFields(r.Context(), profileID)
 				if err := content.SaveProfileUserFieldValues(db, row.UserID, fields, r); err != nil {
@@ -221,6 +253,26 @@ func (h *Handler) renderUserForm(w http.ResponseWriter, r *http.Request, row mod
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
+	canProfile, canMembership, canSecurity, canCreate, canDelete, accessErr := userAccessFlags(r.Context())
+	if accessErr == nil {
+		data["CanEditProfile"] = canProfile
+		if isNew {
+			data["CanEditProfile"] = canCreate
+		}
+		data["CanEditMembership"] = canMembership
+		data["CanEditSecurity"] = canSecurity
+		data["CanCreateUser"] = canCreate
+		data["CanDeleteUser"] = canDelete
+		if canMembership {
+			if filteredRoles, filteredGroups, err := filterMembershipOptions(r.Context(), actorUserID(r), allRoles, allGroups); err == nil {
+				data["AllRoles"] = filteredRoles
+				data["AllGroups"] = filteredGroups
+			}
+		} else {
+			data["AllRoles"] = allRoles
+			data["AllGroups"] = allGroups
+		}
+	}
 	if !isNew && !row.Validated {
 		if token, err := auth.EnsureVerifyToken(r.Context(), row.UserID); err == nil {
 			data["VerifyURL"] = userVerifyURL(r, token)
@@ -254,6 +306,10 @@ func userVerifyURL(r *http.Request, token string) string {
 func (h *Handler) userDelete(w http.ResponseWriter, r *http.Request, idStr string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if ok, _ := CanDeleteAdminUser(r.Context(), actorUserID(r)); !ok {
+		h.forbidden(w, r)
 		return
 	}
 	id, ok := parseID(idStr)

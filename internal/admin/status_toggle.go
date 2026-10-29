@@ -92,6 +92,10 @@ func (h *Handler) routeToggleStatus(w http.ResponseWriter, r *http.Request, idSt
 }
 
 func (h *Handler) userToggleStatus(w http.ResponseWriter, r *http.Request, idStr string) {
+	if ok, _ := CanManageUserSecurity(r.Context(), actorUserID(r)); !ok {
+		h.forbidden(w, r)
+		return
+	}
 	h.postToggleModel(w, r, idStr, &models.User{}, usersBase, func(ctx context.Context) {
 		invalidateSecurityUserFromRequest(ctx, idStr)
 	})

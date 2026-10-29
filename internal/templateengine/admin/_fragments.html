@@ -382,6 +382,7 @@
 {{end}}
 
 {{define "role_access_toggles"}}
+{{if ne .CanEditMembership false}}
 <div class="admin-toggle-grid admin-toggle-grid-sidebar">
   {{range .AllRoles}}
   <label class="admin-form-toggle admin-form-toggle-inline">
@@ -393,12 +394,37 @@
   <p class="admin-cell-muted">No roles defined yet.</p>
   {{end}}
 </div>
+{{else}}
+<ul class="admin-effective-perms">
+  {{range .AllRoles}}
+  {{if containsUint $.SelectedRoleIDs .RoleID}}
+  <li class="admin-effective-perm"><span class="admin-effective-perm-name">{{roleName .Name}}</span></li>
+  {{end}}
+  {{else}}
+  <li class="admin-cell-muted">No direct roles assigned.</li>
+  {{end}}
+</ul>
+<p class="admin-form-help mb-0">You do not have permission to change role assignments.</p>
+{{end}}
 {{end}}
 
 {{define "group_membership_toggles"}}
 <label class="admin-form-label">Member Of</label>
 <p class="admin-form-help mb-3">Assign organizational groups. Members inherit each group's roles and capabilities.</p>
+{{if ne .CanEditMembership false}}
 {{template "group_access_toggles" .}}
+{{else}}
+<ul class="admin-effective-perms">
+  {{range .AllGroups}}
+  {{if containsUint $.SelectedIDs .GroupID}}
+  <li class="admin-effective-perm"><span class="admin-effective-perm-name">{{groupName .Name}}</span></li>
+  {{end}}
+  {{else}}
+  <li class="admin-cell-muted">Not a member of any groups.</li>
+  {{end}}
+</ul>
+<p class="admin-form-help mb-0">You do not have permission to change group membership.</p>
+{{end}}
 {{end}}
 
 {{define "group_visibility_sidebar"}}
@@ -428,12 +454,12 @@
       <i class="bi bi-search" aria-hidden="true"></i>
       <input type="search" class="admin-form-control" placeholder="Filter permissions…" autocomplete="off" data-permission-filter aria-label="Filter permissions">
     </label>
-    <p class="admin-permission-picker-hint admin-cell-muted">Search by name or permission id. Allow and deny are mutually exclusive per permission.</p>
+    <p class="admin-permission-picker-hint admin-cell-muted">Search by name or permission id. Allow and deny are mutually exclusive. Deny on this role blocks an inherited allow; parent role denies apply only to users assigned those parent roles.</p>
   </div>
   {{range .Categories}}
   <details class="admin-permission-group" data-permission-group open>
     <summary class="admin-permission-group-summary">
-      <span class="admin-permission-group-title">{{.}}</span>
+      <span class="admin-permission-group-title">{{categoryLabel .}}</span>
       <span class="admin-permission-group-count">{{len (index $.PermsByCategory .)}} permissions</span>
     </summary>
     <div class="admin-table-scroll">
@@ -452,12 +478,8 @@
               <span class="admin-permission-copy">
                 <span class="admin-permission-name">{{.DisplayName}}</span>
                 <code class="admin-permission-key">{{.ID}}</code>
-                {{if and (not (containsString $.SelectedPermKeys .ID)) (not (containsString $.SelectedDeniedPermKeys .ID))}}
-                {{if containsString $.InheritedDenyKeys .ID}}
-                <span class="admin-permission-inherited is-deny">Denied by a parent</span>
-                {{else if containsString $.InheritedAllowKeys .ID}}
-                <span class="admin-permission-inherited">Inherited</span>
-                {{end}}
+                {{if and (not (containsString $.SelectedPermKeys .ID)) (not (containsString $.SelectedDeniedPermKeys .ID)) (containsString $.InheritedAllowKeys .ID)}}
+                <span class="admin-permission-inherited">Inherited allow</span>
                 {{end}}
               </span>
             </td>
@@ -480,6 +502,36 @@
   {{end}}
   <p class="admin-permission-picker-empty admin-cell-muted" data-permission-empty hidden>No permissions match your filter.</p>
 </div>
+{{end}}
+
+{{define "effective_permissions_panel"}}
+{{if .EffectivePermissions}}
+{{if .Compact}}
+<p class="admin-form-help mb-3">{{.EffectivePermissionsSummary}} ({{.EffectivePermissions.AllowTotal}} allowed{{if .EffectivePermissions.DenyTotal}}, {{.EffectivePermissions.DenyTotal}} denied{{end}}). {{.EffectivePermissionsHelp}}</p>
+{{else}}
+<div class="admin-form-section-card">
+  {{template "form_section_header" (dict "Title" "Effective Permissions" "Description" .EffectivePermissionsHelp)}}
+  <div class="admin-form-section-body">
+    <p class="admin-form-help mb-3">{{.EffectivePermissionsSummary}} ({{.EffectivePermissions.AllowTotal}} allowed{{if .EffectivePermissions.DenyTotal}}, {{.EffectivePermissions.DenyTotal}} denied{{end}}).</p>
+{{end}}
+    {{range .EffectivePermissions.Categories}}
+    <div class="mb-3">
+      <div class="admin-form-label mb-1">{{categoryLabel .}}</div>
+      <ul class="admin-effective-perms">
+        {{range index $.EffectivePermissions.ByCategory .}}
+        <li class="admin-effective-perm{{if .Wildcard}} is-wildcard{{end}}{{if .Denied}} is-denied{{end}}">
+          <span class="admin-effective-perm-name">{{.DisplayName}}</span>
+          <code class="admin-effective-perm-key">{{.ID}}</code>
+        </li>
+        {{end}}
+      </ul>
+    </div>
+    {{end}}
+{{if not .Compact}}
+  </div>
+</div>
+{{end}}
+{{end}}
 {{end}}
 
 {{define "group_access_panel"}}

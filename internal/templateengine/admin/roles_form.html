@@ -42,7 +42,7 @@
   </div>
 
   <div class="admin-form-section-card">
-    {{template "form_section_header" (dict "Title" "Inherits Roles" "Description" "This role receives every permission from the selected parent roles. Leave them all off to grant only the permissions below.")}}
+    {{template "form_section_header" (dict "Title" "Inherits Roles" "Description" "Parent roles contribute allowed permissions to this role. Denies on a parent apply only to users assigned that parent role, not to users who have only this role.")}}
     <div class="admin-form-section-body">
       <div class="admin-toggle-grid">
         {{range .AllRoles}}
@@ -101,7 +101,7 @@
   </div>
 
   <div class="admin-form-section-card">
-    {{template "form_section_header" (dict "Title" "Permissions" "Description" "Allow grants a permission. Deny blocks it, including permissions inherited from a parent. Leave both off to keep the inherited default, or no access when nothing is inherited.")}}
+    {{template "form_section_header" (dict "Title" "Permissions" "Description" "Allow grants a permission on this role. Deny blocks it for users assigned this role, including inherited allows. Leave both off to inherit allowed permissions from parent roles.")}}
     <div class="admin-form-section-body">
       {{template "permission_picker" .}}
       <div class="admin-form-actions">
@@ -110,4 +110,8 @@
       </div>
     </div>
   </div>
+
+  {{if .EffectivePermissions}}
+  {{template "effective_permissions_panel" (dict "EffectivePermissions" .EffectivePermissions "EffectivePermissionsHelp" "Resolved permissions for a user assigned only this role (direct grants, inherited allows, and direct denies on this role)." "EffectivePermissionsSummary" "Preview for users with this role only")}}
+  {{end}}
 </form>

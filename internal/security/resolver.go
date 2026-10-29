@@ -42,11 +42,96 @@ func resolveFromDB(db *gorm.DB, userID uint) (EffectivePermissions, error) {
 	if len(roleIDs) == 0 {
 		return NewEffectivePermissions(), nil
 	}
-	expanded, err := expandRoleInheritance(db, roleIDs)
+	out := NewEffectivePermissions()
+	for _, roleID := range roleIDs {
+		rolePerms, err := resolveRoleEffective(db, roleID, map[uint]struct{}{})
+		if err != nil {
+			return EffectivePermissions{}, err
+		}
+		mergeEffectivePermissions(&out, rolePerms)
+	}
+	return out, nil
+}
+
+// resolveRoleEffective returns permissions granted by one role: direct assignments plus
+// inherited allows from parent roles. Explicit denies on parent roles do not propagate
+// to child roles; only direct denies on this role apply.
+func resolveRoleEffective(db *gorm.DB, roleID uint, visiting map[uint]struct{}) (EffectivePermissions, error) {
+	if _, ok := visiting[roleID]; ok {
+		return NewEffectivePermissions(), nil
+	}
+	visiting[roleID] = struct{}{}
+	defer delete(visiting, roleID)
+
+	allows, denies, err := LoadRolePermissionAssignments(db, roleID)
 	if err != nil {
 		return EffectivePermissions{}, err
 	}
-	return loadRolePermissions(db, expanded)
+	out := NewEffectivePermissions()
+	for _, key := range allows {
+		out.Allow[key] = struct{}{}
+	}
+	for _, key := range denies {
+		out.Deny[key] = struct{}{}
+	}
+
+	parentIDs, err := LoadParentRoleIDs(db, roleID)
+	if err != nil {
+		return EffectivePermissions{}, err
+	}
+	for _, parentID := range parentIDs {
+		parentPerms, err := resolveRoleEffective(db, parentID, visiting)
+		if err != nil {
+			return EffectivePermissions{}, err
+		}
+		for key := range parentPerms.Allow {
+			if _, denied := out.Deny[key]; denied {
+				continue
+			}
+			out.Allow[key] = struct{}{}
+		}
+	}
+	return out, nil
+}
+
+func mergeEffectivePermissions(dst *EffectivePermissions, src EffectivePermissions) {
+	for key := range src.Allow {
+		dst.Allow[key] = struct{}{}
+	}
+	for key := range src.Deny {
+		dst.Deny[key] = struct{}{}
+	}
+}
+
+// CollectUserRoleIDs returns role ids assigned to the user directly or via active groups.
+func CollectUserRoleIDs(ctx context.Context, userID uint) ([]uint, error) {
+	if userID == 0 {
+		return nil, nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return collectRoleIDs(db, userID)
+}
+
+// CollectUserGroupIDs returns group ids the user belongs to.
+func CollectUserGroupIDs(ctx context.Context, userID uint) ([]uint, error) {
+	if userID == 0 {
+		return nil, nil
+	}
+	db, err := sites.DB(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var ids []uint
+	err = db.Model(&models.User{}).
+		Joins("JOIN user_groups ON user_groups.user_user_id = users.user_id").
+		Joins("JOIN groups ON groups.group_id = user_groups.group_group_id").
+		Where("users.user_id = ? AND users.status = ? AND groups.status = ?",
+			userID, models.StatusActive, models.StatusActive).
+		Pluck("groups.group_id", &ids).Error
+	return ids, err
 }
 
 func collectRoleIDs(db *gorm.DB, userID uint) ([]uint, error) {
@@ -234,28 +319,34 @@ func SaveRolePermissions(db *gorm.DB, roleID uint, allows, denies []string) erro
 	return nil
 }
 
-// ParentPermissionKeys returns allow and deny keys granted by parent roles, including their own parents.
+// ResolveRoleEffective returns permissions granted by a single role assignment (direct grants,
+// inherited allows from parents, and direct denies on this role only).
+func ResolveRoleEffective(db *gorm.DB, roleID uint) (EffectivePermissions, error) {
+	return resolveRoleEffective(db, roleID, map[uint]struct{}{})
+}
+
+// ParentPermissionKeys returns allow keys contributed by selected parent roles for role-editor
+// display. Parent explicit denies are not inherited and are omitted.
 func ParentPermissionKeys(db *gorm.DB, parentRoleIDs []uint) (allows []string, denies []string, err error) {
 	if len(parentRoleIDs) == 0 {
 		return nil, nil, nil
 	}
-	expanded, err := expandRoleInheritance(db, parentRoleIDs)
-	if err != nil {
-		return nil, nil, err
+	allowSet := map[string]struct{}{}
+	for _, parentID := range parentRoleIDs {
+		perms, err := resolveRoleEffective(db, parentID, map[uint]struct{}{})
+		if err != nil {
+			return nil, nil, err
+		}
+		for key := range perms.Allow {
+			allowSet[key] = struct{}{}
+		}
 	}
-	perms, err := loadRolePermissions(db, expanded)
-	if err != nil {
-		return nil, nil, err
-	}
-	for key := range perms.Allow {
+	allows = make([]string, 0, len(allowSet))
+	for key := range allowSet {
 		allows = append(allows, key)
 	}
-	for key := range perms.Deny {
-		denies = append(denies, key)
-	}
 	sort.Strings(allows)
-	sort.Strings(denies)
-	return allows, denies, nil
+	return allows, nil, nil
 }
 
 // LoadRolePermissionKeys returns allowed permission keys directly on a role (not inherited).

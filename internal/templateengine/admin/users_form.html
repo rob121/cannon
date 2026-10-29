@@ -62,23 +62,23 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="admin-form-label" for="user-given-name">Given Name</label>
-              <input class="admin-form-control" id="user-given-name" name="given_name" value="{{.Row.GivenName}}">
+              <input class="admin-form-control" id="user-given-name" name="given_name" value="{{.Row.GivenName}}" {{if eq .CanEditProfile false}}readonly{{end}}>
             </div>
             <div class="col-md-6">
               <label class="admin-form-label" for="user-family-name">Family Name</label>
-              <input class="admin-form-control" id="user-family-name" name="family_name" value="{{.Row.FamilyName}}">
+              <input class="admin-form-control" id="user-family-name" name="family_name" value="{{.Row.FamilyName}}" {{if eq .CanEditProfile false}}readonly{{end}}>
             </div>
             <div class="col-md-6">
               <label class="admin-form-label" for="user-email">Email</label>
-              <input class="admin-form-control" id="user-email" type="email" name="email" value="{{.Row.Email}}" required>
+              <input class="admin-form-control" id="user-email" type="email" name="email" value="{{.Row.Email}}" required {{if eq .CanEditProfile false}}readonly{{end}}>
             </div>
             <div class="col-md-6">
               <label class="admin-form-label" for="user-username">Username</label>
-              <input class="admin-form-control" id="user-username" name="username" value="{{.Row.Username}}" required>
+              <input class="admin-form-control" id="user-username" name="username" value="{{.Row.Username}}" required {{if eq .CanEditProfile false}}readonly{{end}}>
             </div>
             <div class="col-md-6">
               <label class="admin-form-label" for="user-password">Password</label>
-              <input class="admin-form-control" id="user-password" type="password" name="password">
+              <input class="admin-form-control" id="user-password" type="password" name="password" {{if eq .CanEditProfile false}}disabled{{end}}>
               <p class="admin-form-help mb-0">Leave blank to keep the current password.</p>
             </div>
             <div class="col-12">
@@ -126,6 +126,10 @@
 
         <div class="admin-sidebar-panel is-active" data-sidebar-panel="account" role="tabpanel">
           <div class="admin-sidebar-fields">
+            {{if eq .CanEditSecurity false}}
+            <p class="admin-form-help mb-3">Status: {{template "status_badge" .Row.Status}} · Email {{if .Row.Validated}}verified{{else}}unverified{{end}} · {{if .Row.Locked}}Locked{{else}}Unlocked{{end}}</p>
+            <p class="admin-form-help mb-0">You do not have permission to change account security settings.</p>
+            {{else}}
             <div class="admin-sidebar-field">
               <label class="admin-form-label" for="user-status">Status</label>
               <select class="admin-form-control" id="user-status" name="status">
@@ -157,6 +161,7 @@
               {{template "form_toggle" (dict "Name" "locked" "Checked" .Row.Locked "OnLabel" "Locked" "OffLabel" "Unlocked")}}
               <p class="admin-form-help mb-0">Prevent this account from signing in.</p>
             </div>
+            {{end}}
           </div>
         </div>
 
@@ -176,20 +181,7 @@
         {{if .EffectivePermissions}}
         <div class="admin-sidebar-panel" data-sidebar-panel="permissions" role="tabpanel">
           <div class="admin-sidebar-fields">
-            <p class="admin-form-help mb-3">Effective permissions from direct roles, group roles, and inheritance ({{.EffectivePermissions.AllowTotal}} allowed{{if .EffectivePermissions.DenyTotal}}, {{.EffectivePermissions.DenyTotal}} denied{{end}}).</p>
-            {{range .EffectivePermissions.Categories}}
-            <div class="mb-3">
-              <div class="admin-form-label mb-1">{{.}}</div>
-              <ul class="admin-effective-perms">
-                {{range index $.EffectivePermissions.ByCategory .}}
-                <li class="admin-effective-perm{{if .Wildcard}} is-wildcard{{end}}{{if .Denied}} is-denied{{end}}">
-                  <span class="admin-effective-perm-name">{{.DisplayName}}</span>
-                  <code class="admin-effective-perm-key">{{.ID}}</code>
-                </li>
-                {{end}}
-              </ul>
-            </div>
-            {{end}}
+            {{template "effective_permissions_panel" (dict "EffectivePermissions" .EffectivePermissions "Compact" true "EffectivePermissionsHelp" "Denies apply only from roles this user is assigned." "EffectivePermissionsSummary" "Calculated access for this user")}}
           </div>
         </div>
         {{end}}

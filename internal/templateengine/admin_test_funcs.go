@@ -21,6 +21,7 @@ func TestAdminFuncs() template.FuncMap {
 		"uintPtrEq":              func(a *uint, b uint) bool { return a != nil && *a == b },
 		"groupName":              func(name string) string { return name },
 		"roleName":               func(name string) string { return name },
+		"categoryLabel":          func(category string) string { return category },
 		"joinRoleNames":          func(roles any) string { return "" },
 		"joinGroupNames":         func(groups any) string { return "" },
 		"helpURL":                func(extensionName, articlePath string) string { return "#" },

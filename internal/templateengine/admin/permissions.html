@@ -9,7 +9,7 @@
           <select class="admin-form-control" name="category" onchange="this.form.submit()">
             <option value="">All categories</option>
             {{range .Categories}}
-            <option value="{{.}}" {{if eq $.FilterCategory .}}selected{{end}}>{{.}}</option>
+            <option value="{{.}}" {{if eq $.FilterCategory .}}selected{{end}}>{{categoryLabel .}}</option>
             {{end}}
           </select>
         </div>
@@ -18,7 +18,7 @@
     {{range .Categories}}
     {{if or (not $.FilterCategory) (eq $.FilterCategory .)}}
     <div class="mb-4">
-      <h2 class="admin-form-card-title h5">{{.}}</h2>
+      <h2 class="admin-form-card-title h5">{{categoryLabel .}}</h2>
       <div class="table-responsive">
         <table class="table admin-table">
           <thead>

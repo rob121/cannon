@@ -73,7 +73,11 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 	}
 	allRoles := []models.Role{}
 	db.Where("status = ?", models.StatusActive).Order("name asc").Find(&allRoles)
-	allPerms := security.RegisteredPermissions()
+	allPerms, err := permissionsForRoleAssignment(r.Context(), row.RoleID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	categories := security.Categories(allPerms)
 	permsByCategory := security.PermissionsByCategory(allPerms)
 	selectedPerms, selectedDenied, _ := security.LoadRolePermissionAssignments(db, row.RoleID)
@@ -113,7 +117,8 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
-		if err := security.SaveRolePermissions(db, row.RoleID, r.Form["permission_keys"], r.Form["deny_permission_keys"]); err != nil {
+		allowKeys, denyKeys := filterRolePermissionFormKeys(r.Context(), row.RoleID, r.Form["permission_keys"], r.Form["deny_permission_keys"])
+		if err := security.SaveRolePermissions(db, row.RoleID, allowKeys, denyKeys); err != nil {
 			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
 		}
@@ -162,12 +167,12 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		roleFilters = map[string]notifications.SubscriptionFilters{}
 	}
 	itemFilters := roleFilters["onItemAfterSave"]
-	inheritedAllows, inheritedDenies := []string{}, []string{}
+	inheritedAllows := []string{}
 	if errMsg == "" {
 		row, parentIDs, selectedPerms = applyUnsetRoleDefaults(row, allRoles, parentIDs, selectedPerms, selectedDenied)
 		if db, err := sites.DB(r.Context()); err == nil {
-			if keys, denies, err := security.ParentPermissionKeys(db, parentIDs); err == nil {
-				inheritedAllows, inheritedDenies = keys, denies
+			if keys, _, err := security.ParentPermissionKeys(db, parentIDs); err == nil {
+				inheritedAllows = keys
 			}
 		}
 	}
@@ -184,7 +189,6 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 		"SelectedDeniedPermKeys":         selectedDenied,
 		"SelectedParentIDs":              parentIDs,
 		"InheritedAllowKeys":             inheritedAllows,
-		"InheritedDenyKeys":              inheritedDenies,
 		"SelectedRoleNotificationEvents": selectedRoleEvents,
 		"SubscribableGroups":             notifications.EventGroupsFor(r.Context()),
 		"ItemNotificationFilters":        itemFilters,
@@ -192,6 +196,11 @@ func (h *Handler) renderRoleForm(w http.ResponseWriter, r *http.Request, row mod
 	})
 	if errMsg != "" {
 		data["Error"] = errMsg
+	}
+	if !isNew && row.RoleID != 0 {
+		if preview, err := roleEffectivePermissionPreview(r.Context(), row.RoleID); err == nil && preview.Total > 0 {
+			data["EffectivePermissions"] = preview
+		}
 	}
 	h.render(w, r, title, "admin/roles_form.html", data)
 }

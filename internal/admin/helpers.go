@@ -512,6 +512,17 @@ func RoleDisplayName(name string) string {
 	return cases.Title(language.English, cases.NoLower).String(name)
 }
 
+// PermissionCategoryLabel returns a title-case label for permission catalog sections.
+func PermissionCategoryLabel(category string) string {
+	category = strings.TrimSpace(category)
+	if category == "" {
+		return "General"
+	}
+	category = strings.ReplaceAll(category, "_", " ")
+	category = strings.ReplaceAll(category, "-", " ")
+	return cases.Title(language.English, cases.NoLower).String(category)
+}
+
 func blockMetaSelected(meta map[string]any, field, value string) bool {
 	if meta == nil || field == "" || value == "" {
 		return false
