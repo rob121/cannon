@@ -264,8 +264,9 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 				}
 				return false
 			},
-			"blockMetaSelected": blockMetaSelected,
-			"blockMetaTruthy":   blockMetaTruthy,
+			"blockMetaSelected":    blockMetaSelected,
+			"blockMetaTruthy":      blockMetaTruthy,
+			"blockTypeOptionLabel": blockTypeOptionLabel,
 			"groupName":   GroupDisplayName,
 			"roleName":    RoleDisplayName,
 			"formatBytes": formatBytes,
@@ -290,6 +291,9 @@ func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
 		data["NavContentOpen"] = contentNavOpen(nav)
 		data["NavSystemOpen"] = systemNavOpen(nav)
 		data["NavExtensionAppsOpen"] = extensionAppsNavOpen(nav)
+	}
+	if opts := h.siteSwitcherOptions(r); len(opts) > 0 {
+		data["SiteSwitcherSites"] = opts
 	}
 }
 

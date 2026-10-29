@@ -54,6 +54,30 @@ func TestCanAccessAdminUsesPermissions(t *testing.T) {
 		t.Fatalf("users read should be denied: ok=%v err=%v", ok, err)
 	}
 
+	var editor models.Role
+	if err := db.Where("name = ?", security.RoleEditor).First(&editor).Error; err != nil {
+		t.Fatal(err)
+	}
+	editorUser := models.User{Username: "editor", Email: "editor@test", Status: models.StatusActive}
+	if err := db.Create(&editorUser).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&editorUser).Association("Roles").Append(&editor); err != nil {
+		t.Fatal(err)
+	}
+	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/users", false)
+	if err != nil || ok {
+		t.Fatalf("editor users read should be denied: ok=%v err=%v", ok, err)
+	}
+	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/items", true)
+	if err != nil || !ok {
+		t.Fatalf("editor items write: ok=%v err=%v", ok, err)
+	}
+	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/roles", false)
+	if err != nil || ok {
+		t.Fatalf("editor roles should be denied: ok=%v err=%v", ok, err)
+	}
+
 	var admin models.Role
 	if err := db.Where("name = ?", security.RoleAdministrator).First(&admin).Error; err != nil {
 		t.Fatal(err)
@@ -119,19 +143,19 @@ func TestCanAccessExtensionAppsPath(t *testing.T) {
 		t.Fatalf("other extension should be denied: ok=%v err=%v", ok, err)
 	}
 
-	var editor models.Role
-	if err := db.Where("name = ?", security.RoleEditor).First(&editor).Error; err != nil {
+	var manager models.Role
+	if err := db.Where("name = ?", security.RoleManager).First(&manager).Error; err != nil {
 		t.Fatal(err)
 	}
-	editorUser := models.User{Username: "editor", Email: "editor@test", Status: models.StatusActive}
-	if err := db.Create(&editorUser).Error; err != nil {
+	managerUser := models.User{Username: "manager", Email: "manager@test", Status: models.StatusActive}
+	if err := db.Create(&managerUser).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Model(&editorUser).Association("Roles").Append(&editor); err != nil {
+	if err := db.Model(&managerUser).Association("Roles").Append(&manager); err != nil {
 		t.Fatal(err)
 	}
-	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/extension-apps/legacy-ext", false)
+	ok, err = CanAccessAdmin(ctx, managerUser.UserID, "/admin/extension-apps/legacy-ext", false)
 	if err != nil || !ok {
-		t.Fatalf("editor with extension-apps.read should access legacy extension admin: ok=%v err=%v", ok, err)
+		t.Fatalf("manager with extension-apps.read should access legacy extension admin: ok=%v err=%v", ok, err)
 	}
 }

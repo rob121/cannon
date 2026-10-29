@@ -124,5 +124,8 @@ func EnsureForSite(db *gorm.DB) error {
 	if err := SyncToDB(db); err != nil {
 		return err
 	}
-	return SeedDefaults(db)
+	if err := SeedDefaults(db); err != nil {
+		return err
+	}
+	return migrateSystemRoleDirectPermissions(db)
 }

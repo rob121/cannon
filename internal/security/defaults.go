@@ -221,10 +221,24 @@ func registerCorePermissions() {
 	})
 }
 
+// Editorial admin sections editors may manage (not users, security, system, or site config).
+var editorialAdminSections = []string{
+	"items", "categories", "tags", "field-groups", "comments", "media", "blocks",
+	"routes", "templates", "menus", "menu-items", "help", "languages", "notifications",
+}
+
+// Operational admin sections for managers (site configuration and accounts).
+var operationalAdminSections = []string{
+	"users", "groups", "configuration", "extensions", "extension-apps",
+	"sites", "system", "authenticators", "profiles", "api",
+}
+
 func registerCoreRoles() {
 	contentPerms := contentFrontendPerms()
-	adminReadPerms := adminSectionPerms(false)
-	adminWritePerms := adminSectionPerms(true)
+	editorAdminRead := adminSectionPermsFor(editorialAdminSections, false)
+	editorAdminWrite := adminSectionPermsFor(editorialAdminSections, true)
+	opsRead := adminSectionPermsFor(operationalAdminSections, false)
+	opsWrite := adminSectionPermsFor(operationalAdminSections, true)
 
 	RegisterRole(RoleDef{
 		Name:        RoleViewer,
@@ -247,10 +261,10 @@ func registerCoreRoles() {
 	})
 	RegisterRole(RoleDef{
 		Name:        RoleEditor,
-		Description: "Full content management and most admin sections.",
+		Description: "Manage site content and editorial admin sections.",
 		SystemRole:  true,
 		Inherits:    []string{RoleWriter},
-		Permissions: append(contentPerms, adminReadPerms...),
+		Permissions: append(append(contentPerms, editorAdminRead...), editorAdminWrite...),
 	})
 	RegisterRole(RoleDef{
 		Name:        RolePublisher,
@@ -261,10 +275,10 @@ func registerCoreRoles() {
 	})
 	RegisterRole(RoleDef{
 		Name:        RoleManager,
-		Description: "Manage content and admin operations.",
+		Description: "Manage content, users, extensions, and site configuration.",
 		SystemRole:  true,
 		Inherits:    []string{RolePublisher},
-		Permissions: append(adminWritePerms, PermGroupsManage),
+		Permissions: append(append(opsRead, opsWrite...), PermGroupsManage),
 	})
 	RegisterRole(RoleDef{
 		Name:        RoleAdministrator,
@@ -276,18 +290,17 @@ func registerCoreRoles() {
 }
 
 func adminSectionPerms(write bool) []string {
-	sections := []string{
-		"items", "categories", "tags", "field-groups", "comments", "media", "blocks",
-		"routes", "templates", "menus", "menu-items", "users", "groups", "roles",
-		"notifications", "configuration", "extensions", "extension-apps", "help", "languages", "sites",
-		"system", "authenticators", "profiles", "api",
+	sections := append(append([]string(nil), editorialAdminSections...), operationalAdminSections...)
+	return adminSectionPermsFor(sections, write)
+}
+
+func adminSectionPermsFor(sections []string, write bool) []string {
+	suffix := ".read"
+	if write {
+		suffix = ".write"
 	}
-	var out []string
+	out := make([]string, 0, len(sections))
 	for _, s := range sections {
-		suffix := ".read"
-		if write {
-			suffix = ".write"
-		}
 		out = append(out, "core.admin."+s+suffix)
 	}
 	return out

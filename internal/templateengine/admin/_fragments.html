@@ -612,6 +612,17 @@
       <button type="button" class="btn-admin-ghost btn-admin-sm" data-copy-text="{{.Row.Path}}" title="Copy URL">
         <i class="bi bi-clipboard"></i>
       </button>
+      {{if .Row.CanEdit}}
+      <button type="button" class="btn-admin-ghost btn-admin-sm" title="Edit image" data-media-edit data-media-id="{{.Row.MediaID}}" data-media-url="{{.Row.Path}}" data-media-name="{{.Row.Name}}" data-media-mime="{{.Row.MIME}}">
+        <i class="bi bi-pencil-square"></i>
+      </button>
+      {{end}}
+      <form method="post" action="{{.Root.BasePath}}/{{.Row.MediaID}}/duplicate{{if .Root.FolderFilter}}?folder={{.Root.FolderFilter}}{{end}}" class="admin-inline-form">
+        {{csrfField}}
+        <button type="submit" class="btn-admin-ghost btn-admin-sm" title="Duplicate">
+          <i class="bi bi-copy"></i>
+        </button>
+      </form>
       <a class="btn-admin-ghost btn-admin-sm" href="{{.Row.Path}}" target="_blank" rel="noopener noreferrer" title="Open">
         <i class="bi bi-box-arrow-up-right"></i>
       </a>

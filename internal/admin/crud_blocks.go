@@ -64,14 +64,18 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
 	spaceFilter := strings.TrimSpace(r.URL.Query().Get("space"))
+	typeFilter, searchQuery := blockListFiltersFromRequest(r)
+	listFiltersActive := typeFilter != "" || searchQuery != ""
 
-	q := db.Model(&models.Block{})
-	if spaceFilter != "" {
-		q = q.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
-			Where("block_spaces.space = ?", spaceFilter)
-	}
 	var total int64
-	q.Count(&total)
+	if !listFiltersActive {
+		q := db.Model(&models.Block{})
+		if spaceFilter != "" {
+			q = q.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+				Where("block_spaces.space = ?", spaceFilter)
+		}
+		q.Count(&total)
+	}
 
 	data := listPage(r, page, total, blocksBase,
 		"Assign HTML, Markdown, or extension blocks to template spaces.",
@@ -106,7 +110,41 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	var rows []models.Block
 	listQ := db.Model(&models.Block{}).Preload("Spaces")
 	pageSize := pageSizeFor(r)
-	if spaceFilter != "" {
+	if listFiltersActive {
+		if spaceFilter != "" {
+			listQ = listQ.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
+				Where("block_spaces.space = ?", spaceFilter).
+				Select("blocks.*, block_spaces.sort AS sort")
+		}
+		listQ.Find(&rows)
+		filtered := rows[:0]
+		for _, row := range rows {
+			if blockMatchesListFilters(row, typeFilter, searchQuery) {
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
+		total = int64(len(rows))
+		data["Total"] = total
+		if defaultSort {
+			sortBlocksByPrimarySpace(rows, dirParam == "desc")
+		} else {
+			sortBlocksByColumn(rows, sortParam, dirParam)
+		}
+		for i := range rows {
+			rows[i].Sort = primarySpaceSort(rows[i])
+		}
+		start := (page - 1) * pageSize
+		if start >= len(rows) {
+			rows = nil
+		} else {
+			end := start + pageSize
+			if end > len(rows) {
+				end = len(rows)
+			}
+			rows = rows[start:end]
+		}
+	} else if spaceFilter != "" {
 		listQ.Joins("JOIN block_spaces ON block_spaces.block_id = blocks.block_id").
 			Where("block_spaces.space = ?", spaceFilter).
 			Select("blocks.*, block_spaces.sort AS sort").
@@ -159,6 +197,9 @@ func (h *Handler) blockList(w http.ResponseWriter, r *http.Request) {
 	spaces, _ := blocks.DistinctSpaces(db)
 	data["Rows"] = listRows
 	data["SpaceFilter"] = spaceFilter
+	data["BlockTypeFilter"] = typeFilter
+	data["SearchQuery"] = searchQuery
+	data["BlockTypes"] = allBlockTypes()
 	data["Spaces"] = spaces
 	data["ListQuery"] = listQueryFromData(data)
 	data["ReorderEnabled"] = true

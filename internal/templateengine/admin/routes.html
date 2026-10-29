@@ -5,6 +5,57 @@
       <h2 class="admin-data-card-title">Site Routes</h2>
       <p class="admin-data-card-desc">Custom URL paths for extensions, redirects, and alternate controller placements.</p>
     </div>
+    {{template "list_toolbar_open" .}}
+    <form method="get" action="{{.BasePath}}" class="admin-filter-form admin-list-filter-form admin-list-filter-form-routes">
+      {{template "sort_preserve_fields" .}}
+      <div class="admin-filter-field">
+        <label class="admin-filter-label" for="routes-type-filter">Type</label>
+        <select class="admin-form-control admin-form-control-sm" id="routes-type-filter" name="route_type" onchange="this.form.submit()">
+          <option value="">All Types</option>
+          {{range .RouteTypes}}
+          <option value="{{.}}" {{if eq $.TypeFilter (printf "%s" .)}}selected{{end}}>{{.}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="admin-filter-field">
+        <label class="admin-filter-label" for="routes-status-filter">Status</label>
+        <select class="admin-form-control admin-form-control-sm" id="routes-status-filter" name="status" onchange="this.form.submit()">
+          <option value="">All Statuses</option>
+          <option value="active" {{if eq .StatusFilter "active"}}selected{{end}}>Active</option>
+          <option value="inactive" {{if eq .StatusFilter "inactive"}}selected{{end}}>Inactive</option>
+        </select>
+      </div>
+      <div class="admin-filter-field">
+        <label class="admin-filter-label" for="routes-default-filter">Default</label>
+        <select class="admin-form-control admin-form-control-sm" id="routes-default-filter" name="default" onchange="this.form.submit()">
+          <option value="">All Routes</option>
+          <option value="1" {{if eq .DefaultFilter "1"}}selected{{end}}>Default home only</option>
+          <option value="0" {{if eq .DefaultFilter "0"}}selected{{end}}>Not default</option>
+        </select>
+      </div>
+      <div class="admin-filter-field">
+        <label class="admin-filter-label" for="routes-show-title-filter">Page Title</label>
+        <select class="admin-form-control admin-form-control-sm" id="routes-show-title-filter" name="show_title" onchange="this.form.submit()">
+          <option value="">All</option>
+          <option value="1" {{if eq .ShowTitleFilter "1"}}selected{{end}}>Shown</option>
+          <option value="0" {{if eq .ShowTitleFilter "0"}}selected{{end}}>Hidden</option>
+        </select>
+      </div>
+      <div class="admin-filter-field admin-filter-field-search">
+        <label class="admin-filter-label" for="routes-search">Search</label>
+        <input class="admin-form-control admin-form-control-sm" id="routes-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Name, path, target, or extension">
+      </div>
+      <div class="admin-filter-field admin-filter-field-actions">
+        <span class="admin-filter-label admin-filter-label-spacer" aria-hidden="true">&nbsp;</span>
+        <div class="admin-filter-actions">
+          <button type="submit" class="btn-admin-outline btn-admin-sm">Filter</button>
+          {{if or .StatusFilter .TypeFilter .DefaultFilter .ShowTitleFilter .SearchQuery}}
+          <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear</a>
+          {{end}}
+        </div>
+      </div>
+    </form>
+    {{template "list_toolbar_close" .}}
     <div class="admin-table-scroll">
       <table class="admin-table">
         <thead>

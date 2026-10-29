@@ -645,6 +645,50 @@ body.admin-sidebar-collapsed .admin-main { margin-left: var(--admin-sidebar-coll
   line-height: 1.2;
 }
 
+.admin-topbar-site-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 14rem;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.admin-topbar-site-select {
+  appearance: none;
+  height: 2rem;
+  width: 100%;
+  max-width: 14rem;
+  padding: 0 1.75rem 0 0.75rem;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-card);
+  color: var(--admin-foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-topbar-site-select:hover,
+.admin-topbar-site-select:focus {
+  background: var(--admin-accent);
+  outline: none;
+}
+
+.admin-topbar-site-select-chevron {
+  position: absolute;
+  right: 0.5rem;
+  pointer-events: none;
+  font-size: 0.625rem;
+  color: var(--admin-muted-fg);
+}
+
 .admin-topbar-site-link {
   display: inline-flex;
   align-items: center;
@@ -3407,6 +3451,7 @@ select.admin-form-control-multiselect option:checked {
 .admin-permission-checkbox {
   margin: 0.1875rem 0 0;
   flex-shrink: 0;
+  accent-color: var(--admin-success);
 }
 
 .admin-permission-copy {
@@ -3527,8 +3572,20 @@ select.admin-form-control-multiselect option:checked {
   accent-color: var(--admin-destructive, #dc2626);
 }
 
-.admin-permission-row:has(.admin-permission-deny-checkbox:checked) {
-  background: color-mix(in srgb, var(--admin-destructive, #dc2626) 6%, transparent);
+.admin-permission-row:has([data-permission-allow]:checked) {
+  background: color-mix(in srgb, var(--admin-success) 12%, var(--admin-card));
+}
+
+.admin-permission-row:has([data-permission-allow]:checked):hover {
+  background: color-mix(in srgb, var(--admin-success) 16%, var(--admin-card));
+}
+
+.admin-permission-row:has([data-permission-deny]:checked) {
+  background: color-mix(in srgb, var(--admin-danger) 12%, var(--admin-card));
+}
+
+.admin-permission-row:has([data-permission-deny]:checked):hover {
+  background: color-mix(in srgb, var(--admin-danger) 16%, var(--admin-card));
 }
 
 .admin-effective-perm.is-denied {
@@ -4752,6 +4809,10 @@ select.admin-form-control-multiselect option:checked {
   width: 100%;
 }
 
+.admin-list-filter-form-routes {
+  grid-template-columns: repeat(4, minmax(9rem, auto)) minmax(12rem, 1fr) auto;
+}
+
 .admin-filter-field {
   display: flex;
   flex-direction: column;
@@ -5497,8 +5558,180 @@ select.admin-form-control-multiselect option:checked {
 .admin-media-item-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.25rem;
+}
+
+.admin-media-editor-dialog {
+  width: min(1120px, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  border: 0;
+  border-radius: var(--admin-radius-lg);
+  background: transparent;
+  color: var(--admin-foreground);
+  overflow: hidden;
+}
+
+.admin-media-editor-dialog:not([open]) {
+  display: none;
+}
+
+.admin-media-editor-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.admin-media-editor-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: min(720px, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
+  box-shadow: var(--admin-shadow-sm);
+}
+
+.admin-media-editor-header,
+.admin-media-editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-media-editor-footer {
+  border-bottom: 0;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-media-editor-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.admin-media-editor-subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--admin-muted-fg);
+}
+
+.admin-media-editor-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-media-editor-sidebar {
+  padding: 1rem;
+  border-right: 1px solid var(--admin-border);
+  background: var(--admin-muted);
+  overflow: auto;
+}
+
+.admin-media-editor-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-media-editor-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--admin-muted-fg);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.45rem 0.65rem 0.55rem;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.admin-media-editor-tab.active {
+  color: var(--admin-primary);
+  border-bottom-color: var(--admin-primary);
+}
+
+.admin-media-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-media-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.admin-media-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-media-editor-rotate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.admin-media-editor-stage {
+  padding: 1rem;
+  min-height: 0;
+  overflow: auto;
+  background-color: var(--admin-card);
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.18) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(148, 163, 184, 0.18) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.18) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.18) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.admin-media-editor-canvas-wrap {
+  min-height: 360px;
+  max-height: calc(100vh - 14rem);
+}
+
+.admin-media-editor-canvas-wrap img {
+  display: block;
+  max-width: 100%;
+}
+
+.admin-media-editor-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--admin-muted-fg);
+}
+
+.admin-media-editor-status.is-error {
+  color: var(--admin-danger);
+}
+
+.admin-media-editor-footer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media (max-width: 900px) {
+  .admin-media-editor-body {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-media-editor-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--admin-border);
+  }
 }
 
 .admin-media-upload {

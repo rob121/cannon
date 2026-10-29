@@ -1,18 +1,39 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
   {{template "list_toolbar_open" .}}
-      <form class="admin-filter-form" method="get" action="{{.BasePath}}">
+      <form class="admin-filter-form admin-list-filter-form" method="get" action="{{.BasePath}}">
         {{template "sort_preserve_fields" .}}
-        <label class="admin-form-label" for="space-filter">Space</label>
-        <select class="admin-form-control admin-form-control-sm" id="space-filter" name="space" onchange="this.form.submit()">
-          <option value="">All spaces</option>
-          {{range .Spaces}}
-          <option value="{{.}}" {{if eq $.SpaceFilter .}}selected{{end}}>{{.}}</option>
-          {{end}}
-        </select>
-        {{if .SpaceFilter}}
-        <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear filter</a>
-        {{end}}
+        <div class="admin-filter-field">
+          <label class="admin-filter-label" for="space-filter">Space</label>
+          <select class="admin-form-control admin-form-control-sm" id="space-filter" name="space" onchange="this.form.submit()">
+            <option value="">All spaces</option>
+            {{range .Spaces}}
+            <option value="{{.}}" {{if eq $.SpaceFilter .}}selected{{end}}>{{.}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="admin-filter-field">
+          <label class="admin-filter-label" for="block-type-filter">Type</label>
+          <select class="admin-form-control admin-form-control-sm" id="block-type-filter" name="block_type" onchange="this.form.submit()">
+            <option value="">All types</option>
+            {{range .BlockTypes}}
+            <option value="{{.}}" {{if eq $.BlockTypeFilter (printf "%s" .)}}selected{{end}}>{{blockTypeOptionLabel .}}</option>
+            {{end}}
+          </select>
+        </div>
+        <div class="admin-filter-field admin-filter-field-search">
+          <label class="admin-filter-label" for="blocks-search">Search</label>
+          <input class="admin-form-control admin-form-control-sm" id="blocks-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Name or type">
+        </div>
+        <div class="admin-filter-field admin-filter-field-actions">
+          <span class="admin-filter-label admin-filter-label-spacer" aria-hidden="true">&nbsp;</span>
+          <div class="admin-filter-actions">
+            <button type="submit" class="btn-admin-outline btn-admin-sm">Filter</button>
+            {{if or .SpaceFilter .BlockTypeFilter .SearchQuery}}
+            <a class="btn-admin-ghost btn-admin-sm" href="{{.BasePath}}">Clear</a>
+            {{end}}
+          </div>
+        </div>
       </form>
   {{template "list_toolbar_close" .}}
   <div class="admin-table-scroll">

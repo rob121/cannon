@@ -27,3 +27,18 @@ func TestIsImageMIME(t *testing.T) {
 		t.Fatal("pdf should not be image")
 	}
 }
+
+func TestDuplicateMediaFilename(t *testing.T) {
+	if got := duplicateMediaFilename("photo.jpg"); got != "photo-copy.jpg" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestIsEditableImageMIME(t *testing.T) {
+	if !isEditableImageMIME("image/jpeg") {
+		t.Fatal("jpeg should be editable")
+	}
+	if isEditableImageMIME("image/gif") {
+		t.Fatal("gif should not be editable")
+	}
+}

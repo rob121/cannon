@@ -47,10 +47,13 @@ func TestListQueryFromDataIncludesFiltersAndSort(t *testing.T) {
 		"SpaceFilter":    "footer",
 		"StatusFilter":   "published",
 		"CategoryFilter": "3",
-		"SearchQuery":    "hello",
-		"Filter":         "pending",
+		"SearchQuery":     "hello",
+		"Filter":          "pending",
+		"TypeFilter":      "Extension",
+		"DefaultFilter":   "1",
+		"ShowTitleFilter": "0",
 	})
-	for _, part := range []string{"page=2", "page_size=50", "sort=name", "dir=desc", "space=footer", "status=published", "category=3", "q=hello", "filter=pending"} {
+	for _, part := range []string{"page=2", "page_size=50", "sort=name", "dir=desc", "space=footer", "status=published", "category=3", "route_type=Extension", "default=1", "show_title=0", "q=hello", "filter=pending"} {
 		if !strings.Contains(got, part) {
 			t.Fatalf("listQueryFromData: missing %q in %q", part, got)
 		}

@@ -53,7 +53,20 @@ func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write 
 		return security.CanAccessExtensionAdmin(ctx, userID, name)
 	}
 	section := adminSection(requestPath)
-	if section == "/extension-apps" {
+	switch section {
+	case "/permissions":
+		if write {
+			return CanManageSecurity(ctx, userID)
+		}
+		return security.Can(ctx, userID, security.PermPermissionsRead)
+	case "/roles":
+		return CanManageSecurity(ctx, userID)
+	case "/analytics":
+		return security.Can(ctx, userID, security.AdminPermissionForPath("/system", write))
+	case "/extension-apps":
+		if write {
+			return security.Can(ctx, userID, security.AdminPermissionForPath("/extension-apps", true))
+		}
 		return security.Can(ctx, userID, security.PermAdminExtensionAppsRead)
 	}
 	perm := security.AdminPermissionForPath(section, write)
@@ -106,6 +119,11 @@ func (h *Handler) requireAccess(w http.ResponseWriter, r *http.Request) bool {
 
 func httpxRedirectLogin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/login", http.StatusSeeOther)
+}
+
+// IsSuperAdmin reports whether the user has full system access (* permission).
+func IsSuperAdmin(ctx context.Context, userID uint) (bool, error) {
+	return security.Can(ctx, userID, security.PermWildcardAll)
 }
 
 // CanManageSecurity reports whether the user may manage roles and permissions.

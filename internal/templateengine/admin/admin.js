@@ -1439,6 +1439,7 @@
     initExtensionUpload();
     initMediaBrowseUpload();
     initMediaCopy();
+    initMediaEditor();
     initMediaFolders();
     initItemBulkToolbar();
     initItemMediaRows();
@@ -1459,7 +1460,23 @@
     initTurboProgress();
     initPreserveTemplateSpaceDebug();
     initUserMenu();
+    initSiteSwitcher();
     initCommandPalette();
+  }
+
+  function initSiteSwitcher() {
+    document.querySelectorAll('[data-admin-site-switcher]').forEach(function (sel) {
+      if (sel.dataset.bound) {
+        return;
+      }
+      sel.dataset.bound = '1';
+      sel.addEventListener('change', function () {
+        var url = sel.value;
+        if (url) {
+          window.location.assign(url);
+        }
+      });
+    });
   }
 
   function initPermissionPicker() {
@@ -3538,6 +3555,811 @@
     copyTextFallback(text);
   }
 
+  var mediaEditorCropper = null;
+  var mediaEditorState = null;
+  var mediaEditorNeedsListRefresh = false;
+  var mediaEditorReopening = false;
+  var mediaEditorRotation = 0;
+  var mediaEditorFullFrameRotate = true;
+  var mediaEditorProgrammaticCrop = false;
+  var cropperAssetsPromise = null;
+
+  function loadCropperAssets() {
+    if (window.Cropper) {
+      return Promise.resolve();
+    }
+    if (cropperAssetsPromise) {
+      return cropperAssetsPromise;
+    }
+    cropperAssetsPromise = new Promise(function (resolve, reject) {
+      if (!document.querySelector('link[data-cropper-css]')) {
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css';
+        link.setAttribute('data-cropper-css', '1');
+        document.head.appendChild(link);
+      }
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js';
+      script.onload = function () { resolve(); };
+      script.onerror = function () { reject(new Error('Could not load image editor')); };
+      document.head.appendChild(script);
+    });
+    return cropperAssetsPromise;
+  }
+
+  function reloadMediaBrowseFrame() {
+    var url = new URL(window.location.href);
+    url.searchParams.set('v', String(Date.now()));
+    if (window.Turbo && typeof window.Turbo.visit === 'function') {
+      window.Turbo.visit(url.toString(), { frame: 'main-content' });
+      return;
+    }
+    window.location.assign(url.toString());
+  }
+
+  function destroyMediaEditor() {
+    if (mediaEditorCropper) {
+      mediaEditorCropper.destroy();
+      mediaEditorCropper = null;
+    }
+    mediaEditorState = null;
+    var dialog = document.getElementById('admin-media-editor-dialog');
+    if (dialog && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function closeMediaEditorDialog() {
+    var dialog = document.getElementById('admin-media-editor-dialog');
+    if (mediaEditorCropper) {
+      mediaEditorCropper.destroy();
+      mediaEditorCropper = null;
+    }
+    mediaEditorState = null;
+    if (dialog && dialog.open) {
+      dialog.close();
+    }
+  }
+
+  function mediaEditorCSRFToken() {
+    var form = document.getElementById('admin-media-editor-form');
+    if (form) {
+      var inForm = form.querySelector('input[name="_csrf"]');
+      if (inForm && inForm.value) {
+        return inForm.value;
+      }
+    }
+    var input = document.querySelector('input[name="_csrf"]');
+    return input ? input.value : '';
+  }
+
+  function mediaEditorCanvasBlob(canvas, outputMime, quality) {
+    return new Promise(function (resolve, reject) {
+      if (!canvas) {
+        reject(new Error('Could not export image.'));
+        return;
+      }
+      var settled = false;
+      function finish(err, blob) {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (err) {
+          reject(err);
+          return;
+        }
+        if (!blob) {
+          reject(new Error('Could not export image.'));
+          return;
+        }
+        resolve(blob);
+      }
+      function dataURLFallback() {
+        try {
+          var dataURL = canvas.toDataURL(outputMime, outputMime === 'image/jpeg' ? quality : undefined);
+          var parts = dataURL.split(',');
+          if (parts.length < 2) {
+            finish(new Error('Could not export image.'));
+            return;
+          }
+          var bin = atob(parts[1]);
+          var arr = new Uint8Array(bin.length);
+          for (var i = 0; i < bin.length; i++) {
+            arr[i] = bin.charCodeAt(i);
+          }
+          finish(null, new Blob([arr], { type: outputMime }));
+        } catch (e) {
+          finish(e);
+        }
+      }
+      var timer = window.setTimeout(function () {
+        dataURLFallback();
+      }, 800);
+      try {
+        if (typeof canvas.toBlob === 'function') {
+          canvas.toBlob(function (blob) {
+            window.clearTimeout(timer);
+            if (blob) {
+              finish(null, blob);
+            } else {
+              dataURLFallback();
+            }
+          }, outputMime, outputMime === 'image/jpeg' ? quality : undefined);
+        } else {
+          window.clearTimeout(timer);
+          dataURLFallback();
+        }
+      } catch (e) {
+        window.clearTimeout(timer);
+        dataURLFallback();
+      }
+    });
+  }
+
+  function setMediaEditorStatus(message, isError) {
+    var el = document.getElementById('admin-media-editor-status');
+    if (!el) {
+      return;
+    }
+    el.textContent = message || '';
+    el.classList.toggle('is-error', !!isError);
+  }
+
+  function mediaEditorCanonicalPath(url) {
+    if (!url) {
+      return '';
+    }
+    return String(url).split('#')[0].split('?')[0];
+  }
+
+  function mediaEditorCacheBustURL(path, version) {
+    var base = mediaEditorCanonicalPath(path);
+    if (!base) {
+      return '';
+    }
+    var v = version == null ? Date.now() : version;
+    return base + '?v=' + encodeURIComponent(String(v));
+  }
+
+  var MEDIA_EDITOR_EDITED_ID_KEY = 'cannon.mediaEditorEditedId';
+
+  function markMediaEditorThumbPendingRefresh(mediaId) {
+    if (!mediaId) {
+      return;
+    }
+    try {
+      sessionStorage.setItem(MEDIA_EDITOR_EDITED_ID_KEY, String(mediaId));
+    } catch (e) {}
+  }
+
+  function refreshPendingMediaEditorThumb() {
+    var id = null;
+    try {
+      id = sessionStorage.getItem(MEDIA_EDITOR_EDITED_ID_KEY);
+    } catch (e) {}
+    if (!id) {
+      return;
+    }
+    try {
+      sessionStorage.removeItem(MEDIA_EDITOR_EDITED_ID_KEY);
+    } catch (e2) {}
+    var editBtn = document.querySelector('[data-media-edit][data-media-id="' + id + '"]');
+    if (!editBtn) {
+      return;
+    }
+    var path = editBtn.getAttribute('data-media-url');
+    if (!path) {
+      return;
+    }
+    refreshMediaEditorGridItem(id, path, {});
+  }
+
+  function refreshMediaEditorGridItem(mediaId, path, meta) {
+    var canonical = mediaEditorCanonicalPath(path);
+    var editBtn = document.querySelector('[data-media-edit][data-media-id="' + mediaId + '"]');
+    if (!editBtn) {
+      return;
+    }
+    editBtn.setAttribute('data-media-url', canonical);
+    if (meta && meta.mime) {
+      editBtn.setAttribute('data-media-mime', meta.mime);
+    }
+    var card = editBtn.closest('.admin-media-file');
+    if (!card) {
+      return;
+    }
+    var thumb = card.querySelector('.admin-media-item-thumb img');
+    if (thumb) {
+      thumb.src = mediaEditorCacheBustURL(canonical);
+    }
+    if (meta && meta.width && meta.height) {
+      var metaEl = card.querySelector('.admin-media-item-meta');
+      if (metaEl) {
+        var parts = metaEl.textContent.split('·');
+        var sizePart = parts[0] ? parts[0].trim() : '';
+        metaEl.textContent = sizePart + ' · ' + meta.width + '×' + meta.height;
+      }
+    }
+  }
+
+  function mediaEditorNormalizedRotation() {
+    return ((mediaEditorRotation % 360) + 360) % 360;
+  }
+
+  function mediaEditorExportTargetSize() {
+    var img = document.getElementById('admin-media-editor-image');
+    if (!mediaEditorCropper || !img || !img.naturalWidth || !img.naturalHeight) {
+      return null;
+    }
+    var rot = mediaEditorNormalizedRotation();
+    var nw = img.naturalWidth;
+    var nh = img.naturalHeight;
+    if (mediaEditorFullFrameRotate) {
+      if (rot === 90 || rot === 270) {
+        return { width: nh, height: nw };
+      }
+      return { width: nw, height: nh };
+    }
+    var crop = mediaEditorCropper.getData(true);
+    var cw = Math.round(crop.width || 0);
+    var ch = Math.round(crop.height || 0);
+    if (cw < 1 || ch < 1) {
+      return null;
+    }
+    if (rot === 90 || rot === 270) {
+      return { width: ch, height: cw };
+    }
+    return { width: cw, height: ch };
+  }
+
+  function syncMediaEditorOutputDimensions() {
+    var size = mediaEditorExportTargetSize();
+    if (!size) {
+      return;
+    }
+    var outW = document.getElementById('admin-media-editor-out-w');
+    var outH = document.getElementById('admin-media-editor-out-h');
+    var w = document.getElementById('admin-media-editor-w');
+    var h = document.getElementById('admin-media-editor-h');
+    if (outW) {
+      outW.value = size.width;
+    }
+    if (outH) {
+      outH.value = size.height;
+    }
+    if (w) {
+      w.value = size.width;
+    }
+    if (h) {
+      h.value = size.height;
+    }
+  }
+
+  function syncMediaEditorFields() {
+    if (!mediaEditorCropper) {
+      return;
+    }
+    var data = mediaEditorCropper.getData(true);
+    var x = document.getElementById('admin-media-editor-x');
+    var y = document.getElementById('admin-media-editor-y');
+    if (x) { x.value = Math.max(0, Math.round(data.x || 0)); }
+    if (y) { y.value = Math.max(0, Math.round(data.y || 0)); }
+    syncMediaEditorOutputDimensions();
+  }
+
+  function mediaEditorSelectFullImage() {
+    var img = document.getElementById('admin-media-editor-image');
+    if (!mediaEditorCropper || !img || !img.naturalWidth || !img.naturalHeight) {
+      return;
+    }
+    mediaEditorProgrammaticCrop = true;
+    mediaEditorCropper.setData({
+      x: 0,
+      y: 0,
+      width: img.naturalWidth,
+      height: img.naturalHeight
+    });
+    mediaEditorProgrammaticCrop = false;
+  }
+
+  function mediaEditorSyncCropBoxToCanvas() {
+    if (!mediaEditorCropper) {
+      return;
+    }
+    var canvasData = mediaEditorCropper.getCanvasData();
+    if (!canvasData || canvasData.width < 1 || canvasData.height < 1) {
+      return;
+    }
+    mediaEditorProgrammaticCrop = true;
+    mediaEditorCropper.setCropBoxData({
+      left: canvasData.left,
+      top: canvasData.top,
+      width: canvasData.width,
+      height: canvasData.height
+    });
+    mediaEditorProgrammaticCrop = false;
+  }
+
+  function mediaEditorFitCropToRotatedImage() {
+    mediaEditorSelectFullImage();
+    mediaEditorSyncCropBoxToCanvas();
+    syncMediaEditorFields();
+    syncMediaEditorOutputDimensions();
+  }
+
+  function mediaEditorAfterTransform() {
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        mediaEditorFitCropToRotatedImage();
+        window.requestAnimationFrame(function () {
+          mediaEditorSyncCropBoxToCanvas();
+          syncMediaEditorFields();
+          syncMediaEditorOutputDimensions();
+        });
+      });
+    });
+  }
+
+  function applyMediaEditorFields() {
+    if (!mediaEditorCropper) {
+      return;
+    }
+    var x = parseFloat(document.getElementById('admin-media-editor-x').value || '0');
+    var y = parseFloat(document.getElementById('admin-media-editor-y').value || '0');
+    var data = mediaEditorCropper.getData(true);
+    mediaEditorCropper.setData({
+      x: Math.max(0, x),
+      y: Math.max(0, y),
+      width: data.width,
+      height: data.height
+    });
+    mediaEditorFullFrameRotate = false;
+    syncMediaEditorFields();
+  }
+
+  function ensureMediaEditorCropBox() {
+    if (!mediaEditorCropper) {
+      return false;
+    }
+    var img = document.getElementById('admin-media-editor-image');
+    if (!img || !img.naturalWidth || !img.naturalHeight) {
+      return false;
+    }
+    var crop = mediaEditorCropper.getData(true);
+    if (crop.width >= 1 && crop.height >= 1) {
+      return true;
+    }
+    mediaEditorCropper.reset();
+    mediaEditorFitCropToRotatedImage();
+    return true;
+  }
+
+  function mediaEditorCroppedExportCanvas(outWidth, outHeight, fillColor) {
+    if (!ensureMediaEditorCropBox()) {
+      return null;
+    }
+    var opts = {
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high'
+    };
+    if (fillColor) {
+      opts.fillColor = fillColor;
+    }
+    var target = mediaEditorExportTargetSize();
+    var targetW = parseInt(outWidth, 10);
+    var targetH = parseInt(outHeight, 10);
+    if (target) {
+      if (!(targetW > 0 && targetH > 0)) {
+        targetW = target.width;
+        targetH = target.height;
+      } else {
+        var targetAspect = targetW / targetH;
+        var expectedAspect = target.width / target.height;
+        if (Math.abs(targetAspect - expectedAspect) > 0.02) {
+          targetW = target.width;
+          targetH = target.height;
+        }
+      }
+    }
+    var cropped;
+    try {
+      if (targetW > 0 && targetH > 0) {
+        cropped = mediaEditorCropper.getCroppedCanvas(Object.assign({}, opts, {
+          width: targetW,
+          height: targetH
+        }));
+      } else {
+        cropped = mediaEditorCropper.getCroppedCanvas(opts);
+      }
+    } catch (e) {
+      return null;
+    }
+    if (!cropped || cropped.width < 1 || cropped.height < 1) {
+      return null;
+    }
+    return cropped;
+  }
+
+  function initMediaEditor() {
+    var dialog = document.getElementById('admin-media-editor-dialog');
+    if (!dialog || dialog.dataset.bound) {
+      return;
+    }
+    dialog.dataset.bound = '1';
+
+    function switchTab(name) {
+      dialog.querySelectorAll('[data-media-editor-tab]').forEach(function (tab) {
+        var active = tab.getAttribute('data-media-editor-tab') === name;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      dialog.querySelectorAll('[data-media-editor-panel]').forEach(function (panel) {
+        var show = panel.getAttribute('data-media-editor-panel') === name;
+        panel.classList.toggle('hidden', !show);
+        panel.hidden = !show;
+      });
+    }
+
+    dialog.querySelectorAll('[data-media-editor-tab]').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        switchTab(tab.getAttribute('data-media-editor-tab'));
+      });
+    });
+
+    dialog.querySelectorAll('[data-media-editor-close]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        closeMediaEditorDialog();
+      });
+    });
+
+    dialog.addEventListener('close', function () {
+      if (mediaEditorCropper) {
+        mediaEditorCropper.destroy();
+        mediaEditorCropper = null;
+      }
+      if (mediaEditorNeedsListRefresh && !mediaEditorReopening) {
+        mediaEditorNeedsListRefresh = false;
+        reloadMediaBrowseFrame();
+      }
+    });
+
+    dialog.addEventListener('cancel', function (e) {
+      e.preventDefault();
+      closeMediaEditorDialog();
+    });
+
+    var aspect = document.getElementById('admin-media-editor-aspect');
+    if (aspect) {
+      aspect.addEventListener('change', function () {
+        if (!mediaEditorCropper) {
+          return;
+        }
+        var val = aspect.value;
+        mediaEditorCropper.setAspectRatio(val === 'free' ? NaN : parseFloat(val));
+      });
+    }
+
+    ['admin-media-editor-x', 'admin-media-editor-y', 'admin-media-editor-w', 'admin-media-editor-h'].forEach(function (id) {
+      var input = document.getElementById(id);
+      if (!input) {
+        return;
+      }
+      input.addEventListener('change', applyMediaEditorFields);
+    });
+
+    dialog.querySelectorAll('[data-media-editor-rotate]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!mediaEditorCropper) {
+          return;
+        }
+        var delta = parseFloat(btn.getAttribute('data-media-editor-rotate') || '0');
+        mediaEditorRotation = (mediaEditorRotation + delta + 360) % 360;
+        mediaEditorFullFrameRotate = true;
+        if (typeof mediaEditorCropper.rotateTo === 'function') {
+          mediaEditorCropper.rotateTo(mediaEditorRotation);
+        } else {
+          mediaEditorCropper.rotate(delta);
+        }
+        mediaEditorAfterTransform();
+      });
+    });
+
+    dialog.querySelectorAll('[data-media-editor-flip]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!mediaEditorCropper) {
+          return;
+        }
+        mediaEditorFullFrameRotate = true;
+        var imageData = mediaEditorCropper.getImageData();
+        var axis = btn.getAttribute('data-media-editor-flip');
+        if (axis === 'y') {
+          mediaEditorCropper.scaleY(imageData.scaleY === -1 ? 1 : -1);
+        } else {
+          mediaEditorCropper.scaleX(imageData.scaleX === -1 ? 1 : -1);
+        }
+        mediaEditorAfterTransform();
+      });
+    });
+
+    var outW = document.getElementById('admin-media-editor-out-w');
+    var outH = document.getElementById('admin-media-editor-out-h');
+    var lockAspect = document.getElementById('admin-media-editor-lock-aspect');
+    if (outW && outH && lockAspect) {
+      outW.addEventListener('input', function () {
+        if (!lockAspect.checked || !mediaEditorCropper) {
+          return;
+        }
+        var size = mediaEditorExportTargetSize();
+        if (size && size.width > 0) {
+          var ratioOut = size.height / size.width;
+          outH.value = Math.max(1, Math.round(parseFloat(outW.value || '0') * ratioOut));
+          var w = document.getElementById('admin-media-editor-w');
+          var h = document.getElementById('admin-media-editor-h');
+          if (w) { w.value = outW.value; }
+          if (h) { h.value = outH.value; }
+        }
+      });
+      outH.addEventListener('input', function () {
+        if (!lockAspect.checked || !mediaEditorCropper) {
+          return;
+        }
+        var size = mediaEditorExportTargetSize();
+        if (size && size.height > 0) {
+          var ratioOut = size.width / size.height;
+          outW.value = Math.max(1, Math.round(parseFloat(outH.value || '0') * ratioOut));
+          var w = document.getElementById('admin-media-editor-w');
+          var h = document.getElementById('admin-media-editor-h');
+          if (w) { w.value = outW.value; }
+          if (h) { h.value = outH.value; }
+        }
+      });
+    }
+
+    function mountMediaEditorCropper(meta) {
+      var img = document.getElementById('admin-media-editor-image');
+      if (!img || !window.Cropper) {
+        return;
+      }
+      if (mediaEditorCropper) {
+        mediaEditorCropper.destroy();
+        mediaEditorCropper = null;
+      }
+      mediaEditorCropper = new window.Cropper(img, {
+        viewMode: 0,
+        autoCropArea: 1,
+        responsive: true,
+        background: false,
+        crop: function (event) {
+          if (!mediaEditorProgrammaticCrop && event && event.detail && event.detail.originalEvent) {
+            mediaEditorFullFrameRotate = false;
+          }
+          syncMediaEditorFields();
+        },
+        ready: function () {
+          if (!mediaEditorCropper) {
+            return;
+          }
+          ensureMediaEditorCropBox();
+          mediaEditorFitCropToRotatedImage();
+        }
+      });
+    }
+
+    function refreshMediaEditorPreview(path, meta) {
+      var img = document.getElementById('admin-media-editor-image');
+      if (!img) {
+        setMediaEditorStatus('Applied.', false);
+        setMediaEditorBusy(false);
+        return;
+      }
+      if (mediaEditorCropper) {
+        mediaEditorCropper.destroy();
+        mediaEditorCropper = null;
+      }
+      var finished = false;
+      var fallbackTimer = window.setTimeout(function () {
+        completePreview(true);
+      }, 15000);
+      function completePreview(ok, msg) {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        window.clearTimeout(fallbackTimer);
+        if (ok) {
+          setMediaEditorStatus('Applied.', false);
+        } else {
+          setMediaEditorStatus(msg || 'Saved, but preview failed to reload.', true);
+        }
+        setMediaEditorBusy(false);
+      }
+      img.onload = function () {
+        mountMediaEditorCropper(meta);
+        completePreview(true);
+      };
+      img.onerror = function () {
+        completePreview(false, 'Saved, but preview failed to reload.');
+      };
+      img.src = mediaEditorCacheBustURL(path);
+    }
+
+    function setMediaEditorBusy(busy) {
+      var saveBtn = document.getElementById('admin-media-editor-save');
+      var applyBtn = document.getElementById('admin-media-editor-apply');
+      if (saveBtn) { saveBtn.disabled = busy; }
+      if (applyBtn) { applyBtn.disabled = busy; }
+    }
+
+    function runMediaEditorSave(closeAfter) {
+      if (!mediaEditorCropper || !mediaEditorState) {
+        return;
+      }
+      setMediaEditorStatus(closeAfter ? 'Saving…' : 'Applying…', false);
+      setMediaEditorBusy(true);
+      syncMediaEditorOutputDimensions();
+      var qualityEl = document.getElementById('admin-media-editor-quality');
+      var quality = Math.min(100, Math.max(1, parseInt(qualityEl && qualityEl.value, 10) || 90)) / 100;
+      var mime = mediaEditorState.mime || 'image/jpeg';
+      var fillColor = mime === 'image/jpeg' ? '#fff' : null;
+      var canvas = mediaEditorCroppedExportCanvas(outW && outW.value, outH && outH.value, fillColor);
+      if (!canvas) {
+        setMediaEditorStatus('Could not export image. Wait for the image to finish loading and try again.', true);
+        setMediaEditorBusy(false);
+        return;
+      }
+      var outputMime = mime === 'image/png' ? 'image/png' : (mime === 'image/webp' ? 'image/webp' : 'image/jpeg');
+      mediaEditorCanvasBlob(canvas, outputMime, quality).then(function (blob) {
+        var token = mediaEditorCSRFToken();
+        if (!token) {
+          throw new Error('Missing CSRF token. Reload the page and try again.');
+        }
+        var formData = new FormData();
+        formData.append('file', blob, mediaEditorState.name || 'image.jpg');
+        formData.append('_csrf', token);
+        var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var fetchTimer = null;
+        if (controller) {
+          fetchTimer = window.setTimeout(function () {
+            controller.abort();
+          }, 120000);
+        }
+        return fetch(mediaEditorState.replaceURL, {
+          method: 'POST',
+          body: formData,
+          credentials: 'same-origin',
+          signal: controller ? controller.signal : undefined,
+          headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': token
+          }
+        }).then(function (resp) {
+          if (fetchTimer) {
+            window.clearTimeout(fetchTimer);
+          }
+          return resp.text().then(function (text) {
+            var body = null;
+            if (text) {
+              try {
+                body = JSON.parse(text);
+              } catch (parseErr) {
+                body = null;
+              }
+            }
+            return { ok: resp.ok, status: resp.status, body: body, raw: text };
+          });
+        });
+      }).then(function (result) {
+        if (!result.ok || !result.body || !result.body.ok) {
+          var msg = (result.body && result.body.error) || 'Save failed';
+          if (!result.body && result.raw) {
+            msg = 'Save failed (unexpected response)';
+          }
+          if (result.status === 403) {
+            msg = 'Save failed: session or CSRF token expired. Reload the page and try again.';
+          }
+          throw new Error(msg);
+        }
+        var path = mediaEditorCanonicalPath(result.body.path || mediaEditorState.url);
+        var meta = {
+          width: result.body.width,
+          height: result.body.height,
+          mime: result.body.mime
+        };
+        mediaEditorState.url = path;
+        if (meta.mime) {
+          mediaEditorState.mime = meta.mime;
+        }
+        refreshMediaEditorGridItem(mediaEditorState.id, path, meta);
+        if (closeAfter) {
+          mediaEditorNeedsListRefresh = false;
+          var nextURL = new URL(window.location.href);
+          nextURL.searchParams.set('v', String(Date.now()));
+          window.location.assign(nextURL.toString());
+          return;
+        }
+        mediaEditorNeedsListRefresh = true;
+        markMediaEditorThumbPendingRefresh(mediaEditorState.id);
+        setMediaEditorStatus('Updating preview…', false);
+        refreshMediaEditorPreview(path, meta);
+      }).catch(function (err) {
+        var msg = err && err.message ? err.message : 'Save failed';
+        if (err && err.name === 'AbortError') {
+          msg = 'Save timed out. Try again or use Save to reload the page.';
+        }
+        setMediaEditorStatus(msg, true);
+        setMediaEditorBusy(false);
+      });
+    }
+
+    var applyBtn = document.getElementById('admin-media-editor-apply');
+    if (applyBtn) {
+      applyBtn.addEventListener('click', function () {
+        runMediaEditorSave(false);
+      });
+    }
+
+    var saveBtn = document.getElementById('admin-media-editor-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', function () {
+        runMediaEditorSave(true);
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-media-edit]');
+      if (!btn) {
+        return;
+      }
+      e.preventDefault();
+      var manager = document.querySelector('.admin-media-manager[data-media-base]');
+      var base = manager ? manager.getAttribute('data-media-base') : '/admin/media';
+      var id = btn.getAttribute('data-media-id');
+      var url = btn.getAttribute('data-media-url') || '';
+      var name = btn.getAttribute('data-media-name') || 'image';
+      var mime = btn.getAttribute('data-media-mime') || 'image/jpeg';
+      if (!id || !url) {
+        return;
+      }
+      setMediaEditorStatus('Loading editor…', false);
+      loadCropperAssets().then(function () {
+        mediaEditorReopening = true;
+        destroyMediaEditor();
+        mediaEditorReopening = false;
+        mediaEditorNeedsListRefresh = false;
+        mediaEditorRotation = 0;
+        mediaEditorFullFrameRotate = true;
+        mediaEditorState = {
+          id: id,
+          url: mediaEditorCanonicalPath(url),
+          name: name,
+          mime: mime,
+          replaceURL: base + '/' + id + '/replace'
+        };
+        var title = document.getElementById('admin-media-editor-title');
+        var filename = document.getElementById('admin-media-editor-filename');
+        if (title) { title.textContent = 'Edit image'; }
+        if (filename) { filename.textContent = name; }
+        var img = document.getElementById('admin-media-editor-image');
+        if (!img) {
+          return;
+        }
+        setMediaEditorBusy(false);
+        img.onload = function () {
+          mountMediaEditorCropper();
+          setMediaEditorStatus('', false);
+          switchTab('crop');
+        };
+        img.src = mediaEditorCacheBustURL(mediaEditorState.url);
+        dialog.showModal();
+      }).catch(function (err) {
+        setMediaEditorStatus(err.message || 'Could not load editor', true);
+      });
+    });
+  }
+
   function initMediaCopy() {
     document.querySelectorAll('[data-copy-text]').forEach(function (btn) {
       if (btn.dataset.bound) {
@@ -3608,6 +4430,9 @@
   document.addEventListener('turbo:before-cache', function () {
     destroyItemEditors();
     destroyTemplateEditors();
+    mediaEditorNeedsListRefresh = false;
+    mediaEditorReopening = false;
+    destroyMediaEditor();
     document.querySelectorAll('[data-bound]').forEach(function (el) {
       delete el.dataset.bound;
     });
@@ -3636,6 +4461,13 @@
     var userToggle = document.getElementById('admin-user-menu-toggle');
     if (userToggle) {
       userToggle.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  document.addEventListener('turbo:frame-load', function (event) {
+    var frame = event.target;
+    if (frame && frame.id === 'main-content') {
+      refreshPendingMediaEditorThumb();
     }
   });
 

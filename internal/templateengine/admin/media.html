@@ -1,6 +1,8 @@
 {{template "page_header" .}}
 {{if eq .Uploaded "1"}}{{template "success_alert" (dict "Success" "File uploaded successfully.")}}{{end}}
-<div class="admin-media-manager">
+{{if eq .Duplicated "1"}}{{template "success_alert" (dict "Success" "File duplicated successfully.")}}{{end}}
+{{if eq .Edited "1"}}{{template "success_alert" (dict "Success" "Image saved successfully.")}}{{end}}
+<div class="admin-media-manager" data-media-base="{{.BasePath}}">
   <aside class="admin-media-sidebar">
     <div class="admin-media-sidebar-header">
       <div class="admin-media-sidebar-title">Library</div>
@@ -146,3 +148,82 @@
     </div>
   </div>
 </div>
+
+<dialog class="admin-media-editor-dialog" id="admin-media-editor-dialog" aria-labelledby="admin-media-editor-title">
+  <form method="dialog" class="admin-media-editor-shell" id="admin-media-editor-form">
+    <header class="admin-media-editor-header">
+      <div>
+        <h2 class="admin-media-editor-title" id="admin-media-editor-title">Edit image</h2>
+        <p class="admin-media-editor-subtitle" id="admin-media-editor-filename"></p>
+      </div>
+      <button type="button" class="btn-admin-icon" data-media-editor-close aria-label="Close">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </header>
+    <div class="admin-media-editor-body">
+      <aside class="admin-media-editor-sidebar" aria-label="Image tools">
+        <div class="admin-media-editor-tabs" role="tablist">
+          <button type="button" class="admin-media-editor-tab active" data-media-editor-tab="crop" role="tab" aria-selected="true">Crop</button>
+          <button type="button" class="admin-media-editor-tab" data-media-editor-tab="resize" role="tab" aria-selected="false">Resize</button>
+          <button type="button" class="admin-media-editor-tab" data-media-editor-tab="rotate" role="tab" aria-selected="false">Rotate</button>
+        </div>
+        <div class="admin-media-editor-panel" data-media-editor-panel="crop">
+          <label class="admin-form-label" for="admin-media-editor-quality">Quality</label>
+          <input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-quality" min="1" max="100" value="90">
+          <div class="admin-media-editor-fields">
+            <label class="admin-form-label" for="admin-media-editor-aspect">Aspect ratio</label>
+            <select class="admin-form-control admin-form-control-sm" id="admin-media-editor-aspect">
+              <option value="free">Free</option>
+              <option value="1">1:1</option>
+              <option value="1.333333">4:3</option>
+              <option value="1.777778">16:9</option>
+              <option value="0.666667">2:3</option>
+              <option value="0.5625">9:16</option>
+            </select>
+          </div>
+          <div class="admin-media-editor-grid">
+            <div><label class="admin-form-label" for="admin-media-editor-x">X</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-x" min="0" step="1"></div>
+            <div><label class="admin-form-label" for="admin-media-editor-y">Y</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-y" min="0" step="1"></div>
+            <div><label class="admin-form-label" for="admin-media-editor-w">Output width</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-w" min="1" step="1"></div>
+            <div><label class="admin-form-label" for="admin-media-editor-h">Output height</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-h" min="1" step="1"></div>
+          </div>
+        </div>
+        <div class="admin-media-editor-panel hidden" data-media-editor-panel="resize" hidden>
+          <p class="admin-form-help">Set output dimensions. The image is scaled when you save.</p>
+          <div class="admin-media-editor-grid">
+            <div><label class="admin-form-label" for="admin-media-editor-out-w">Width</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-out-w" min="1" step="1"></div>
+            <div><label class="admin-form-label" for="admin-media-editor-out-h">Height</label><input class="admin-form-control admin-form-control-sm" type="number" id="admin-media-editor-out-h" min="1" step="1"></div>
+          </div>
+          <label class="admin-form-toggle admin-form-toggle-inline admin-media-editor-lock">
+            <input type="checkbox" class="admin-form-toggle-input" id="admin-media-editor-lock-aspect" checked>
+            <span class="admin-form-toggle-track" aria-hidden="true"><span class="admin-form-toggle-thumb"></span></span>
+            <span class="admin-form-toggle-label">Keep aspect ratio</span>
+          </label>
+        </div>
+        <div class="admin-media-editor-panel hidden" data-media-editor-panel="rotate" hidden>
+          <p class="admin-form-help">Rotate or flip the image. Crop boundaries update live.</p>
+          <div class="admin-media-editor-rotate-actions">
+            <button type="button" class="btn-admin-outline btn-admin-sm" data-media-editor-rotate="-90"><i class="bi bi-arrow-counterclockwise"></i> 90° left</button>
+            <button type="button" class="btn-admin-outline btn-admin-sm" data-media-editor-rotate="90"><i class="bi bi-arrow-clockwise"></i> 90° right</button>
+            <button type="button" class="btn-admin-outline btn-admin-sm" data-media-editor-flip="x">Flip horizontal</button>
+            <button type="button" class="btn-admin-outline btn-admin-sm" data-media-editor-flip="y">Flip vertical</button>
+          </div>
+        </div>
+      </aside>
+      <div class="admin-media-editor-stage">
+        <div class="admin-media-editor-canvas-wrap">
+          <img src="" alt="" id="admin-media-editor-image" class="admin-media-editor-image">
+        </div>
+      </div>
+    </div>
+    <footer class="admin-media-editor-footer">
+      {{csrfField}}
+      <p class="admin-media-editor-status" id="admin-media-editor-status" role="status"></p>
+      <div class="admin-media-editor-footer-actions">
+        <button type="button" class="btn-admin-outline" data-media-editor-close>Cancel</button>
+        <button type="button" class="btn-admin-outline" id="admin-media-editor-apply">Apply</button>
+        <button type="button" class="btn-admin-primary" id="admin-media-editor-save">Save</button>
+      </div>
+    </footer>
+  </form>
+</dialog>

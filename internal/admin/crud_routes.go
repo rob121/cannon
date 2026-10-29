@@ -90,9 +90,112 @@ func (h *Handler) routes(w http.ResponseWriter, r *http.Request, path string) {
 	}
 }
 
+func routeListFiltersFromRequest(r *http.Request) (status, routeType, defaultFilter, showTitle, query string) {
+	q := r.URL.Query()
+	status = strings.TrimSpace(q.Get("status"))
+	if status != string(models.StatusActive) && status != string(models.StatusInactive) {
+		status = ""
+	}
+	routeType = strings.TrimSpace(q.Get("route_type"))
+	if !isKnownRouteType(routeType) {
+		routeType = ""
+	}
+	defaultFilter = strings.TrimSpace(q.Get("default"))
+	if defaultFilter != "1" && defaultFilter != "0" {
+		defaultFilter = ""
+	}
+	showTitle = strings.TrimSpace(q.Get("show_title"))
+	if showTitle != "1" && showTitle != "0" {
+		showTitle = ""
+	}
+	query = strings.TrimSpace(q.Get("q"))
+	return status, routeType, defaultFilter, showTitle, query
+}
+
+func isKnownRouteType(t string) bool {
+	if t == "" {
+		return false
+	}
+	for _, rt := range allRouteTypes() {
+		if string(rt) == t {
+			return true
+		}
+	}
+	return false
+}
+
+func allRouteTypes() []models.RouteType {
+	return []models.RouteType{
+		models.RouteTypeURL,
+		models.RouteTypeExtension,
+		models.RouteTypeExtensionEndpoint,
+		models.RouteTypeLocalFile,
+		models.RouteTypeController,
+		models.RouteTypeIframe,
+	}
+}
+
+func routeMatchesListFilters(row models.Route, status, routeType, defaultFilter, showTitle, query string) bool {
+	if status != "" && string(row.Status) != status {
+		return false
+	}
+	if routeType != "" && string(row.Type) != routeType {
+		return false
+	}
+	if defaultFilter == "1" && !row.IsDefault {
+		return false
+	}
+	if defaultFilter == "0" && row.IsDefault {
+		return false
+	}
+	if showTitle == "1" && !row.ShowTitle {
+		return false
+	}
+	if showTitle == "0" && row.ShowTitle {
+		return false
+	}
+	if query == "" {
+		return true
+	}
+	q := strings.ToLower(query)
+	for _, field := range []string{
+		row.Name, row.Path, row.Target, row.Controller, row.ControllerAction,
+		row.ExtensionName, row.ExtensionPageID, row.ExtensionEndpointID, string(row.Type),
+	} {
+		if strings.Contains(strings.ToLower(field), q) {
+			return true
+		}
+	}
+	return false
+}
+
+func builtinRouteMatchesSearch(row builtinRouteRow, query string) bool {
+	if query == "" {
+		return true
+	}
+	q := strings.ToLower(query)
+	for _, field := range []string{row.Name, row.Path, row.Prefix, row.Controller, row.ControllerAction, row.Methods} {
+		if strings.Contains(strings.ToLower(field), q) {
+			return true
+		}
+	}
+	return false
+}
+
+func builtinRouteMatchesFilters(row builtinRouteRow, showTitle, query string) bool {
+	if showTitle == "1" && !row.ShowTitle {
+		return false
+	}
+	if showTitle == "0" && row.ShowTitle {
+		return false
+	}
+	return builtinRouteMatchesSearch(row, query)
+}
+
 func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 	db, _ := sites.DB(r.Context())
 	page := parsePage(r)
+	statusFilter, typeFilter, defaultFilter, showTitleFilter, searchQuery := routeListFiltersFromRequest(r)
 	var rows []models.Route
 	data := listPage(r, page, 0, routesBase,
 		"Custom URL paths and handlers. Built-in content, auth, and account routes are listed separately below.",
@@ -104,10 +207,20 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 
 	customRows := make([]models.Route, 0, len(rows))
 	for _, row := range rows {
-		if !router.IsBuiltinControllerRoute(row) {
-			customRows = append(customRows, row)
+		if router.IsBuiltinControllerRoute(row) {
+			continue
 		}
+		if !routeMatchesListFilters(row, statusFilter, typeFilter, defaultFilter, showTitleFilter, searchQuery) {
+			continue
+		}
+		customRows = append(customRows, row)
 	}
+	data["StatusFilter"] = statusFilter
+	data["TypeFilter"] = typeFilter
+	data["DefaultFilter"] = defaultFilter
+	data["ShowTitleFilter"] = showTitleFilter
+	data["SearchQuery"] = searchQuery
+	data["RouteTypes"] = allRouteTypes()
 	data["Total"] = int64(len(customRows))
 	rows = paginateRoutes(customRows, page, pageSizeFor(r))
 
@@ -136,7 +249,28 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 	data["Rows"] = userRows
 	data["SystemRoutes"] = router.SystemRoutes()
 	data["BuiltinRoutes"] = router.BuiltinControllerRoutes()
-	data["BuiltinRouteRows"] = loadBuiltinRouteRows(db)
+	builtinRows := loadBuiltinRouteRows(db)
+	if statusFilter != "" || typeFilter != "" || defaultFilter != "" || showTitleFilter != "" || searchQuery != "" {
+		filtered := make([]builtinRouteRow, 0, len(builtinRows))
+		for _, row := range builtinRows {
+			if typeFilter != "" && typeFilter != string(models.RouteTypeController) {
+				continue
+			}
+			if statusFilter != "" {
+				continue
+			}
+			if defaultFilter != "" {
+				continue
+			}
+			if !builtinRouteMatchesFilters(row, showTitleFilter, searchQuery) {
+				continue
+			}
+			filtered = append(filtered, row)
+		}
+		builtinRows = filtered
+	}
+	data["BuiltinRouteRows"] = builtinRows
+	data["ListQuery"] = listQueryFromData(data)
 	h.render(w, r, "Routes", "admin/routes.html", data)
 }
 

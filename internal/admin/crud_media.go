@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"fmt"
 	_ "golang.org/x/image/webp"
 	"image"
@@ -36,6 +37,7 @@ type mediaFolderNav struct {
 type mediaFileView struct {
 	models.MediaAsset
 	IsImage   bool
+	CanEdit   bool
 	SizeLabel string
 	IconClass string
 	ThumbPath string
@@ -54,6 +56,10 @@ func (h *Handler) media(w http.ResponseWriter, r *http.Request, path string) {
 		h.mediaCreateFolder(w, r)
 	case len(parts) == 2 && parts[1] == "delete":
 		h.mediaDelete(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "duplicate":
+		h.mediaDuplicate(w, r, parts[0])
+	case len(parts) == 2 && parts[1] == "replace":
+		h.mediaReplace(w, r, parts[0])
 	default:
 		h.notFound(w, r)
 	}
@@ -79,6 +85,8 @@ func (h *Handler) mediaList(w http.ResponseWriter, r *http.Request) {
 	data["PageActionURL"] = mediaUploadURL(folder)
 	data["PageActionLabel"] = "Upload"
 	data["Uploaded"] = r.URL.Query().Get("uploaded")
+	data["Duplicated"] = r.URL.Query().Get("duplicated")
+	data["Edited"] = r.URL.Query().Get("edited")
 	data["ParentFolderOptions"], _ = mediaFolderOptions(site, db)
 	data["AllFolderNav"], _ = mediaFolderOptions(site, db)
 
@@ -381,6 +389,226 @@ func (h *Handler) mediaDelete(w http.ResponseWriter, r *http.Request, idStr stri
 	redirectList(w, r, mediaBase+listRedirectQuery(r))
 }
 
+func (h *Handler) mediaDuplicate(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	site, err := sites.FromContext(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	var asset models.MediaAsset
+	if err := db.First(&asset, id).Error; err != nil {
+		h.notFound(w, r)
+		return
+	}
+	local := filepath.Join(site.AssetsDir, strings.TrimPrefix(asset.Path, "/assets/"))
+	src, err := os.Open(local)
+	if err != nil {
+		http.Error(w, "file not found on disk", http.StatusNotFound)
+		return
+	}
+	defer src.Close()
+
+	folder := strings.TrimSpace(asset.Folder)
+	if folder == "" {
+		folder = "content"
+	}
+	destDir := filepath.Join(site.AssetsDir, "media", filepath.FromSlash(folder))
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	newName := uniqueMediaFilename(destDir, duplicateMediaFilename(asset.Name))
+	destPath := filepath.Join(destDir, newName)
+	out, err := os.Create(destPath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	size, err := io.Copy(out, src)
+	out.Close()
+	if err != nil {
+		_ = os.Remove(destPath)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	mimeType := detectMIME(destPath)
+	width, height := imageDimensions(destPath)
+	webPath := "/assets/media/" + folder + "/" + newName
+	copy := models.MediaAsset{
+		Name:   newName,
+		Path:   webPath,
+		MIME:   mimeType,
+		Size:   size,
+		Folder: folder,
+		Alt:    asset.Alt,
+		Width:  width,
+		Height: height,
+	}
+	if err := db.Create(&copy).Error; err != nil {
+		_ = os.Remove(destPath)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if strings.HasPrefix(mimeType, "image/") && !strings.Contains(mimeType, "svg") {
+		styles, _ := media.LoadStyles(r.Context())
+		if err := media.GenerateStyles(destPath, styles); err != nil {
+			slog.Warn("media duplicate styles", "path", destPath, "err", err)
+		}
+	}
+	dest := mediaBase + "?duplicated=1"
+	if folder != "" {
+		dest = mediaBase + "?folder=" + url.QueryEscape(folder) + "&duplicated=1"
+	}
+	redirectList(w, r, dest)
+}
+
+func (h *Handler) mediaReplace(w http.ResponseWriter, r *http.Request, idStr string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := parseID(idStr)
+	if !ok {
+		h.notFound(w, r)
+		return
+	}
+	site, err := sites.FromContext(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	mediaCfg, err := media.LoadSettings(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	maxMultipart := mediaCfg.MaxFileSizeBytes + (1 << 20)
+	if maxMultipart < 32<<20 {
+		maxMultipart = 32 << 20
+	}
+	if err := r.ParseMultipartForm(maxMultipart); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	if err := media.ValidateUpload(mediaCfg, header.Filename, header.Size); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	db, _ := sites.DB(r.Context())
+	var asset models.MediaAsset
+	if err := db.First(&asset, id).Error; err != nil {
+		h.notFound(w, r)
+		return
+	}
+	local := filepath.Join(site.AssetsDir, strings.TrimPrefix(asset.Path, "/assets/"))
+	styles, _ := media.LoadStyles(r.Context())
+	media.RemoveDerivatives(local, styles)
+
+	out, err := os.Create(local)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	size, err := io.Copy(out, io.LimitReader(file, mediaCfg.MaxFileSizeBytes+1))
+	out.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if mediaCfg.MaxFileSizeBytes > 0 && size > mediaCfg.MaxFileSizeBytes {
+		_ = os.Remove(local)
+		http.Error(w, fmt.Sprintf("file exceeds the maximum upload size of %d MB", mediaCfg.MaxFileSizeBytes/(1024*1024)), http.StatusBadRequest)
+		return
+	}
+	mimeType := detectMIME(local)
+	if !isEditableImageMIME(mimeType) {
+		_ = os.Remove(local)
+		http.Error(w, "only JPEG, PNG, and WebP images can be saved from the editor", http.StatusBadRequest)
+		return
+	}
+	width, height := imageDimensions(local)
+	asset.Size = size
+	asset.MIME = mimeType
+	asset.Width = width
+	asset.Height = height
+	if err := db.Save(&asset).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if wantsJSONResponse(r) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":     true,
+			"path":   asset.Path,
+			"mime":   mimeType,
+			"width":  width,
+			"height": height,
+			"size":   size,
+		})
+		localPath := local
+		styleSet := styles
+		go func() {
+			if err := media.GenerateStyles(localPath, styleSet); err != nil {
+				slog.Warn("media replace styles", "path", localPath, "err", err)
+			}
+		}()
+		return
+	}
+	if err := media.GenerateStyles(local, styles); err != nil {
+		slog.Warn("media replace styles", "path", local, "err", err)
+	}
+	dest := mediaBase + "?edited=1"
+	if asset.Folder != "" {
+		dest = mediaBase + "?folder=" + url.QueryEscape(asset.Folder) + "&edited=1"
+	}
+	redirectList(w, r, dest)
+}
+
+func duplicateMediaFilename(name string) string {
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(filepath.Base(name), ext)
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "copy"
+	}
+	return base + "-copy" + ext
+}
+
+func uniqueMediaFilename(dir, name string) string {
+	safeName := filepath.Base(strings.ReplaceAll(name, " ", "-"))
+	destPath := filepath.Join(dir, safeName)
+	if _, err := os.Stat(destPath); os.IsNotExist(err) {
+		return safeName
+	}
+	ext := filepath.Ext(safeName)
+	base := strings.TrimSuffix(safeName, ext)
+	return fmt.Sprintf("%s-%d%s", base, time.Now().Unix(), ext)
+}
+
+func isEditableImageMIME(mime string) bool {
+	switch strings.ToLower(strings.TrimSpace(mime)) {
+	case "image/jpeg", "image/png", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+
 func mediaFileViews(site *config.SiteConfig, rows []models.MediaAsset) []mediaFileView {
 	out := make([]mediaFileView, 0, len(rows))
 	assetsDir := ""
@@ -391,6 +619,7 @@ func mediaFileViews(site *config.SiteConfig, rows []models.MediaAsset) []mediaFi
 		view := mediaFileView{
 			MediaAsset: row,
 			IsImage:    isImageMIME(row.MIME),
+			CanEdit:    isEditableImageMIME(row.MIME),
 			SizeLabel:  formatFileSize(row.Size),
 			IconClass:  mediaIconClass(row.MIME),
 		}
@@ -557,4 +786,18 @@ func mediaPickerType(filesMode bool) string {
 		return "files"
 	}
 	return "images"
+}
+
+func wantsJSONResponse(r *http.Request) bool {
+	if strings.EqualFold(r.Header.Get("X-Requested-With"), "XMLHttpRequest") {
+		return true
+	}
+	return strings.Contains(r.Header.Get("Accept"), "application/json")
+}
+
+func writeJSON(w http.ResponseWriter, code int, payload any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(payload)
 }
