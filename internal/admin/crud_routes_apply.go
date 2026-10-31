@@ -169,7 +169,7 @@ func (h *Handler) routeApplyExtensionRoutes(w http.ResponseWriter, r *http.Reque
 				ExtensionName:   extName,
 				ExtensionPageID: "",
 				Metadata:        meta,
-				ShowTitle:       true,
+				ShowTitle:       false,
 				Sort:            maxSort + 1,
 			}
 			if !mount.Resolver {
