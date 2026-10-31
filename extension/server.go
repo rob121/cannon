@@ -44,8 +44,10 @@ type Server struct {
 	blocks            map[string]blockEntry
 	blockListProvider BlockListProvider
 
-	pages            map[string]pageEntry
-	pageListProvider PageListProvider
+	pages              map[string]pageEntry
+	pageListProvider   PageListProvider
+	pageCatalogProvider func() (PageListResponse, error)
+	pageResolveHandler PageResolveHandler
 
 	endpoints            map[string]endpointEntry
 	endpointListProvider EndpointListProvider
@@ -129,6 +131,16 @@ func (s *Server) RegisterPage(def PageDefinition, fn PageHandler) {
 // OnPageList customizes the page definitions returned from GET /page.
 func (s *Server) OnPageList(fn PageListProvider) {
 	s.pageListProvider = fn
+}
+
+// OnPageCatalog customizes the full GET /page payload (pages, mounts, fixed routes).
+func (s *Server) OnPageCatalog(fn func() (PageListResponse, error)) {
+	s.pageCatalogProvider = fn
+}
+
+// OnPageResolve registers POST /page/resolve for mount routes with empty page_item.
+func (s *Server) OnPageResolve(fn PageResolveHandler) {
+	s.pageResolveHandler = fn
 }
 
 // HandlePage registers a single default page at path for simple extensions.
@@ -404,6 +416,9 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(s.pages) > 0 {
 		caps["page"] = s.pageBase()
+	}
+	if s.pageResolveHandler != nil {
+		caps["page_resolve"] = s.pageBase() + "/resolve"
 	}
 	if len(s.blocks) > 0 {
 		caps["block"] = s.blockBase()

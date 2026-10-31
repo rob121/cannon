@@ -17,6 +17,7 @@ import (
 
 	"github.com/rob121/cannon/internal/extensions"
 	"github.com/rob121/cannon/internal/models"
+	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
 	"github.com/rob121/cannon/internal/templatemgr"
 	"gorm.io/gorm"
@@ -666,6 +667,7 @@ func (h *Handler) extensionAction(w http.ResponseWriter, r *http.Request, idStr 
 		h.notFound(w, r)
 		return
 	}
+	wasInstalled := row.Installed
 	if err := action(r.Context(), extMgr, row); err != nil {
 		if extensionReturnEdit(r) {
 			_ = db.First(&row, id)
@@ -676,6 +678,14 @@ func (h *Handler) extensionAction(w http.ResponseWriter, r *http.Request, idStr 
 		return
 	}
 	_ = db.First(&row, id)
+	if !wasInstalled && row.Installed {
+		if userID := actorUserID(r); userID != 0 {
+			if err := security.GrantExtensionToInstaller(r.Context(), db, userID, row.Name); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
 	extensionAfterAction(w, r, id)
 }
 

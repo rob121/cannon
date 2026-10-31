@@ -2,7 +2,7 @@
 <div class="admin-data-card">
   <form method="post" action="{{.BasePath}}" class="admin-bulk-form">
     {{csrfField}}
-    <div class="admin-table-toolbar admin-table-toolbar-secondary">
+  {{template "list_toolbar_open" (dict "Secondary" true)}}
       <div class="admin-bulk-toolbar">
         <span class="admin-bulk-toolbar-label">With Selected</span>
         <select class="admin-form-control admin-form-control-sm admin-bulk-action-select" name="bulk_action">
@@ -12,7 +12,7 @@
         </select>
         <button type="submit" class="btn-admin-outline btn-admin-sm" onclick="return confirm('Apply bulk action to selected items?')">Apply</button>
       </div>
-    </div>
+  {{template "list_toolbar_close" .}}
     <div class="admin-table-scroll">
       <table class="admin-table">
         <thead>

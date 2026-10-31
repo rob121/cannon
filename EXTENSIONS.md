@@ -217,7 +217,60 @@ s.RegisterPage(extension.PageDefinition{
 
 `HandlePage(path, fn)` remains available for simple extensions: it registers one `default` page at `POST /page/default`.
 
-Cannon loads page definitions when an extension starts. Site admins pick an extension page under **System → Routes** for Extension-type routes; metadata is stored on the route and passed as `page_data`.
+Cannon loads page definitions when an extension starts. Site admins pick an extension page under **Menus → Routes** for Extension-type routes; metadata is stored on the route and passed as `page_data`.
+
+### Mount routes and subpage resolution
+
+Multi-page extensions (list + detail, nested paths) can declare **mounts** and a **page resolver** so site admins create one route instead of wiring each page type.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/page/resolve` | POST | Map a mount request to a `page_item` (when capability `page_resolve` is present) |
+
+**GET /page** may also return:
+
+```json
+{
+  "pages": [ ... ],
+  "mounts": [
+    {
+      "id": "jobs",
+      "title": "Job Listings",
+      "path": "/jobs/*",
+      "resolver": true,
+      "default_page_data": {"detail_base_url": "/jobs"}
+    }
+  ],
+  "routes": [
+    {"page_id": "contact", "path": "/contact", "name": "Contact"}
+  ]
+}
+```
+
+- **mounts** — recommended paths with `resolver: true` create Extension routes with an empty `extension_page_id`; Cannon calls `POST /page/resolve` before render.
+- **routes** — optional fixed one-page placements (one `page_id` per path).
+
+Wire requests for page render and resolve include `route_path`, `path_suffix`, and `path_segments` derived from the matched admin route. Use `extension.WirePathSuffix(req)` instead of parsing `url` manually.
+
+```go
+s.OnPageCatalog(func() (extension.PageListResponse, error) {
+    pages, _ := app.pageDefinitions()
+    return extension.PageListResponse{
+        Pages: pages,
+        Mounts: []extension.MountSpec{{
+            ID: "jobs", Title: "Job Listings", Path: "/jobs/*", Resolver: true,
+        }},
+    }, nil
+})
+s.OnPageResolve(func(req extension.WireRequest) extension.PageResolveResponse {
+    if extension.WirePathSuffix(req) == "" {
+        return extension.PageResolveResponse{PageItem: "jobs-index"}
+    }
+    return extension.PageResolveResponse{PageItem: "jobs-detail"}
+})
+```
+
+On **Menus → Routes**, use **Apply** on an extension bundle or choose **Mount resolver (subpages)** when editing an Extension route.
 
 ### Data routes (`/ext/{route_hash}/…`)
 

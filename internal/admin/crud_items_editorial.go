@@ -55,6 +55,13 @@ func (h *Handler) itemTrashList(w http.ResponseWriter, r *http.Request) {
 	}
 	data["Rows"] = listRows
 	data["ListQuery"] = listQueryFromData(data)
+	if total > 0 {
+		data["PageSecondaryActionPostURL"] = trashBase + "/empty"
+		data["PageSecondaryActionLabel"] = "Empty Trash"
+		data["PageSecondaryActionIcon"] = "bi-trash"
+		data["PageSecondaryActionDanger"] = true
+		data["PageSecondaryActionConfirm"] = "Permanently delete all trashed items? This cannot be undone."
+	}
 	h.render(w, r, "Trash", "admin/trash.html", data)
 }
 

@@ -34,6 +34,7 @@ import (
 type Capabilities struct {
 	Request       string `json:"request"`
 	Page          string `json:"page"`
+	PageResolve   string `json:"page_resolve"`
 	Block         string `json:"block"`
 	Endpoint      string `json:"endpoint"`
 	Data          string `json:"data"`
@@ -65,6 +66,8 @@ type Runtime struct {
 	Permissions          []extension.PermissionDef
 	Blocks               []extension.BlockDefinition
 	Pages                []extension.PageDefinition
+	PageMounts           []extension.MountSpec
+	PageRoutes           []extension.PageRouteSpec
 	Endpoints            []extension.EndpointDefinition
 	Templates            []extension.TemplateDefinition
 	NotificationEvents   []extension.NotificationEventDefinition
@@ -389,7 +392,10 @@ func (m *Manager) refreshRuntimeMetadata(ctx context.Context, rt *Runtime, socke
 		}
 	}
 	if payload.Capabilities.Page != "" {
-		rt.Pages = m.loadPages(socketPath, payload.Capabilities.Page)
+		catalog := m.loadPageCatalog(socketPath, payload.Capabilities.Page)
+		rt.Pages = catalog.Pages
+		rt.PageMounts = catalog.Mounts
+		rt.PageRoutes = catalog.Routes
 	}
 	if payload.Capabilities.Endpoint != "" {
 		rt.Endpoints = m.loadEndpoints(socketPath, payload.Capabilities.Endpoint)
@@ -552,12 +558,57 @@ func (m *Manager) HandleRequest(ctx context.Context, r *http.Request, userCtx ma
 	return current, nil, false, nil
 }
 
-func (m *Manager) RenderPage(ctx context.Context, extensionName, item string, r *http.Request, userCtx, pageData map[string]any) (string, error) {
-	return m.InvokePage(ctx, extensionName, item, r, userCtx, pageData)
+func (m *Manager) RenderPage(ctx context.Context, extensionName, item string, r *http.Request, userCtx, pageData map[string]any, routePath string) (string, error) {
+	return m.InvokePage(ctx, extensionName, item, r, userCtx, pageData, routePath)
+}
+
+// ResolveExtensionPage asks the extension which page_item should render a mount route.
+func (m *Manager) ResolveExtensionPage(ctx context.Context, extensionName, routePath string, r *http.Request, userCtx, pageData map[string]any) (extension.PageResolveResponse, error) {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return extension.PageResolveResponse{}, err
+	}
+	resolvePath := strings.TrimSpace(rt.Capabilities.PageResolve)
+	if resolvePath == "" {
+		return extension.PageResolveResponse{}, fmt.Errorf("extension %s has no page resolve capability", extensionName)
+	}
+	wire, err := m.buildWireRequest(r, userCtx)
+	if err != nil {
+		return extension.PageResolveResponse{}, err
+	}
+	if len(pageData) > 0 {
+		wire.PageData = pageData
+	}
+	m.attachRouteWire(wire, routePath, r)
+	raw, _ := json.Marshal(wire)
+	path := "/" + strings.TrimPrefix(resolvePath, "/")
+	resp, err := m.do(rt.Model.Socket, http.MethodPost, path, bytes.NewReader(raw))
+	if err != nil {
+		return extension.PageResolveResponse{}, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var out extension.PageResolveResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return extension.PageResolveResponse{}, fmt.Errorf("decode page resolve: %w", err)
+	}
+	if out.StatusCode == 0 {
+		out.StatusCode = http.StatusOK
+	}
+	return out, nil
+}
+
+// ExtensionSupportsPageResolve reports whether the extension exposes POST /page/resolve.
+func (m *Manager) ExtensionSupportsPageResolve(ctx context.Context, extensionName string) bool {
+	rt, err := m.ensureActiveRuntime(ctx, extensionName)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(rt.Capabilities.PageResolve) != ""
 }
 
 // InvokePage POSTs to an extension page handler with optional route metadata.
-func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r *http.Request, userCtx, pageData map[string]any) (string, error) {
+func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r *http.Request, userCtx, pageData map[string]any, routePath string) (string, error) {
 	rt, err := m.ensureActiveRuntime(ctx, extensionName)
 	if err != nil {
 		return "", err
@@ -577,6 +628,7 @@ func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r 
 	if len(pageData) > 0 {
 		wire.PageData = pageData
 	}
+	m.attachRouteWire(wire, routePath, r)
 	raw, _ := json.Marshal(wire)
 	path := capabilityPath(rt.Capabilities.Page, item)
 	resp, err := m.do(rt.Model.Socket, http.MethodPost, path, bytes.NewReader(raw))
@@ -590,6 +642,19 @@ func (m *Manager) InvokePage(ctx context.Context, extensionName, item string, r 
 		return string(body), nil
 	}
 	return out.Body, nil
+}
+
+func (m *Manager) attachRouteWire(wire *WireRequest, routePath string, r *http.Request) {
+	if wire == nil || strings.TrimSpace(routePath) == "" || r == nil || r.URL == nil {
+		return
+	}
+	wire.RoutePath = routePath
+	wire.PathSuffix = extension.MountPathSuffix(routePath, r.URL.Path)
+	if wire.PathSuffix != "" {
+		wire.PathSegments = strings.Split(wire.PathSuffix, "/")
+	} else {
+		wire.PathSegments = nil
+	}
 }
 
 // InvokeBlock POSTs to an extension block handler with optional placement metadata.
@@ -929,6 +994,14 @@ func extensionWireSettings(ctx context.Context) map[string]string {
 		dev = false
 	}
 	out[extension.SettingDevelopmentMode] = strconv.FormatBool(dev)
+	if site, err := sites.FromContext(ctx); err == nil {
+		if base := strings.TrimSpace(site.Host); base != "" {
+			if !strings.Contains(base, "://") {
+				base = "http://" + base
+			}
+			out[extension.SettingSitePublicBase] = strings.TrimRight(base, "/")
+		}
+	}
 	return out
 }
 

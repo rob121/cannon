@@ -27,6 +27,7 @@ import (
 	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/realtime"
+	"github.com/rob121/cannon/internal/richtext"
 	"github.com/rob121/cannon/internal/routepath"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -282,6 +283,7 @@ func (h *Handler) enrichLayoutData(r *http.Request, data map[string]any) {
 	for k, v := range layoutContext(r) {
 		data[k] = v
 	}
+	data["RichTextConfigJSON"] = template.JS(richtext.ClientConfigJSON(r.Context()))
 	data["DebugTemplateSpaces"] = blocks.DebugSpacesActive(r.Context(), r)
 	extNav := h.adminExtensionNav(r)
 	data["AdminExtensions"] = extNav

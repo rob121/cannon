@@ -2910,6 +2910,15 @@ tr.is-current-menu-item > td {
 .admin-form-card-body,
 .admin-form-section-body { padding: 1.25rem 1.5rem 1.5rem; }
 
+.admin-form-card-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid var(--admin-border);
+}
+
 .admin-form-card-body > .admin-form-section-card + .admin-form-section-card {
   margin-top: 1rem;
 }
@@ -3042,26 +3051,119 @@ textarea.admin-template-editor {
   background: var(--admin-border);
 }
 
-.admin-richtext-source-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.5rem;
-}
-
-.admin-richtext-source-toggle.is-active {
-  border-color: var(--admin-primary);
-  background: var(--admin-primary-soft);
-  color: var(--admin-primary);
-}
-
-.admin-item-form textarea[data-ckeditor].admin-richtext-source-mode {
-  display: block !important;
-  width: 100%;
-  min-height: 16rem;
+.admin-richtext-field .ck-source-editing-area textarea,
+.admin-richtext-field .ck-editor__editable_inline[data-cke-editor-placeholder] + .ck-source-editing-area textarea {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 0.8125rem;
   line-height: 1.55;
   tab-size: 2;
+}
+
+.admin-richtext-field.ck-richtext-compact .ck-editor__editable p,
+.ck-richtext-compact .ck-editor__editable p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.admin-richtext-toolbar-builder {
+  margin-bottom: 1.5rem;
+}
+
+.admin-richtext-toolbar-active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0.75rem;
+  min-height: 3rem;
+  background: var(--admin-muted);
+  border: 1px dashed var(--admin-input);
+  border-radius: 0.375rem;
+}
+
+.admin-richtext-toolbar-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-richtext-toolbar-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  border-radius: 999px;
+  border: 1px solid var(--admin-input);
+  background: var(--admin-card);
+  color: var(--admin-foreground);
+  cursor: default;
+  user-select: none;
+}
+
+.admin-richtext-toolbar-pill.is-active {
+  list-style: none;
+  padding: 0.35rem 0.5rem 0.35rem 0.35rem;
+  cursor: grab;
+}
+
+.admin-richtext-toolbar-pill.is-active.is-dragging {
+  opacity: 0.55;
+}
+
+.admin-richtext-toolbar-pill.is-active.is-drag-over {
+  box-shadow: 0 0 0 2px var(--admin-primary-soft);
+  border-color: var(--admin-primary);
+}
+
+.admin-richtext-toolbar-pill.is-separator .admin-richtext-toolbar-pill-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.admin-richtext-toolbar-pill-grip {
+  color: var(--admin-muted-foreground);
+  font-size: 0.65rem;
+  letter-spacing: -0.15em;
+  cursor: grab;
+}
+
+.admin-richtext-toolbar-pill-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: 0.15rem;
+}
+
+.admin-richtext-toolbar-move,
+.admin-richtext-toolbar-remove {
+  border: none;
+  background: transparent;
+  color: var(--admin-muted-foreground);
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.15rem 0.25rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.admin-richtext-toolbar-move:hover,
+.admin-richtext-toolbar-remove:hover {
+  background: var(--admin-muted);
+  color: var(--admin-foreground);
+}
+
+.admin-richtext-toolbar-add {
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.admin-richtext-toolbar-add:hover {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
 }
 
 .admin-richtext-intro .ck.ck-editor__main > .ck-editor__editable {
@@ -3528,17 +3630,98 @@ select.admin-form-control-multiselect option:checked {
   font-weight: 500;
 }
 
-.admin-effective-perm-key {
-  font-size: 0.75rem;
-  color: var(--admin-muted, #64748b);
+.admin-effective-perms code.admin-effective-perm-key {
+  --bs-code-color: var(--admin-foreground);
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--admin-foreground);
+  background: color-mix(in srgb, var(--admin-muted) 55%, var(--admin-card));
+  border: 1px solid var(--admin-border);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  width: fit-content;
+  max-width: 100%;
+  word-break: break-all;
+}
+
+.admin-effective-perm.is-denied code.admin-effective-perm-key {
+  color: var(--admin-destructive, #dc2626);
+  --bs-code-color: var(--admin-destructive, #dc2626);
+  border-color: color-mix(in srgb, var(--admin-destructive, #dc2626) 35%, var(--admin-border));
+  background: color-mix(in srgb, var(--admin-danger-soft) 80%, var(--admin-card));
+}
+
+.admin-role-form .admin-form-section-card:last-of-type .admin-form-label {
+  color: var(--admin-foreground);
+  font-weight: 600;
 }
 
 .admin-permission-effect-col {
-  width: 5.5rem;
+  width: 6.75rem;
   text-align: center;
   vertical-align: middle;
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.admin-permission-table thead .admin-permission-effect-col {
+  vertical-align: middle;
+}
+
+.admin-permission-effect-head {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-width: 5.25rem;
+}
+
+.admin-permission-col-label {
+  display: block;
+  line-height: 1.2;
+}
+
+.admin-permission-bulk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--admin-primary) 40%, var(--admin-border));
+  border-radius: 999px;
+  background: var(--admin-card);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: var(--admin-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-permission-bulk:hover {
+  background: var(--admin-primary-soft);
+  border-color: var(--admin-primary);
+}
+
+.admin-permission-bulk:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+
+.admin-permission-bulk[data-permission-bulk="deny"] {
+  color: var(--admin-destructive, #dc2626);
+  border-color: color-mix(in srgb, var(--admin-destructive, #dc2626) 35%, var(--admin-border));
+}
+
+.admin-permission-bulk[data-permission-bulk="deny"]:hover {
+  background: var(--admin-danger-soft);
+  border-color: var(--admin-destructive, #dc2626);
 }
 
 .admin-permission-inherited {
@@ -4803,14 +4986,18 @@ select.admin-form-control-multiselect option:checked {
 
 .admin-list-filter-form {
   display: grid;
-  grid-template-columns: minmax(9rem, auto) minmax(9rem, auto) minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(14rem, 1.35fr) minmax(8.5rem, auto) minmax(8.5rem, auto) minmax(8.5rem, auto) auto;
   gap: 0.75rem 1rem;
   align-items: end;
   width: 100%;
 }
 
+.admin-list-filter-form-blocks {
+  grid-template-columns: minmax(14rem, 1.35fr) minmax(9rem, auto) minmax(9rem, auto) auto;
+}
+
 .admin-list-filter-form-routes {
-  grid-template-columns: repeat(4, minmax(9rem, auto)) minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(14rem, 1.2fr) repeat(4, minmax(8rem, auto)) auto;
 }
 
 .admin-filter-field {
@@ -4833,7 +5020,9 @@ select.admin-form-control-multiselect option:checked {
 }
 
 .admin-filter-field-search .admin-form-control {
-  min-width: 0;
+  min-width: 12rem;
+  min-height: 2.375rem;
+  font-size: 0.9375rem;
 }
 
 .admin-filter-actions {

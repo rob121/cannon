@@ -1,11 +1,5 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
-  <div class="admin-table-toolbar">
-    <form method="post" action="{{.BasePath}}/empty" class="admin-inline-form" onsubmit="return confirm('Permanently delete all trashed items? This cannot be undone.')">
-      {{csrfField}}
-      <button type="submit" class="btn-admin-danger btn-admin-sm"><i class="bi bi-trash"></i> Empty Trash</button>
-    </form>
-  </div>
   <div class="admin-table-scroll">
     <table class="admin-table">
       <thead>

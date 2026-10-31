@@ -29,10 +29,20 @@ type routeListRow struct {
 }
 
 type extensionRouteOption struct {
-	Name      string
-	Label     string
-	Pages     []extension.PageDefinition
-	Endpoints []extension.EndpointDefinition
+	Name        string
+	Label       string
+	Pages       []extension.PageDefinition
+	Mounts      []extension.MountSpec
+	FixedRoutes []extension.PageRouteSpec
+	PageResolve bool
+	Endpoints   []extension.EndpointDefinition
+}
+
+type extensionRouteApplyOption struct {
+	Name        string
+	Label       string
+	Mounts      []extension.MountSpec
+	FixedRoutes []extension.PageRouteSpec
 }
 
 type controllerRouteOption struct {
@@ -80,6 +90,8 @@ func (h *Handler) routes(w http.ResponseWriter, r *http.Request, path string) {
 		h.routeMoveSort(w, r, parts[0], -1)
 	case len(parts) == 2 && parts[1] == "move-down":
 		h.routeMoveSort(w, r, parts[0], 1)
+	case len(parts) == 1 && parts[0] == "apply-extension-routes" && r.Method == http.MethodPost:
+		h.routeApplyExtensionRoutes(w, r)
 	default:
 		id, ok := parseID(parts[0])
 		if !ok {
@@ -271,6 +283,17 @@ func (h *Handler) routeList(w http.ResponseWriter, r *http.Request) {
 	}
 	data["BuiltinRouteRows"] = builtinRows
 	data["ListQuery"] = listQueryFromData(data)
+	if r.URL.Query().Get("applied") == "1" {
+		data["Applied"] = "1"
+		data["AppliedCreated"] = r.URL.Query().Get("created")
+		data["AppliedSkipped"] = r.URL.Query().Get("skipped")
+	}
+	if site, err := sites.FromContext(r.Context()); err == nil {
+		extMgr := h.chain.Extensions(site)
+		_ = extMgr.Bootstrap(r.Context())
+		extMgr.EnsurePageDefinitions(r.Context())
+		data["ExtensionApplyOptions"] = extensionRouteApplyOptions(extMgr, db)
+	}
 	h.render(w, r, "Routes", "admin/routes.html", data)
 }
 
@@ -366,12 +389,29 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 		row.ShowTitle = formBool(r, "show_title")
 		row.Sort = formInt(r, "sort", row.Sort)
 
+		groupIDs := formUintList(r, "group_ids")
+		deactivateNoGroups := !isNew && len(groupIDs) == 0
+		if deactivateNoGroups {
+			row.Status = models.StatusInactive
+		}
+
+		if row.ExtensionPageID == "__mount__" {
+			row.ExtensionPageID = ""
+		}
 		if row.Type == models.RouteTypeExtension {
-			if row.ExtensionName == "" || row.ExtensionPageID == "" {
+			if row.ExtensionName == "" {
 				metaRaw, _ := routemeta.MetadataFromForm(r.Form)
 				row.Metadata = metaRaw
-				h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "Extension and page are required.")
+				h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "Extension is required.")
 				return
+			}
+			if strings.TrimSpace(row.ExtensionPageID) == "" {
+				if !extMgr.ExtensionSupportsPageResolve(r.Context(), row.ExtensionName) {
+					metaRaw, _ := routemeta.MetadataFromForm(r.Form)
+					row.Metadata = metaRaw
+					h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, "Select a page or use mount resolver (extension must support page resolve).")
+					return
+				}
 			}
 		}
 		if row.Type == models.RouteTypeExtensionEndpoint {
@@ -430,6 +470,9 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 		}
 		if row.Type == models.RouteTypeExtension {
 			row.ExtensionEndpointID = ""
+			if strings.TrimSpace(row.ExtensionPageID) == "" {
+				row.Path = normalizeExtensionMountPath(row.Path)
+			}
 		}
 		if row.Type == models.RouteTypeExtensionEndpoint {
 			row.ExtensionPageID = ""
@@ -465,7 +508,9 @@ func (h *Handler) routeForm(w http.ResponseWriter, r *http.Request, id uint) {
 			h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, saveErr.Error())
 			return
 		}
-		if err := replaceFormGroups(db, &row, r); err != nil {
+		if deactivateNoGroups {
+			// Leave existing group associations; route is inactive and unreachable.
+		} else if err := replaceFormGroups(db, &row, r); err != nil {
 			h.renderRouteForm(w, r, row, allGroups, extOptions, controllerOptions(row.Controller), isNew, err.Error())
 			return
 		}
@@ -570,6 +615,9 @@ func extensionRouteOptions(extMgr *extensions.Manager, db *gorm.DB, selectedExt 
 		opt.Name = rt.Model.Name
 		opt.Label = extensionMenuLabel(rt.Model.Name, menuNames)
 		opt.Pages = extensions.RuntimePages(rt)
+		opt.Mounts = append([]extension.MountSpec(nil), rt.PageMounts...)
+		opt.FixedRoutes = append([]extension.PageRouteSpec(nil), rt.PageRoutes...)
+		opt.PageResolve = strings.TrimSpace(rt.Capabilities.PageResolve) != ""
 		byName[rt.Model.Name] = opt
 		if !containsString(order, rt.Model.Name) {
 			order = append(order, rt.Model.Name)
@@ -609,6 +657,17 @@ func extensionRouteOptions(extMgr *extensions.Manager, db *gorm.DB, selectedExt 
 		out = append(out, opt)
 	}
 	return out
+}
+
+func normalizeExtensionMountPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return path
+	}
+	if strings.Contains(path, "*") || strings.ContainsAny(path, "[]()^$+?\\|") {
+		return path
+	}
+	return strings.TrimRight(path, "/") + "/*"
 }
 
 func containsString(list []string, value string) bool {

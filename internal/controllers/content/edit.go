@@ -1,12 +1,15 @@
 package content
 
 import (
+	"context"
+	"html/template"
 	"net/http"
 	"strconv"
 	"strings"
 
 	cms "github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/controllers"
+	"github.com/rob121/cannon/internal/richtext"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
@@ -94,7 +97,7 @@ func (c *Controller) handleEdit(ctx *controllers.Context) controllers.Result {
 		}
 		return controllers.Redirect(http.StatusSeeOther, cms.ItemURLForContext(ctx.GoContext(), item.Slug))
 	}
-	data := editFormData(item, categories, tags, fields, fieldValues, false, canPublish, "")
+	data := editFormData(ctx.GoContext(), item, categories, tags, fields, fieldValues, false, canPublish, "")
 	return controllers.HTMLPage("Edit Item", "default/controllers/content/edit.html", data)
 }
 
@@ -232,7 +235,7 @@ func renderEditForm(ctx *controllers.Context, item models.Item, categories []mod
 	}
 	db, _ := sites.DB(ctx.GoContext())
 	fields, fieldValues := frontendCustomFields(ctx, db, &item)
-	data := editFormData(item, categories, tags, fields, fieldValues, isNew, canPublish, errMsg)
+	data := editFormData(ctx.GoContext(), item, categories, tags, fields, fieldValues, isNew, canPublish, errMsg)
 	title := "Create Item"
 	if !isNew {
 		title = "Edit Item"
@@ -240,7 +243,7 @@ func renderEditForm(ctx *controllers.Context, item models.Item, categories []mod
 	return controllers.HTMLPage(title, "default/controllers/content/edit.html", data)
 }
 
-func editFormData(item models.Item, categories []models.Category, tags []models.Tag, fields []models.ContentField, fieldValues map[uint]string, isNew, canPublish bool, errMsg string) map[string]any {
+func editFormData(goCtx context.Context, item models.Item, categories []models.Category, tags []models.Tag, fields []models.ContentField, fieldValues map[uint]string, isNew, canPublish bool, errMsg string) map[string]any {
 	tagIDs := make([]uint, 0, len(item.Tags))
 	for _, t := range item.Tags {
 		tagIDs = append(tagIDs, t.TagID)
@@ -264,6 +267,7 @@ func editFormData(item models.Item, categories []models.Category, tags []models.
 	if errMsg != "" {
 		data["Error"] = errMsg
 	}
+	data["RichTextConfigJSON"] = template.JS(richtext.ClientConfigJSON(goCtx))
 	return data
 }
 

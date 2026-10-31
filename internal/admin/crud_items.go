@@ -110,6 +110,9 @@ func (h *Handler) itemList(w http.ResponseWriter, r *http.Request) {
 	data := listPage(r, page, total, itemsBase,
 		"Create and manage structured content items.",
 		"Add Item", map[string]any{"ActiveNav": "items"})
+	data["PageSecondaryActionURL"] = trashBase
+	data["PageSecondaryActionLabel"] = "Trash"
+	data["PageSecondaryActionIcon"] = "bi-trash"
 	order := applyListSort(r, data, map[string]string{
 		"title": "title", "status": "status", "sort": "sort", "featured": "featured", "featured_sort": "featured_sort",
 	}, "sort")

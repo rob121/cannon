@@ -168,7 +168,9 @@ s.RegisterPage(extension.PageDefinition{
 })
 ```
 
-Site admins create an **Extension** route under **System → Routes**, pick your extension and page id, and fill metadata fields. Cannon stores field values on the route and passes them as `page_data` on each request.
+Site admins create an **Extension** route under **Menus → Routes**, pick your extension and page id (or **Mount resolver**), and fill metadata fields. Cannon stores field values on the route and passes them as `page_data` on each request.
+
+Multi-page extensions should use `OnPageCatalog` (mounts + optional fixed `routes`), `OnPageResolve`, and the **Apply** bundle on the Routes list. Wire requests include `route_path` and `path_suffix` — use `extension.WirePathSuffix(req)`.
 
 `HandlePage` is a shortcut that registers a single `default` page.
 

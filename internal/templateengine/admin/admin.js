@@ -1,12 +1,8 @@
 (function () {
   var STORAGE_KEY = 'cannon-admin-sidebar-collapsed';
   var NAV_GROUP_PREFIX = 'cannon-admin-nav-';
-  var CKEDITOR5_URL = 'https://cdn.jsdelivr.net/npm/@ckeditor/ckeditor5-build-classic@41.4.2/build/ckeditor.js';
   var CODEMIRROR_BASE = 'https://cdn.jsdelivr.net/npm/codemirror@5.65.16';
-  var ckEditorLoadPromise = null;
   var codeMirrorLoadPromise = null;
-  var ckEditorInstances = [];
-  var ckEditorSourceRecords = [];
   var templateEditors = [];
 
   function isCollapsed() {
@@ -107,52 +103,27 @@
   }
 
   function refreshCKEditors() {
-    ckEditorInstances.forEach(function (editor) {
-      if (editor && editor.ui && typeof editor.ui.update === 'function') {
-        editor.ui.update();
-      }
-    });
-    window.dispatchEvent(new Event('resize'));
+    if (window.CannonRichText) {
+      window.CannonRichText.refreshCKEditors();
+    }
   }
 
   function initLazyCKEditors(container) {
-    if (!container) {
-      return;
+    if (window.CannonRichText) {
+      window.CannonRichText.initLazyCKEditors(container);
     }
-    var pending = [];
-    container.querySelectorAll('[data-ckeditor]').forEach(function (el) {
-      if (el.dataset.ckEditorReady && !findCKEditorInstanceForElement(el)) {
-        resetCKEditorSourceElement(el);
-      }
-      if (!el.id || el.dataset.ckEditorReady) {
-        return;
-      }
-      if (el.dataset.ckEditorSourceMode === '1') {
-        return;
-      }
-      var key = el.getAttribute('data-ckeditor') || el.id;
-      var config = ckEditorConfig(key === 'body' ? 'body' : 'intro');
-      pending.push({ element: el, config: config, key: key });
-    });
-    if (!pending.length) {
-      return;
+  }
+
+  function syncCKEditors() {
+    if (window.CannonRichText) {
+      window.CannonRichText.syncCKEditors();
     }
-    loadCKEditor5().then(function (ClassicEditor) {
-      return Promise.all(pending.map(function (item) {
-        if (item.element.dataset.ckEditorReady) {
-          return null;
-        }
-        return createCKEditor(ClassicEditor, item.element, item.config).then(function (editor) {
-          item.element.dataset.ckEditorReady = '1';
-          registerCKEditor(editor, item.element, item.config);
-          return editor;
-        });
-      }));
-    }).then(function () {
-      refreshCKEditors();
-    }).catch(function (err) {
-      console.error('CKEditor lazy init failed:', err);
-    });
+  }
+
+  function destroyCKEditors() {
+    if (window.CannonRichText) {
+      window.CannonRichText.destroyCKEditors();
+    }
   }
 
   function initSidebarTabs(root) {
@@ -722,8 +693,26 @@
       }
       var name = extSelect.value;
       var page = pageSelect.value;
+      var mountMode = page === '__mount__';
+      var mountFieldsSeen = {};
       dataFields.forEach(function (field) {
-        var matches = field.dataset.extensionName === name && field.dataset.pageId === page;
+        var matchesExt = field.dataset.extensionName === name;
+        var matches = false;
+        if (matchesExt) {
+          if (mountMode) {
+            var fieldName = field.dataset.fieldName || '';
+            if (fieldName && mountFieldsSeen[fieldName]) {
+              matches = false;
+            } else {
+              if (fieldName) {
+                mountFieldsSeen[fieldName] = true;
+              }
+              matches = true;
+            }
+          } else {
+            matches = field.dataset.pageId === page;
+          }
+        }
         field.hidden = !matches;
         field.querySelectorAll('input, select, textarea').forEach(function (input) {
           input.disabled = !matches;
@@ -1403,6 +1392,142 @@
     });
   }
 
+  function initRichTextToolbarConfig() {
+    document.querySelectorAll('.admin-richtext-toolbar-builder:not([data-bound])').forEach(function (root) {
+      root.dataset.bound = '1';
+      var activeList = root.querySelector('[data-toolbar-active]');
+      var pool = root.querySelector('[data-toolbar-pool]');
+      var input = root.querySelector('[data-toolbar-input]');
+      if (!activeList || !pool || !input) {
+        return;
+      }
+
+      function syncInput() {
+        var ids = [];
+        activeList.querySelectorAll('[data-item-id]').forEach(function (pill) {
+          ids.push(pill.getAttribute('data-item-id'));
+        });
+        input.value = ids.join(', ');
+      }
+
+      function createActivePill(id, label) {
+        var li = document.createElement('li');
+        li.className = 'admin-richtext-toolbar-pill is-active' + (id === '|' ? ' is-separator' : '');
+        li.draggable = true;
+        li.setAttribute('data-item-id', id);
+        li.setAttribute('data-item-label', label || id);
+        var grip = document.createElement('span');
+        grip.className = 'admin-richtext-toolbar-pill-grip';
+        grip.setAttribute('aria-hidden', 'true');
+        grip.textContent = '⋮⋮';
+        var labelEl = document.createElement('span');
+        labelEl.className = 'admin-richtext-toolbar-pill-label';
+        labelEl.textContent = label || id;
+        var actions = document.createElement('span');
+        actions.className = 'admin-richtext-toolbar-pill-actions';
+        actions.innerHTML =
+          '<button type="button" class="admin-richtext-toolbar-move" data-move="up" aria-label="Move left">↑</button>' +
+          '<button type="button" class="admin-richtext-toolbar-move" data-move="down" aria-label="Move right">↓</button>' +
+          '<button type="button" class="admin-richtext-toolbar-remove" aria-label="Remove">×</button>';
+        li.appendChild(grip);
+        li.appendChild(labelEl);
+        li.appendChild(actions);
+        wireActivePill(li);
+        return li;
+      }
+
+      function createPoolPill(id, label) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'admin-richtext-toolbar-pill admin-richtext-toolbar-add' + (id === '|' ? ' is-separator' : '');
+        btn.setAttribute('data-item-id', id);
+        btn.setAttribute('data-item-label', label || id);
+        btn.textContent = '+' + (label || id);
+        btn.addEventListener('click', function () {
+          activeList.appendChild(createActivePill(id, label || id));
+          if (id !== '|') {
+            btn.remove();
+          }
+          syncInput();
+        });
+        return btn;
+      }
+
+      function wireActivePill(pill) {
+        pill.addEventListener('dragstart', function (e) {
+          pill.classList.add('is-dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', pill.getAttribute('data-item-id') || '');
+        });
+        pill.addEventListener('dragend', function () {
+          pill.classList.remove('is-dragging');
+          activeList.querySelectorAll('.is-drag-over').forEach(function (el) {
+            el.classList.remove('is-drag-over');
+          });
+        });
+        pill.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          pill.classList.add('is-drag-over');
+        });
+        pill.addEventListener('dragleave', function () {
+          pill.classList.remove('is-drag-over');
+        });
+        pill.addEventListener('drop', function (e) {
+          e.preventDefault();
+          pill.classList.remove('is-drag-over');
+          var dragging = activeList.querySelector('.is-dragging');
+          if (!dragging || dragging === pill) {
+            return;
+          }
+          var rect = pill.getBoundingClientRect();
+          var before = e.clientX < rect.left + rect.width / 2;
+          if (before) {
+            activeList.insertBefore(dragging, pill);
+          } else {
+            activeList.insertBefore(dragging, pill.nextSibling);
+          }
+          syncInput();
+        });
+        pill.querySelectorAll('.admin-richtext-toolbar-move').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var dir = btn.getAttribute('data-move');
+            if (dir === 'up' && pill.previousElementSibling) {
+              activeList.insertBefore(pill, pill.previousElementSibling);
+            } else if (dir === 'down' && pill.nextElementSibling) {
+              activeList.insertBefore(pill.nextElementSibling, pill);
+            }
+            syncInput();
+          });
+        });
+        var removeBtn = pill.querySelector('.admin-richtext-toolbar-remove');
+        if (removeBtn) {
+          removeBtn.addEventListener('click', function () {
+            var id = pill.getAttribute('data-item-id');
+            var label = pill.getAttribute('data-item-label') || id;
+            pill.remove();
+            pool.appendChild(createPoolPill(id, label));
+            syncInput();
+          });
+        }
+      }
+
+      activeList.querySelectorAll('.admin-richtext-toolbar-pill.is-active').forEach(wireActivePill);
+      pool.querySelectorAll('.admin-richtext-toolbar-add').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-item-id');
+          var label = btn.getAttribute('data-item-label') || id;
+          activeList.appendChild(createActivePill(id, label));
+          if (id !== '|') {
+            btn.remove();
+          }
+          syncInput();
+        });
+      });
+
+      root.closest('form') && root.closest('form').addEventListener('submit', syncInput);
+    });
+  }
+
   function init() {
     var collapsed = false;
     try {
@@ -1457,6 +1582,7 @@
     initSystemUpdate();
     initRealtimeAnalytics();
     initPermissionPicker();
+    initRichTextToolbarConfig();
     initTurboProgress();
     initPreserveTemplateSpaceDebug();
     initUserMenu();
@@ -1540,6 +1666,36 @@
           if (allowBox) {
             allowBox.checked = false;
           }
+        });
+      });
+      picker.querySelectorAll('[data-permission-group]').forEach(function (group) {
+        group.querySelectorAll('[data-permission-bulk]').forEach(function (btn) {
+          btn.addEventListener('click', function (event) {
+            event.preventDefault();
+            var effect = btn.getAttribute('data-permission-bulk');
+            group.querySelectorAll('[data-permission-row]').forEach(function (row) {
+              if (row.classList.contains('is-hidden')) {
+                return;
+              }
+              var allowBox = row.querySelector('[data-permission-allow]');
+              var denyBox = row.querySelector('[data-permission-deny]');
+              if (effect === 'allow') {
+                if (allowBox) {
+                  allowBox.checked = true;
+                }
+                if (denyBox) {
+                  denyBox.checked = false;
+                }
+              } else if (effect === 'deny') {
+                if (denyBox) {
+                  denyBox.checked = true;
+                }
+                if (allowBox) {
+                  allowBox.checked = false;
+                }
+              }
+            });
+          });
         });
       });
     });
@@ -2387,361 +2543,6 @@
     }).catch(function () {});
   }
 
-  function loadCKEditor5() {
-    var editorCtor = getCKEditor5Constructor();
-    if (editorCtor) {
-      return Promise.resolve(editorCtor);
-    }
-    if (ckEditorLoadPromise) {
-      return ckEditorLoadPromise;
-    }
-    ckEditorLoadPromise = new Promise(function (resolve, reject) {
-      var script = document.createElement('script');
-      script.src = CKEDITOR5_URL;
-      script.async = true;
-      script.onload = function () {
-        var editorCtor = getCKEditor5Constructor();
-        if (editorCtor) {
-          resolve(editorCtor);
-        } else {
-          reject(new Error('CKEditor failed to load'));
-        }
-      };
-      script.onerror = function () {
-        reject(new Error('CKEditor failed to load'));
-      };
-      document.head.appendChild(script);
-    });
-    return ckEditorLoadPromise;
-  }
-
-  function getCKEditor5Constructor() {
-    if (window.ClassicEditor) {
-      return window.ClassicEditor;
-    }
-    if (window.CKEDITOR && window.CKEDITOR.ClassicEditor) {
-      return window.CKEDITOR.ClassicEditor;
-    }
-    return null;
-  }
-
-  function createCKEditor(ClassicEditor, element, config) {
-    return ClassicEditor.create(element, config);
-  }
-
-  function ckEditorPlugins(kind) {
-    var c = window.CKEDITOR;
-    if (!c || !c.GeneralHtmlSupport) {
-      return null;
-    }
-    var plugins = [
-      c.Essentials,
-      c.Paragraph,
-      c.GeneralHtmlSupport,
-      c.Bold,
-      c.Italic,
-      c.Link,
-      c.List
-    ];
-    if (kind === 'body') {
-      plugins = plugins.concat([
-        c.Heading,
-        c.BlockQuote,
-        c.Table,
-        c.TableToolbar,
-        c.MediaEmbed
-      ]);
-    }
-    return plugins.filter(Boolean);
-  }
-
-  function ckEditorConfig(kind) {
-    var toolbar = kind === 'body' ? [
-      'heading', '|',
-      'bold', 'italic', 'link', '|',
-      'bulletedList', 'numberedList', 'blockQuote', '|',
-      'insertTable', 'mediaEmbed', '|',
-      'undo', 'redo'
-    ] : ['bold', 'italic', 'link', '|', 'bulletedList', 'numberedList', '|', 'undo', 'redo'];
-
-    var config = {
-      toolbar: toolbar
-    };
-    var plugins = ckEditorPlugins(kind);
-    if (!plugins) {
-      return config;
-    }
-
-    config.licenseKey = 'GPL';
-    config.plugins = plugins;
-    config.htmlSupport = {
-      allow: [
-        {
-          name: /^(?!script$).+/,
-          styles: true,
-          classes: true,
-          attributes: [
-            'id',
-            'title',
-            'lang',
-            'dir',
-            'role',
-            'aria-label',
-            'aria-describedby',
-            /^data-[\w-]+$/
-          ]
-        }
-      ],
-      disallow: [
-        {
-          name: /^(script|iframe|object|embed)$/i
-        },
-        {
-          attributes: /^on.*$/i
-        }
-      ]
-    };
-    if (kind === 'body') {
-      config.table = {
-        contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
-      };
-    }
-    return config;
-  }
-
-  function syncCKEditors() {
-    ckEditorInstances.forEach(function (editor) {
-      if (editor && typeof editor.updateSourceElement === 'function') {
-        editor.updateSourceElement();
-      }
-    });
-  }
-
-  function findCKEditorInstanceForElement(element) {
-    for (var i = 0; i < ckEditorInstances.length; i += 1) {
-      if (ckEditorInstances[i] && ckEditorInstances[i].sourceElement === element) {
-        return ckEditorInstances[i];
-      }
-    }
-    return null;
-  }
-
-  function resetCKEditorSourceElement(element) {
-    if (!element) {
-      return;
-    }
-    delete element.dataset.ckEditorReady;
-    delete element.dataset.ckEditorSourceMode;
-    element.classList.remove('ck-hidden', 'admin-richtext-source-mode');
-    element.hidden = false;
-    element.style.display = '';
-
-    var field = element.closest('.admin-richtext-field');
-    if (!field) {
-      return;
-    }
-    field.querySelectorAll('.admin-richtext-source-bar').forEach(function (bar) {
-      bar.remove();
-    });
-    field.querySelectorAll('.ck.ck-editor').forEach(function (wrapper) {
-      wrapper.remove();
-    });
-  }
-
-  function resetStaleCKEditorUI(root) {
-    var scope = root || document;
-    scope.querySelectorAll('textarea[data-ckeditor]').forEach(resetCKEditorSourceElement);
-  }
-
-  function destroyCKEditors() {
-    var editors = ckEditorInstances.slice();
-    ckEditorInstances = [];
-    ckEditorSourceRecords = [];
-    editors.forEach(function (editor) {
-      if (editor && typeof editor.updateSourceElement === 'function') {
-        editor.updateSourceElement();
-      }
-      resetCKEditorSourceElement(editor && editor.sourceElement);
-      if (editor && typeof editor.destroy === 'function') {
-        editor.destroy().catch(function () {});
-      }
-    });
-    resetStaleCKEditorUI();
-    ['item-form', 'category-form'].forEach(function (formID) {
-      var form = document.getElementById(formID);
-      if (form) {
-        delete form.dataset.ckEditorInit;
-      }
-    });
-  }
-
-  function shouldUseCKEditorSourceToggle(element) {
-    return element && (element.id === 'item-intro' || element.id === 'item-body');
-  }
-
-  function findCKEditorSourceRecord(element) {
-    for (var i = 0; i < ckEditorSourceRecords.length; i += 1) {
-      if (ckEditorSourceRecords[i].element === element) {
-        return ckEditorSourceRecords[i];
-      }
-    }
-    return null;
-  }
-
-  function removeCKEditorInstance(editor) {
-    ckEditorInstances = ckEditorInstances.filter(function (item) {
-      return item !== editor;
-    });
-  }
-
-  function registerCKEditor(editor, element, config) {
-    ckEditorInstances.push(editor);
-    if (!shouldUseCKEditorSourceToggle(element)) {
-      return;
-    }
-    var record = findCKEditorSourceRecord(element);
-    if (!record) {
-      record = { element: element, editor: editor, config: config, sourceMode: false };
-      ckEditorSourceRecords.push(record);
-    } else {
-      record.editor = editor;
-      record.config = config;
-      record.sourceMode = false;
-    }
-    ensureCKEditorSourceToggle(record);
-  }
-
-  function ensureCKEditorSourceToggle(record) {
-    var element = record.element;
-    var field = element.closest('.admin-richtext-field');
-    if (!field) {
-      return;
-    }
-    var existing = field.querySelector('[data-ckeditor-source-toggle]');
-    if (existing) {
-      existing._ckEditorSourceRecord = record;
-      return;
-    }
-    var bar = document.createElement('div');
-    bar.className = 'admin-richtext-source-bar';
-    var button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'btn-admin-outline btn-admin-sm admin-richtext-source-toggle';
-    button.setAttribute('data-ckeditor-source-toggle', element.id);
-    button.setAttribute('aria-pressed', 'false');
-    button.innerHTML = '<i class="bi bi-code-slash" aria-hidden="true"></i> <span>HTML Source</span>';
-    button._ckEditorSourceRecord = record;
-    button.addEventListener('click', function () {
-      toggleCKEditorSourceMode(button._ckEditorSourceRecord, button);
-    });
-    bar.appendChild(button);
-    field.insertBefore(bar, field.firstChild);
-  }
-
-  function setCKEditorSourceToggleState(button, sourceMode, busy) {
-    if (!button) {
-      return;
-    }
-    button.disabled = !!busy;
-    button.classList.toggle('is-active', !!sourceMode);
-    button.setAttribute('aria-pressed', sourceMode ? 'true' : 'false');
-    var label = button.querySelector('span');
-    if (label) {
-      label.textContent = sourceMode ? 'Visual Editor' : 'HTML Source';
-    }
-  }
-
-  function toggleCKEditorSourceMode(record, button) {
-    if (!record || !record.element) {
-      return;
-    }
-    var element = record.element;
-    if (record.sourceMode || element.dataset.ckEditorSourceMode === '1') {
-      setCKEditorSourceToggleState(button, true, true);
-      loadCKEditor5().then(function (ClassicEditor) {
-        return createCKEditor(ClassicEditor, element, record.config);
-      }).then(function (editor) {
-        element.dataset.ckEditorReady = '1';
-        delete element.dataset.ckEditorSourceMode;
-        element.classList.remove('admin-richtext-source-mode');
-        record.editor = editor;
-        record.sourceMode = false;
-        registerCKEditor(editor, element, record.config);
-        setCKEditorSourceToggleState(button, false, false);
-      }).catch(function (err) {
-        console.error('CKEditor failed to restore visual editor:', err);
-        setCKEditorSourceToggleState(button, true, false);
-      });
-      return;
-    }
-    if (!record.editor || typeof record.editor.destroy !== 'function') {
-      return;
-    }
-    setCKEditorSourceToggleState(button, false, true);
-    if (typeof record.editor.updateSourceElement === 'function') {
-      record.editor.updateSourceElement();
-    }
-    var editor = record.editor;
-    editor.destroy().then(function () {
-      removeCKEditorInstance(editor);
-      record.editor = null;
-      record.sourceMode = true;
-      element.dataset.ckEditorReady = '';
-      element.dataset.ckEditorSourceMode = '1';
-      element.classList.add('admin-richtext-source-mode');
-      element.style.display = '';
-      element.hidden = false;
-      setCKEditorSourceToggleState(button, true, false);
-      element.focus();
-    }).catch(function (err) {
-      console.error('CKEditor failed to switch to source mode:', err);
-      setCKEditorSourceToggleState(button, false, false);
-    });
-  }
-
-  function initRichTextForm(formID, fields) {
-    var form = document.getElementById(formID);
-    if (!form || form.dataset.ckEditorInit) {
-      return;
-    }
-    resetStaleCKEditorUI(form);
-    var configs = [];
-    fields.forEach(function (field) {
-      var el = document.getElementById(field.id);
-      if (el && el.getAttribute('data-ckeditor') === field.key) {
-        configs.push({ element: el, config: field.config });
-      }
-    });
-    if (!configs.length) {
-      return;
-    }
-    form.dataset.ckEditorInit = '1';
-    form.addEventListener('submit', syncCKEditors);
-
-    loadCKEditor5().then(function (ClassicEditor) {
-      if (!document.getElementById(formID)) {
-        return;
-      }
-      return Promise.all(configs.map(function (item) {
-        return createCKEditor(ClassicEditor, item.element, item.config).then(function (editor) {
-          if (document.getElementById(formID)) {
-            registerCKEditor(editor, item.element, item.config);
-          }
-          return editor;
-        });
-      })).then(function (editors) {
-        if (!document.getElementById(formID)) {
-          editors.forEach(function (editor) {
-            editor.destroy().catch(function () {});
-          });
-        }
-      });
-    }).catch(function (err) {
-      console.error('CKEditor failed to initialize:', err);
-      delete form.dataset.ckEditorInit;
-    });
-  }
-
   function syncItemEditors() {
     syncCKEditors();
   }
@@ -2751,15 +2552,23 @@
   }
 
   function initItemEditors() {
-    initRichTextForm('item-form', [
-      { id: 'item-intro', key: 'intro', config: ckEditorConfig('body') },
-      { id: 'item-body', key: 'body', config: ckEditorConfig('body') }
+    var rt = window.CannonRichText;
+    if (!rt) {
+      return;
+    }
+    rt.initRichTextForm('item-form', [
+      { id: 'item-intro', key: 'intro', kind: 'intro' },
+      { id: 'item-body', key: 'body', kind: 'body' }
     ]);
   }
 
   function initCategoryEditors() {
-    initRichTextForm('category-form', [
-      { id: 'category-description', key: 'description', config: ckEditorConfig('intro') }
+    var rt = window.CannonRichText;
+    if (!rt) {
+      return;
+    }
+    rt.initRichTextForm('category-form', [
+      { id: 'category-description', key: 'description', kind: 'intro' }
     ]);
   }
 
@@ -2770,11 +2579,9 @@
     }
     initLazyCKEditors(root);
     root.querySelectorAll('form').forEach(function (form) {
-      if (form.dataset.ckEditorSubmitBound || !form.querySelector('textarea[data-ckeditor]')) {
-        return;
+      if (window.CannonRichText) {
+        window.CannonRichText.bindRichTextFormSubmit(form);
       }
-      form.dataset.ckEditorSubmitBound = '1';
-      form.addEventListener('submit', syncCKEditors);
     });
   }
 
@@ -2934,6 +2741,7 @@
     mediaPickerBound = true;
 
     var mediaPickerTarget = null;
+    var mediaPickerCallback = null;
     var pickerURL = '/admin/media/picker';
     var pickerType = 'images';
 
@@ -2953,10 +2761,16 @@
       return url;
     }
 
-    function openMediaPicker(target, type) {
+    function openMediaPicker(target, type, callback) {
+      if (typeof type === 'function') {
+        callback = type;
+        type = 'images';
+        target = null;
+      }
       var dialog = pickerDialog();
       var frame = pickerFrame();
-      mediaPickerTarget = target || document.getElementById('item-image');
+      mediaPickerCallback = typeof callback === 'function' ? callback : null;
+      mediaPickerTarget = mediaPickerCallback ? null : (target || document.getElementById('item-image'));
       pickerType = type || 'images';
       if (frame) {
         var url = pickerURLWithParams('');
@@ -3029,6 +2843,7 @@
       var dialog = pickerDialog();
       var frame = pickerFrame();
       mediaPickerTarget = null;
+      mediaPickerCallback = null;
       if (dialog && dialog.open) {
         dialog.close();
       }
@@ -3070,19 +2885,26 @@
       var pick = e.target.closest('[data-media-pick]');
       if (pick && dialog && dialog.contains(pick)) {
         e.preventDefault();
-        var target = mediaPickerTarget || document.getElementById('item-image');
-        if (target) {
-          target.value = pick.getAttribute('data-media-path') || '';
-          syncMediaFieldPreview(target);
-          target.dispatchEvent(new Event('change', { bubbles: true }));
-          if (pickerType === 'files' && target.name === 'attachment_url') {
-            var attachmentRow = target.closest('[data-repeat-row="attachment"]');
-            var labelInput = attachmentRow ? attachmentRow.querySelector('input[name="attachment_label"]') : null;
-            if (labelInput && !labelInput.value.trim()) {
-              var nameEl = pick.querySelector('.admin-media-picker-name');
-              var fileName = (pick.getAttribute('title') || (nameEl && nameEl.textContent) || '').trim();
-              if (fileName) {
-                labelInput.value = fileName;
+        var path = pick.getAttribute('data-media-path') || '';
+        if (mediaPickerCallback) {
+          var pickCallback = mediaPickerCallback;
+          mediaPickerCallback = null;
+          pickCallback(path);
+        } else {
+          var target = mediaPickerTarget || document.getElementById('item-image');
+          if (target) {
+            target.value = path;
+            syncMediaFieldPreview(target);
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+            if (pickerType === 'files' && target.name === 'attachment_url') {
+              var attachmentRow = target.closest('[data-repeat-row="attachment"]');
+              var labelInput = attachmentRow ? attachmentRow.querySelector('input[name="attachment_label"]') : null;
+              if (labelInput && !labelInput.value.trim()) {
+                var nameEl = pick.querySelector('.admin-media-picker-name');
+                var fileName = (pick.getAttribute('title') || (nameEl && nameEl.textContent) || '').trim();
+                if (fileName) {
+                  labelInput.value = fileName;
+                }
               }
             }
           }
@@ -3129,9 +2951,17 @@
       submitPickerForm(form);
     });
 
+    window.CannonMediaPicker = {
+      open: function (opts) {
+        opts = opts || {};
+        openMediaPicker(null, opts.type || 'images', opts.onPick);
+      }
+    };
+
     document.addEventListener('close', function (e) {
       if (e.target && e.target.id === 'media-picker-dialog') {
         mediaPickerTarget = null;
+        mediaPickerCallback = null;
         var frame = pickerFrame();
         if (frame) {
           frame.removeAttribute('src');

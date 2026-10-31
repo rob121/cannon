@@ -165,10 +165,37 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		pageItem := strings.TrimSpace(route.ExtensionPageID)
+		titleOverride := ""
+		if pageItem == "" {
+			resolved, resolveErr := d.ext.ResolveExtensionPage(ctx, route.ExtensionName, route.Path, r, userCtx, pageData)
+			if resolveErr != nil {
+				d.renderFrontendError(w, r, http.StatusInternalServerError, resolveErr.Error())
+				return
+			}
+			if resolved.RedirectURL != "" {
+				code := resolved.StatusCode
+				if code < 300 || code >= 400 {
+					code = http.StatusFound
+				}
+				http.Redirect(w, r, resolved.RedirectURL, code)
+				return
+			}
+			if resolved.StatusCode == http.StatusNotFound || strings.TrimSpace(resolved.PageItem) == "" {
+				d.renderFrontendError(w, r, http.StatusNotFound, "")
+				return
+			}
+			if resolved.StatusCode >= 400 && resolved.StatusCode != http.StatusOK {
+				d.renderFrontendError(w, r, resolved.StatusCode, "")
+				return
+			}
+			pageItem = resolved.PageItem
+			titleOverride = strings.TrimSpace(resolved.TitleOverride)
+		}
 		prepareArgs := map[string]any{
 			"content_type": "extension_page",
 			"extension":    route.ExtensionName,
-			"page_item":    route.ExtensionPageID,
+			"page_item":    pageItem,
 			"page_data":    pageData,
 		}
 		for k, v := range routeHookArgs(route) {
@@ -178,13 +205,17 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		html, err := d.ext.RenderPage(ctx, route.ExtensionName, route.ExtensionPageID, r, userCtx, pageData)
+		html, err := d.ext.RenderPage(ctx, route.ExtensionName, pageItem, r, userCtx, pageData, route.Path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		displayTitle := route.Name
+		if titleOverride != "" {
+			displayTitle = titleOverride
+		}
 		displayArgs := map[string]any{
-			"title":   route.Name,
+			"title":   displayTitle,
 			"content": html,
 			"layout":  "default/layout.html",
 			"page":    "default/page.html",
@@ -197,7 +228,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		title := route.Name
+		title := displayTitle
 		if v, ok := displayOut["title"].(string); ok && v != "" {
 			title = v
 		}
@@ -271,7 +302,7 @@ func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path string) (model
 		if !groups.CanView(viewerGroups, route.Groups) {
 			continue
 		}
-		kind, score, ok := matchPath(route.Path, path)
+		kind, score, ok := matchRoutePath(route, path)
 		if !ok {
 			continue
 		}
@@ -389,6 +420,31 @@ func (d *Dispatcher) renderNoRoutes(w http.ResponseWriter, r *http.Request, stat
 	if err := d.tpl.RenderFragment(w, "default/noroutes.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func matchRoutePath(route models.Route, path string) (matchKind, int, bool) {
+	if route.Type == models.RouteTypeExtension && strings.TrimSpace(route.ExtensionPageID) == "" {
+		return matchExtensionMount(route.Path, path)
+	}
+	return matchPath(route.Path, path)
+}
+
+func matchExtensionMount(pattern, path string) (matchKind, int, bool) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return matchPath(pattern, path)
+	}
+	if strings.HasSuffix(pattern, "/*") || strings.ContainsAny(pattern, "[]()^$.*+?\\|") {
+		return matchPath(pattern, path)
+	}
+	base := strings.TrimRight(pattern, "/")
+	if path == base {
+		return kindExact, 1000+len(base), true
+	}
+	if strings.HasPrefix(path, base+"/") {
+		return kindWildcard, 500+len(base), true
+	}
+	return matchPath(pattern, path)
 }
 
 func matchPath(pattern, path string) (matchKind, int, bool) {

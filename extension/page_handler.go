@@ -12,12 +12,38 @@ type pageEntry struct {
 }
 
 func (s *Server) registerPageRoutes(mux *http.ServeMux) {
-	if len(s.pages) == 0 {
+	if len(s.pages) == 0 && s.pageResolveHandler == nil {
 		return
 	}
 	base := s.pageBase()
 	mux.HandleFunc(base, s.handlePageIndex)
-	mux.HandleFunc(base+"/", s.handlePageItem)
+	if s.pageResolveHandler != nil {
+		mux.HandleFunc(base+"/resolve", s.handlePageResolve)
+	}
+	if len(s.pages) > 0 {
+		mux.HandleFunc(base+"/", s.handlePageItem)
+	}
+}
+
+func (s *Server) handlePageResolve(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.pageResolveHandler == nil {
+		http.NotFound(w, r)
+		return
+	}
+	req, err := DecodeWireRequest(r, s.siteID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	out := s.pageResolveHandler(req)
+	if out.StatusCode == 0 {
+		out.StatusCode = http.StatusOK
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handlePageIndex(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +86,13 @@ func (s *Server) handlePageItem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) pageList() PageListResponse {
+	if s.pageCatalogProvider != nil {
+		catalog, err := s.pageCatalogProvider()
+		if err == nil {
+			sort.Slice(catalog.Pages, func(i, j int) bool { return catalog.Pages[i].ID < catalog.Pages[j].ID })
+			return catalog
+		}
+	}
 	if s.pageListProvider != nil {
 		items, err := s.pageListProvider()
 		if err == nil {

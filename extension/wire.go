@@ -25,6 +25,9 @@ type WireRequest struct {
 	EndpointItem    string            `json:"endpoint_item,omitempty"`
 	EndpointData    map[string]any    `json:"endpoint_data,omitempty"`
 	DataPath        string            `json:"data_path,omitempty"`
+	RoutePath       string            `json:"route_path,omitempty"`
+	PathSuffix      string            `json:"path_suffix,omitempty"`
+	PathSegments    []string          `json:"path_segments,omitempty"`
 	CaptchaContext  string            `json:"captcha_context,omitempty"`
 	CaptchaAction   string            `json:"captcha_action,omitempty"`
 	CaptchaToken    string            `json:"captcha_token,omitempty"`

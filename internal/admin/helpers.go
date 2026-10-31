@@ -247,7 +247,7 @@ func layoutContext(r *http.Request) map[string]any {
 	navCan := navCanMap(r.Context())
 	data["NavCan"] = navCan
 	data["NavContentVisible"] = navGroupVisible(navCan, "items", "review", "trash", "categories", "tags", "field_groups", "media", "comments")
-	data["NavMenusVisible"] = navGroupVisible(navCan, "menus", "menu_items")
+	data["NavMenusVisible"] = navGroupVisible(navCan, "menus", "menu_items", "routes")
 	data["NavUsersVisible"] = navGroupVisible(navCan, "accounts", "authenticators", "profiles", "groups", "roles", "permissions")
 	data["NavAPIVisible"] = navGroupVisible(navCan, "api_credentials", "api_settings")
 	data["NavSystemVisible"] = navGroupVisible(navCan, "sites", "extension_registry", "extension_apps", "blocks", "configuration", "notifications", "access_log", "system_update")
@@ -360,7 +360,7 @@ func usersNavOpen(nav string) bool {
 
 func menusNavOpen(nav string) bool {
 	switch nav {
-	case "menus", "menu_items":
+	case "menus", "menu_items", "routes":
 		return true
 	default:
 		return false
@@ -454,14 +454,14 @@ func defaultGroupSelectedIDs(db *gorm.DB, assigned []models.Group, isNew bool) [
 func replaceFormGroups(db *gorm.DB, model any, r *http.Request) error {
 	groupIDs := formUintList(r, "group_ids")
 	if len(groupIDs) == 0 {
-		return fmt.Errorf("select at least one group")
+		return fmt.Errorf("Select at least one group")
 	}
 	var selected []models.Group
 	if err := db.Where("group_id IN ?", groupIDs).Find(&selected).Error; err != nil {
 		return err
 	}
 	if len(selected) == 0 {
-		return fmt.Errorf("select at least one group")
+		return fmt.Errorf("Select at least one group")
 	}
 	return db.Model(model).Association("Groups").Replace(selected)
 }

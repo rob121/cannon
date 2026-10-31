@@ -145,15 +145,17 @@
   </form>
 </article>
 
-<script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
+<script type="application/json" id="cannon-richtext-settings">{{.RichTextConfigJSON}}</script>
+<script src="/admin/assets/cannon-richtext.js?v=6"></script>
 <script>
 (function () {
-  var fields = document.querySelectorAll('[data-ckeditor]');
-  fields.forEach(function (el) {
-    if (window.ClassicEditor) {
-      ClassicEditor.create(el).catch(function () {});
+  var form = document.querySelector('form');
+  if (window.CannonRichText) {
+    window.CannonRichText.initRichTextFields(document).catch(function () {});
+    if (form) {
+      window.CannonRichText.bindRichTextFormSubmit(form);
     }
-  });
+  }
   var list = document.getElementById('gallery-rows');
   var addBtn = document.getElementById('gallery-add');
   if (list && addBtn) {

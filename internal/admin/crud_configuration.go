@@ -10,6 +10,7 @@ import (
 	"github.com/rob121/cannon/extension"
 	"github.com/rob121/cannon/internal/content"
 	"github.com/rob121/cannon/internal/extensions"
+	"github.com/rob121/cannon/internal/richtext"
 	"github.com/rob121/cannon/internal/hooks"
 	"github.com/rob121/cannon/internal/settings"
 	"github.com/rob121/cannon/internal/sites"
@@ -155,6 +156,10 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 		db, _ := sites.DB(r.Context())
 		settings, _ := content.LoadSettings(r.Context())
 		formHTML = content.InjectConfigurationAuthorProfileField(formHTML, loadActiveProfiles(db), settings.AuthorProfileID)
+	}
+	if sectionID == richtext.SettingsSection {
+		rtCfg, _ := richtext.LoadSettings(r.Context())
+		formHTML = richtext.InjectConfigurationToolbarBuilder(formHTML, rtCfg)
 	}
 	h.renderConfiguration(w, r, extMgr, section.Title, "global", section.ID, section.Title, "", formHTML, r.URL.Query().Get("saved") == "1", "", nil)
 }

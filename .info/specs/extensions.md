@@ -78,6 +78,8 @@ Wire requests include a session `csrf` token. Include it in extension-rendered f
 
 The admin Routes UI stores page field values as route metadata and passes them back to the extension as `page_data`.
 
+GET /page may include `mounts` (resolver-driven subpages) and `routes` (fixed one-page paths). Mount routes leave `extension_page_id` empty; Cannon POSTs `/page/resolve` then `/page/{id}`. Wire requests include `route_path`, `path_suffix`, and `path_segments`.
+
 Data is for automatic public action URLs. Cannon always proxies `/ext/{route_hash}/{path}` to `POST /data/{path}` on the extension socket without requiring an admin route. `{route_hash}` is stable per extension + site (same as the socket filename without `.sock`); `GET /meta` returns it as `route_hash`.
 
 Register paths with `HandleData("contact/submit", fn)`. Build form actions with `PublicDataURL(extensionName, siteID, "contact/submit")`. Wire requests include `data_path` (for example `contact/submit`).

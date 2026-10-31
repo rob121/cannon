@@ -41,4 +41,27 @@ func TestEmbeddedAdminCKEditorAssets(t *testing.T) {
 	if !strings.Contains(string(raw), "GeneralHtmlSupport") {
 		t.Fatalf("ckeditor5.umd.js missing GeneralHtmlSupport")
 	}
+	if !strings.Contains(string(raw), "SourceEditing") {
+		t.Fatalf("ckeditor5.umd.js missing SourceEditing")
+	}
+	raw, err = AdminAsset("cannon-richtext.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "sourceEditing") {
+		t.Fatalf("cannon-richtext.js missing sourceEditing toolbar config")
+	}
+	if !strings.Contains(string(raw), "cannonMediaImage") {
+		t.Fatalf("cannon-richtext.js missing cannonMediaImage toolbar integration")
+	}
+	if strings.Contains(string(raw), "licenseKey") {
+		t.Fatalf("cannon-richtext.js must not set licenseKey (pinned ckeditor5@41.4.2 UMD)")
+	}
+	raw, err = AdminAsset("ckeditor5.umd.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "license-key-missing") {
+		t.Fatalf("ckeditor5.umd.js appears to be v44+ with license enforcement; use ckeditor5@41.4.2 dist/browser")
+	}
 }

@@ -1,8 +1,12 @@
 {{template "page_header" .}}
 <div class="admin-data-card">
   {{template "list_toolbar_open" .}}
-    <form method="get" action="{{.BasePath}}" class="admin-filter-form admin-list-filter-form">
+    <form method="get" action="{{.BasePath}}" class="admin-filter-form admin-list-filter-form admin-list-filter-form-items">
       {{template "sort_preserve_fields" .}}
+      <div class="admin-filter-field admin-filter-field-search">
+        <label class="admin-filter-label" for="items-search">Search</label>
+        <input class="admin-form-control" id="items-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Title or slug">
+      </div>
       <div class="admin-filter-field">
         <label class="admin-filter-label" for="items-status-filter">Status</label>
         <select class="admin-form-control admin-form-control-sm" id="items-status-filter" name="status" onchange="this.form.submit()">
@@ -29,10 +33,6 @@
           <option value="1" {{if eq .FeaturedFilter "1"}}selected{{end}}>Featured only</option>
           <option value="0" {{if eq .FeaturedFilter "0"}}selected{{end}}>Not featured</option>
         </select>
-      </div>
-      <div class="admin-filter-field admin-filter-field-search">
-        <label class="admin-filter-label" for="items-search">Search</label>
-        <input class="admin-form-control admin-form-control-sm" id="items-search" type="search" name="q" value="{{.SearchQuery}}" placeholder="Title or slug">
       </div>
       <div class="admin-filter-field admin-filter-field-actions">
         <span class="admin-filter-label admin-filter-label-spacer" aria-hidden="true">&nbsp;</span>

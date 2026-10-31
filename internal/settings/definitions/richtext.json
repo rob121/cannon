@@ -1,0 +1,39 @@
+{
+  "title": "Rich Text Editor",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "enter_key_mode": {
+        "type": "string",
+        "title": "Enter key behavior",
+        "enum": ["paragraph", "line_break"],
+        "default": "paragraph",
+        "description": "Paragraph (recommended): Enter creates a new paragraph (<p>); Shift+Enter inserts a line break (<br>). Line break: Enter inserts <br>; Shift+Enter creates a new paragraph."
+      },
+      "paragraph_spacing": {
+        "type": "string",
+        "title": "Paragraph spacing (visual editor)",
+        "enum": ["default", "compact"],
+        "default": "default",
+        "description": "Compact removes vertical margin between paragraphs while editing. Saved HTML is unchanged."
+      },
+      "toolbar_intro": {
+        "type": "string",
+        "title": "Intro / short field toolbar",
+        "default": "bold, italic, link, |, bulletedList, numberedList, |, cannonMediaImage, |, sourceEditing, |, undo, redo"
+      },
+      "toolbar_body": {
+        "type": "string",
+        "title": "Body field toolbar",
+        "default": "heading, |, bold, italic, link, |, bulletedList, numberedList, blockQuote, |, cannonMediaImage, insertTable, mediaEmbed, |, sourceEditing, |, undo, redo"
+      }
+    }
+  },
+  "ui_schema": {
+    "type": "VerticalLayout",
+    "elements": [
+      {"type": "Control", "scope": "#/properties/enter_key_mode"},
+      {"type": "Control", "scope": "#/properties/paragraph_spacing"}
+    ]
+  }
+}

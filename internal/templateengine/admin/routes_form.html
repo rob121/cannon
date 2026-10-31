@@ -67,11 +67,15 @@
                 {{range .ExtensionOptions}}
                 {{$extName := .Name}}
                 {{$extLabel := .Label}}
+                {{if .PageResolve}}
+                <option value="__mount__" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionPageID "")}}selected{{end}}>{{$extLabel}} / Mount resolver (subpages)</option>
+                {{end}}
                 {{range .Pages}}
                 <option value="{{.ID}}" data-extension-name="{{$extName}}" {{if and (eq $.Row.ExtensionName $extName) (eq $.Row.ExtensionPageID .ID)}}selected{{end}}>{{$extLabel}} / {{if .Title}}{{.Title}}{{else}}{{.ID}}{{end}} ({{.ID}})</option>
                 {{end}}
                 {{end}}
               </select>
+              <p class="admin-form-help">Use <strong>Mount resolver</strong> when the extension resolves list/detail subpages automatically. Or apply bundles from the <a href="{{.BasePath}}" data-turbo-frame="_top">Routes list</a>.</p>
             </div>
             {{range .ExtensionOptions}}
             {{$extName := .Name}}
@@ -79,7 +83,7 @@
             {{$pageID := .ID}}
             {{range .Fields}}
             {{$fieldName := .Name}}
-            <div class="{{if or (eq .Type "textarea") (eq .Type "rich_text") (eq .Type "wysiwyg")}}col-12{{else}}col-md-6{{end}} route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
+            <div class="{{if or (eq .Type "textarea") (eq .Type "rich_text") (eq .Type "wysiwyg")}}col-12{{else}}col-md-6{{end}} route-data-field" data-extension-name="{{$extName}}" data-page-id="{{$pageID}}" data-field-name="{{.Name}}"{{if ne $.Row.Type "Extension"}} hidden{{end}}>
               <label class="admin-form-label">{{if .Label}}{{.Label}}{{else}}{{.Name}}{{end}}</label>
               {{if eq .Type "item"}}
               <select class="admin-form-control" name="page_data_{{.Name}}" {{if .Required}}required{{end}}>

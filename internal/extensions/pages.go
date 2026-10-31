@@ -15,22 +15,30 @@ import (
 	"github.com/rob121/cannon/internal/sites"
 )
 
-func (m *Manager) fetchPages(socketPath, pageBase string) ([]extension.PageDefinition, error) {
+func (m *Manager) fetchPageCatalog(socketPath, pageBase string) (extension.PageListResponse, error) {
 	path := capabilityPath(pageBase, "")
 	resp, err := m.do(socketPath, http.MethodGet, path, nil)
 	if err != nil {
-		return nil, err
+		return extension.PageListResponse{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("status %d: %s", resp.StatusCode, string(body))
+		return extension.PageListResponse{}, fmt.Errorf("status %d: %s", resp.StatusCode, string(body))
 	}
 	var payload extension.PageListResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return extension.PageListResponse{}, err
+	}
+	return payload, nil
+}
+
+func (m *Manager) fetchPages(socketPath, pageBase string) ([]extension.PageDefinition, error) {
+	catalog, err := m.fetchPageCatalog(socketPath, pageBase)
+	if err != nil {
 		return nil, err
 	}
-	return payload.Pages, nil
+	return catalog.Pages, nil
 }
 
 func capabilityPath(base, item string) string {
@@ -47,12 +55,16 @@ var DefaultPageDefinitions = []extension.PageDefinition{
 	{ID: "default", Title: "Default"},
 }
 
-func (m *Manager) loadPages(socketPath, pageBase string) []extension.PageDefinition {
-	pages, err := m.fetchPages(socketPath, pageBase)
-	if err == nil && len(pages) > 0 {
-		return pages
+func (m *Manager) loadPageCatalog(socketPath, pageBase string) extension.PageListResponse {
+	catalog, err := m.fetchPageCatalog(socketPath, pageBase)
+	if err == nil && (len(catalog.Pages) > 0 || len(catalog.Mounts) > 0 || len(catalog.Routes) > 0) {
+		return catalog
 	}
-	return append([]extension.PageDefinition(nil), DefaultPageDefinitions...)
+	return extension.PageListResponse{Pages: append([]extension.PageDefinition(nil), DefaultPageDefinitions...)}
+}
+
+func (m *Manager) loadPages(socketPath, pageBase string) []extension.PageDefinition {
+	return m.loadPageCatalog(socketPath, pageBase).Pages
 }
 
 // EnsurePageDefinitions reloads page lists for admin UI.
@@ -71,9 +83,11 @@ func (m *Manager) EnsurePageDefinitions(ctx context.Context) {
 		socket := rt.Model.Socket
 		pageBase := rt.Capabilities.Page
 		m.mu.RUnlock()
-		pages := m.loadPages(socket, pageBase)
+		catalog := m.loadPageCatalog(socket, pageBase)
 		m.mu.Lock()
-		rt.Pages = pages
+		rt.Pages = catalog.Pages
+		rt.PageMounts = catalog.Mounts
+		rt.PageRoutes = catalog.Routes
 		m.mu.Unlock()
 	}
 }

@@ -49,7 +49,7 @@
     {{if .PageSecondaryActionPostURL}}
     <form method="post" action="{{.PageSecondaryActionPostURL}}" class="admin-inline-form" data-turbo-frame="_top"{{if .PageSecondaryActionConfirm}} onsubmit="return confirm('{{.PageSecondaryActionConfirm}}')"{{end}}>
       {{csrfField}}
-      <button type="submit" class="btn-admin-outline">
+      <button type="submit" class="{{if .PageSecondaryActionDanger}}btn-admin-outline btn-admin-danger{{else}}btn-admin-outline{{end}}">
         <i class="bi {{if .PageSecondaryActionIcon}}{{.PageSecondaryActionIcon}}{{else}}bi-cloud-arrow-down{{end}}"></i> {{.PageSecondaryActionLabel}}
       </button>
     </form>
@@ -467,8 +467,18 @@
         <thead>
           <tr>
             <th scope="col">Permission</th>
-            <th scope="col" class="admin-permission-effect-col">Allow</th>
-            <th scope="col" class="admin-permission-effect-col">Deny</th>
+            <th scope="col" class="admin-permission-effect-col">
+              <div class="admin-permission-effect-head">
+                <span class="admin-permission-col-label">Allow</span>
+                <button type="button" class="admin-permission-bulk" data-permission-bulk="allow" aria-label="Allow all permissions in this section">Select all</button>
+              </div>
+            </th>
+            <th scope="col" class="admin-permission-effect-col">
+              <div class="admin-permission-effect-head">
+                <span class="admin-permission-col-label">Deny</span>
+                <button type="button" class="admin-permission-bulk" data-permission-bulk="deny" aria-label="Deny all permissions in this section">Select all</button>
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -520,8 +530,12 @@
       <ul class="admin-effective-perms">
         {{range index $.EffectivePermissions.ByCategory .}}
         <li class="admin-effective-perm{{if .Wildcard}} is-wildcard{{end}}{{if .Denied}} is-denied{{end}}">
+          {{if ne .DisplayName .ID}}
           <span class="admin-effective-perm-name">{{.DisplayName}}</span>
           <code class="admin-effective-perm-key">{{.ID}}</code>
+          {{else}}
+          <code class="admin-effective-perm-key">{{.ID}}</code>
+          {{end}}
         </li>
         {{end}}
       </ul>
