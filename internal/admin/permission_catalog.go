@@ -7,6 +7,7 @@ import (
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
+	"gorm.io/gorm"
 )
 
 func permissionsForRoleAssignment(ctx context.Context, roleID uint) ([]security.Permission, error) {
@@ -22,6 +23,9 @@ func permissionsForRoleAssignment(ctx context.Context, roleID uint) ([]security.
 	byID := map[string]security.Permission{}
 	for _, p := range filtered {
 		byID[p.ID] = p
+	}
+	if err := mergeInstalledExtensionPermissionsFromDB(db, byID); err != nil {
+		return nil, err
 	}
 	if roleID != 0 {
 		allows, denies, err := security.LoadRolePermissionAssignments(db, roleID)
@@ -66,6 +70,36 @@ func permissionsForRoleAssignment(ctx context.Context, roleID uint) ([]security.
 	return out, nil
 }
 
+func mergeInstalledExtensionPermissionsFromDB(db *gorm.DB, byKey map[string]security.Permission) error {
+	var dbPerms []models.Permission
+	if err := db.Where("deprecated = ?", false).Order("category asc, key asc").Find(&dbPerms).Error; err != nil {
+		return err
+	}
+	installed, err := security.InstalledExtensionNames(db)
+	if err != nil {
+		return err
+	}
+	for _, row := range dbPerms {
+		if _, ok := byKey[row.Key]; ok {
+			continue
+		}
+		ext, isExt := security.PermissionExtensionOwner(row.Key)
+		if isExt {
+			if _, ok := installed[ext]; !ok {
+				continue
+			}
+		}
+		byKey[row.Key] = security.Permission{
+			ID:          row.Key,
+			DisplayName: row.DisplayName,
+			Description: row.Description,
+			Category:    row.Category,
+			Dangerous:   row.Dangerous,
+		}
+	}
+	return nil
+}
+
 func filterRolePermissionFormKeys(ctx context.Context, roleID uint, allowKeys, denyKeys []string) ([]string, []string) {
 	allowed, err := permissionsForRoleAssignment(ctx, roleID)
 	if err != nil {
@@ -104,31 +138,8 @@ func permissionsForCatalog(ctx context.Context) ([]security.Permission, error) {
 	for _, p := range filtered {
 		byKey[p.ID] = p
 	}
-	var dbPerms []models.Permission
-	if err := db.Where("deprecated = ?", false).Order("category asc, key asc").Find(&dbPerms).Error; err != nil {
+	if err := mergeInstalledExtensionPermissionsFromDB(db, byKey); err != nil {
 		return nil, err
-	}
-	for _, row := range dbPerms {
-		if _, ok := byKey[row.Key]; ok {
-			continue
-		}
-		ext, isExt := security.PermissionExtensionOwner(row.Key)
-		if isExt {
-			installed, err := security.InstalledExtensionNames(db)
-			if err != nil {
-				return nil, err
-			}
-			if _, ok := installed[ext]; !ok {
-				continue
-			}
-		}
-		byKey[row.Key] = security.Permission{
-			ID:          row.Key,
-			DisplayName: row.DisplayName,
-			Description: row.Description,
-			Category:    row.Category,
-			Dangerous:   row.Dangerous,
-		}
 	}
 	out := make([]security.Permission, 0, len(byKey))
 	for _, p := range byKey {

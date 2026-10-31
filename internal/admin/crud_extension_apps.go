@@ -85,7 +85,15 @@ func extensionAdminUserContext(r *http.Request) (map[string]any, error) {
 	if err != nil {
 		return map[string]any{"authenticated": false}, nil
 	}
-	return svc.Context(r.Context())
+	ctx := r.Context()
+	if _, ok := security.PermissionsFromContext(ctx); !ok {
+		if userID, ok := svc.CurrentID(); ok && userID != 0 {
+			if loaded, err := security.PreloadForUser(ctx, userID); err == nil {
+				ctx = loaded
+			}
+		}
+	}
+	return svc.Context(ctx)
 }
 
 func (h *Handler) adminExtensionNav(r *http.Request) []AdminExtensionNav {
