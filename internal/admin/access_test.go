@@ -73,6 +73,14 @@ func TestCanAccessAdminUsesPermissions(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("editor items write: ok=%v err=%v", ok, err)
 	}
+	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/trash", false)
+	if err != nil || !ok {
+		t.Fatalf("editor trash read should use items permission: ok=%v err=%v", ok, err)
+	}
+	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/review", false)
+	if err != nil || !ok {
+		t.Fatalf("editor review read should use items permission: ok=%v err=%v", ok, err)
+	}
 	ok, err = CanAccessAdmin(ctx, editorUser.UserID, "/admin/roles", false)
 	if err != nil || ok {
 		t.Fatalf("editor roles should be denied: ok=%v err=%v", ok, err)

@@ -47,6 +47,20 @@ var AdminRoutes = []AdminRoute{
 	{Path: "/api", Label: "API", FormKey: "api"},
 }
 
+// adminSectionPermissionAliases maps admin URL sections to the permission section used in the catalog.
+// Editorial routes share Items permissions (see nav_can.go).
+var adminSectionPermissionAliases = map[string]string{
+	"/trash":  "/items",
+	"/review": "/items",
+}
+
+func adminPermissionSection(section string) string {
+	if alias, ok := adminSectionPermissionAliases[section]; ok {
+		return alias
+	}
+	return section
+}
+
 // CanAccessAdmin reports whether the user may access an admin path.
 func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write bool) (bool, error) {
 	if name := extensionNameFromAdminPath(requestPath); name != "" {
@@ -60,6 +74,12 @@ func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write 
 		}
 		return security.Can(ctx, userID, security.PermPermissionsRead)
 	case "/roles":
+		perm := security.AdminPermissionForPath("/roles", write)
+		if ok, err := security.Can(ctx, userID, perm); err != nil {
+			return false, err
+		} else if ok {
+			return true, nil
+		}
 		return CanManageSecurity(ctx, userID)
 	case "/analytics":
 		return security.Can(ctx, userID, security.AdminPermissionForPath("/system", write))
@@ -74,7 +94,7 @@ func CanAccessAdmin(ctx context.Context, userID uint, requestPath string, write 
 		}
 		return security.Can(ctx, userID, security.AdminPermissionForPath("/users", false))
 	}
-	perm := security.AdminPermissionForPath(section, write)
+	perm := security.AdminPermissionForPath(adminPermissionSection(section), write)
 	return security.Can(ctx, userID, perm)
 }
 
