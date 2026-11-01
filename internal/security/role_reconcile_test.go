@@ -59,3 +59,58 @@ func TestMigrateSystemRoleDirectPermissionsResetsEditorScope(t *testing.T) {
 		t.Fatalf("editor should have items write: %#v", keys)
 	}
 }
+
+func TestEnsureAdministratorWildcardGrantRestoresStar(t *testing.T) {
+	site := &config.SiteConfig{
+		ID: "admin-star-reconcile-test",
+		Database: config.DatabaseConfig{
+			Type: "sqlite",
+			DSN:  t.TempDir() + "/site.db",
+		},
+	}
+	if err := database.Migrate(site); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Get(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SeedDefaults(db); err != nil {
+		t.Fatal(err)
+	}
+	var admin models.Role
+	if err := db.Where("name = ?", RoleAdministrator).First(&admin).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveRolePermissions(db, admin.RoleID, []string{
+		"core.admin.items.read",
+		"core.roles.manage",
+		"core.permissions.read",
+	}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveSecurityMigrationRevision(db, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateSystemRoleDirectPermissions(db); err != nil {
+		t.Fatal(err)
+	}
+	allows, _, err := LoadRolePermissionAssignments(db, admin.RoleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasStar := false
+	for _, key := range allows {
+		if key == PermWildcardAll {
+			hasStar = true
+			break
+		}
+	}
+	if !hasStar {
+		t.Fatalf("administrator should have * after migration: %#v", allows)
+	}
+	rev, err := loadSecurityMigrationRevision(db)
+	if err != nil || rev < 2 {
+		t.Fatalf("migration revision = %d err=%v, want >= 2", rev, err)
+	}
+}

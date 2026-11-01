@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const systemRoleDirectPermissionsRevision = 1
+const systemRoleDirectPermissionsRevision = 2
 
 type securityMigrationState struct {
 	SystemRoleDirectPermissionsRev int `json:"system_role_direct_permissions_rev"`
@@ -58,13 +58,48 @@ func migrateSystemRoleDirectPermissions(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	if rev >= systemRoleDirectPermissionsRevision {
+	if rev < 1 {
+		if err := reconcileSystemRoleDirectPermissions(db); err != nil {
+			return err
+		}
+		rev = 1
+		if err := saveSecurityMigrationRevision(db, rev); err != nil {
+			return err
+		}
+	}
+	if rev < 2 {
+		if err := ensureAdministratorWildcardGrant(db); err != nil {
+			return err
+		}
+		if err := saveSecurityMigrationRevision(db, 2); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensureAdministratorWildcardGrant adds * to the administrator role when missing.
+// Saving the role form with every catalog allow replaces direct grants and omits * (not in catalog).
+func ensureAdministratorWildcardGrant(db *gorm.DB) error {
+	var role models.Role
+	err := db.Where("name = ?", RoleAdministrator).First(&role).Error
+	if err == gorm.ErrRecordNotFound {
 		return nil
 	}
-	if err := reconcileSystemRoleDirectPermissions(db); err != nil {
+	if err != nil {
 		return err
 	}
-	return saveSecurityMigrationRevision(db, systemRoleDirectPermissionsRevision)
+	allows, denies, err := LoadRolePermissionAssignments(db, role.RoleID)
+	if err != nil {
+		return err
+	}
+	for _, key := range allows {
+		if key == PermWildcardAll {
+			return nil
+		}
+	}
+	allows = append(allows, PermWildcardAll)
+	return SaveRolePermissions(db, role.RoleID, allows, denies)
 }
 
 func loadSecurityMigrationRevision(db *gorm.DB) (int, error) {
