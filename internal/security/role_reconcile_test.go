@@ -114,3 +114,60 @@ func TestEnsureAdministratorWildcardGrantRestoresStar(t *testing.T) {
 		t.Fatalf("migration revision = %d err=%v, want >= 2", rev, err)
 	}
 }
+
+func TestEnsureForSiteAlwaysRestoresAdministratorWildcard(t *testing.T) {
+	site := &config.SiteConfig{
+		ID: "ensure-for-site-star-test",
+		Database: config.DatabaseConfig{
+			Type: "sqlite",
+			DSN:  t.TempDir() + "/site.db",
+		},
+	}
+	if err := database.Migrate(site); err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Get(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureForSite(db); err != nil {
+		t.Fatal(err)
+	}
+	var admin models.Role
+	if err := db.Where("name = ?", RoleAdministrator).First(&admin).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveRolePermissions(db, admin.RoleID, []string{"core.admin.items.read"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureForSite(db); err != nil {
+		t.Fatal(err)
+	}
+	allows, _, err := LoadRolePermissionAssignments(db, admin.RoleID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsString(allows, PermWildcardAll) {
+		t.Fatalf("administrator should have * after EnsureForSite: %#v", allows)
+	}
+}
+
+func TestWithAdministratorWildcardAllow(t *testing.T) {
+	out := WithAdministratorWildcardAllow([]string{"core.admin.items.read"})
+	if !containsString(out, PermWildcardAll) {
+		t.Fatalf("expected * in %#v", out)
+	}
+	dup := WithAdministratorWildcardAllow(out)
+	if len(dup) != len(out) {
+		t.Fatalf("should not duplicate *: %#v", dup)
+	}
+}
+
+func containsString(list []string, want string) bool {
+	for _, s := range list {
+		if s == want {
+			return true
+		}
+	}
+	return false
+}

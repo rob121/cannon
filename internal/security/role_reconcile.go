@@ -78,6 +78,16 @@ func migrateSystemRoleDirectPermissions(db *gorm.DB) error {
 	return nil
 }
 
+// WithAdministratorWildcardAllow ensures * is included in allow keys for the administrator role.
+func WithAdministratorWildcardAllow(allows []string) []string {
+	for _, key := range allows {
+		if key == PermWildcardAll {
+			return allows
+		}
+	}
+	return append(allows, PermWildcardAll)
+}
+
 // ensureAdministratorWildcardGrant adds * to the administrator role when missing.
 // Saving the role form with every catalog allow replaces direct grants and omits * (not in catalog).
 func ensureAdministratorWildcardGrant(db *gorm.DB) error {

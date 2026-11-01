@@ -124,8 +124,12 @@ func EnsureForSite(db *gorm.DB) error {
 	if err := SyncToDB(db); err != nil {
 		return err
 	}
-	if err := SeedDefaults(db); err != nil {
+	seedErr := SeedDefaults(db)
+	if err := migrateSystemRoleDirectPermissions(db); err != nil {
 		return err
 	}
-	return migrateSystemRoleDirectPermissions(db)
+	if err := ensureAdministratorWildcardGrant(db); err != nil {
+		return err
+	}
+	return seedErr
 }

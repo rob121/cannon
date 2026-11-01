@@ -118,6 +118,9 @@ func (h *Handler) roleForm(w http.ResponseWriter, r *http.Request, id uint) {
 			return
 		}
 		allowKeys, denyKeys := filterRolePermissionFormKeys(r.Context(), row.RoleID, r.Form["permission_keys"], r.Form["deny_permission_keys"])
+		if row.Name == security.RoleAdministrator {
+			allowKeys = security.WithAdministratorWildcardAllow(allowKeys)
+		}
 		if err := security.SaveRolePermissions(db, row.RoleID, allowKeys, denyKeys); err != nil {
 			h.renderRoleForm(w, r, row, allRoles, categories, permsByCategory, selectedPerms, selectedDenied, parentIDs, selectedRoleEvents, roleFilters, isNew, err.Error())
 			return
