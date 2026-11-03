@@ -38,6 +38,10 @@ type ExtensionsConfig struct {
 type SessionConfig struct {
 	CookieName string `json:"cookie_name"`
 	MaxAge     int    `json:"max_age"`
+	// CookieSecure forces the Secure flag on session cookies. When false, Cannon
+	// still sets Secure automatically for HTTPS requests (including behind
+	// X-Forwarded-Proto: https).
+	CookieSecure bool `json:"cookie_secure"`
 }
 
 // SiteConfig holds per-site settings.

@@ -11,13 +11,56 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rob121/cannon/internal/config"
 	"github.com/rob121/cannon/internal/database"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/sites"
+	"github.com/rob121/cannon/internal/fetchurl"
 	"github.com/rob121/cannon/internal/updater"
 )
+
+const updateTestPublicHost = "example.com"
+
+type rewriteHostTransport struct {
+	base       http.RoundTripper
+	actualAddr string
+	publicHost string
+}
+
+func (t *rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if strings.EqualFold(req.URL.Hostname(), t.publicHost) {
+		req = req.Clone(req.Context())
+		req.URL.Host = t.actualAddr
+		req.Host = t.actualAddr
+	}
+	rt := t.base
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+	return rt.RoundTrip(req)
+}
+
+func updateTestClient(server *httptest.Server) *http.Client {
+	return &http.Client{
+		Transport: &rewriteHostTransport{
+			base:       http.DefaultTransport,
+			actualAddr: server.Listener.Addr().String(),
+			publicHost: updateTestPublicHost,
+		},
+		Timeout: 2 * time.Minute,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return http.ErrUseLastResponse
+			}
+			if _, err := fetchurl.ValidateHTTPURL(req.URL.String(), fetchurl.Options{AllowHTTP: true}); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
 
 func TestNewerVersion(t *testing.T) {
 	if !updater.NewerVersion("v0.2.0", "0.1.0") {
@@ -67,8 +110,8 @@ func TestLatestUpdateInfoFromManifest(t *testing.T) {
 	defer server.Close()
 
 	m := NewManager(nil, nil)
-	m.updateClient = server.Client()
-	info, err := m.latestUpdateInfo(models.Extension{Name: "demo-extension", UpdateURLBase: server.URL})
+	m.updateClient = updateTestClient(server)
+	info, err := m.latestUpdateInfo(models.Extension{Name: "demo-extension", UpdateURLBase: "http://" + updateTestPublicHost})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +187,7 @@ func TestUpdateAllUpdatesOutdated(t *testing.T) {
 				"version": "0.2.0",
 				"assets": {
 					"` + platform + `": {
-						"url": "http://` + r.Host + `/` + name + `/bin",
+						"url": "http://` + updateTestPublicHost + `/` + name + `/bin",
 						"sha256": "sha256:` + digest + `"
 					}
 				}
@@ -156,13 +199,14 @@ func TestUpdateAllUpdatesOutdated(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	mgr.updateClient = server.Client()
+	mgr.updateClient = updateTestClient(server)
 
 	for _, name := range []string{"ext-a", "ext-b"} {
 		binPath := filepath.Join(app.Extensions.Dir, name)
 		if err := os.WriteFile(binPath, []byte("#!/bin/sh\necho old\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
+		publicBase := "http://" + updateTestPublicHost + "/" + name
 		if err := db.Create(&models.Extension{
 			Name:              name,
 			Socket:            mgr.socketPath(name),
@@ -170,9 +214,9 @@ func TestUpdateAllUpdatesOutdated(t *testing.T) {
 			Installed:         true,
 			Version:           "0.1.0",
 			LatestVersion:     "0.2.0",
-			UpdateURLBase:     server.URL + "/" + name,
+			UpdateURLBase:     publicBase,
 			UpdateAvailable:   true,
-			UpdateAssetURL:    server.URL + "/" + name + "/bin",
+			UpdateAssetURL:    publicBase + "/bin",
 			UpdateAssetSHA256: digest,
 		}).Error; err != nil {
 			t.Fatal(err)

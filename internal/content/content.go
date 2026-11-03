@@ -520,7 +520,7 @@ func ItemFieldDisplays(ctx context.Context, item *models.Item) ([]FieldDisplay, 
 			Label: label,
 			Type:  field.Type,
 			Value: value,
-			HTML:  FormatFieldDisplayHTML(field, value),
+			HTML:  FormatFieldDisplayHTML(ctx, field, value),
 		})
 	}
 	return out, nil

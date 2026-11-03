@@ -228,8 +228,8 @@ func (h *Handler) saveItemFromForm(r *http.Request, db *gorm.DB, row *models.Ite
 		}
 		row.Slug = slug
 	}
-	row.Intro = r.FormValue("intro")
-	row.Body = r.FormValue("body")
+	row.Intro = content.SanitizeStoredRichText(r.Context(), r.FormValue("intro"))
+	row.Body = content.SanitizeStoredRichText(r.Context(), r.FormValue("body"))
 	row.Status = formItemStatus(r)
 	wasFeatured := false
 	if !isNew {

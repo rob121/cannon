@@ -78,7 +78,7 @@ func LoadAuthorProfile(ctx context.Context, userID uint) (*AuthorProfile, error)
 			Label: f.Name,
 			Type:  f.Type,
 			Value: value,
-			HTML:  FormatFieldDisplayHTML(profileFieldAsContentField(f), value),
+			HTML:  FormatFieldDisplayHTML(ctx, profileFieldAsContentField(f), value),
 		})
 	}
 	return out, nil

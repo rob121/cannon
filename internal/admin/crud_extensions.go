@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rob121/cannon/internal/extensions"
+	"github.com/rob121/cannon/internal/fetchurl"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
@@ -266,12 +267,8 @@ func (h *Handler) saveExtensionFromURL(ctx context.Context, extMgr *extensions.M
 	if rawURL == "" {
 		return models.Extension{}, fmt.Errorf("extension URL is required")
 	}
-	parsed, err := url.Parse(rawURL)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return models.Extension{}, fmt.Errorf("enter a valid http or https URL")
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return models.Extension{}, fmt.Errorf("extension URL must use http or https")
+	if _, err := fetchurl.ValidateHTTPURL(rawURL, fetchurl.Options{AllowHTTP: true}); err != nil {
+		return models.Extension{}, fmt.Errorf("enter a valid public http or https URL")
 	}
 
 	manifestURL, updateBase, ok := extensionManifestURL(rawURL)
@@ -300,6 +297,9 @@ func (h *Handler) saveExtensionFromURL(ctx context.Context, extMgr *extensions.M
 }
 
 func fetchExtensionManifest(manifestURL string) (extensionDownloadManifest, error) {
+	if _, err := fetchurl.ValidateHTTPURL(manifestURL, fetchurl.Options{AllowHTTP: true}); err != nil {
+		return extensionDownloadManifest{}, err
+	}
 	resp, err := extensionHTTPClient.Get(manifestURL)
 	if err != nil {
 		return extensionDownloadManifest{}, err
@@ -316,6 +316,9 @@ func fetchExtensionManifest(manifestURL string) (extensionDownloadManifest, erro
 }
 
 func downloadAndSaveExtension(ctx context.Context, extMgr *extensions.Manager, downloadURL, name, sha256, updateBase, latestVersion string) (models.Extension, error) {
+	if _, err := fetchurl.ValidateHTTPURL(downloadURL, fetchurl.Options{AllowHTTP: true}); err != nil {
+		return models.Extension{}, err
+	}
 	resp, err := extensionHTTPClient.Get(downloadURL)
 	if err != nil {
 		return models.Extension{}, err
@@ -333,7 +336,7 @@ func downloadAndSaveExtension(ctx context.Context, extMgr *extensions.Manager, d
 	})
 }
 
-var extensionHTTPClient = &http.Client{Timeout: 2 * time.Minute}
+var extensionHTTPClient = fetchurl.SafeHTTPClient(2*time.Minute, fetchurl.Options{AllowHTTP: true})
 
 func extensionManifestURL(rawURL string) (manifestURL, updateBase string, ok bool) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))

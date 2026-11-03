@@ -247,8 +247,8 @@ func (c *Controller) handleItem(ctx *controllers.Context) controllers.Result {
 	if displaySettings.ShowRelatedItems {
 		related, _ = cms.RelatedItems(ctx.GoContext(), ctx.ViewerGroups, item, 5)
 	}
-	bodyHTML, _ := cms.RichTextToHTML(item.Body)
-	introHTML, _ := cms.RichTextToHTML(item.Intro)
+	bodyHTML, _ := cms.RichTextToHTML(ctx.GoContext(), item.Body)
+	introHTML, _ := cms.RichTextToHTML(ctx.GoContext(), item.Intro)
 	gallery := cms.ParseGalleryJSON(item.GalleryJSON)
 	embeds := cms.ParseEmbedsJSON(item.EmbedJSON)
 	attachments := cms.ParseAttachmentsJSON(item.AttachmentsJSON)

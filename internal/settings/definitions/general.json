@@ -144,6 +144,20 @@
         "enum": ["green", "black", "blue", "red", "brown", "purple", "dark-gray"],
         "description": "Primary color for admin buttons, links, logo badge, and highlights. Use different accents per site to tell multi-site admins apart."
       },
+      "html_content_policy": {
+        "type": "string",
+        "title": "Rich Text HTML Policy",
+        "default": "standard",
+        "enum": ["strict", "standard", "trusted"],
+        "description": "How HTML from the rich text editor is sanitized when saving and on the public site. Standard matches typical CKEditor output; strict is tighter; trusted allows CSS classes on elements."
+      },
+      "html_iframe_hosts": {
+        "type": "array",
+        "title": "Iframe Embed Hosts",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "HTTPS hostnames allowed for iframe embeds (for example www.youtube.com). When empty, Cannon uses built-in defaults for YouTube and Vimeo."
+      },
       "content_multilingual": {
         "type": "boolean",
         "title": "Multilingual Content",
@@ -200,6 +214,14 @@
       {"type": "Control", "scope": "#/properties/frontend_theme"},
       {"type": "Control", "scope": "#/properties/admin_theme"},
       {"type": "Control", "scope": "#/properties/admin_accent"},
+      {
+        "type": "Group",
+        "label": "Rich Text HTML",
+        "elements": [
+          {"type": "Control", "scope": "#/properties/html_content_policy"},
+          {"type": "Control", "scope": "#/properties/html_iframe_hosts"}
+        ]
+      },
       {
         "type": "Group",
         "label": "Multilingual Content",

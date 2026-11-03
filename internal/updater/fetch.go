@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/rob121/cannon/internal/fetchurl"
 )
 
 type githubLatestRelease struct {
@@ -62,6 +64,9 @@ func (c *Client) LatestInfo(base, binaryName string) (Info, error) {
 }
 
 func (c *Client) get(rawURL string) (*http.Response, error) {
+	if _, err := fetchurl.ValidateHTTPURL(rawURL, fetchurl.Options{AllowHTTP: true}); err != nil {
+		return nil, err
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err

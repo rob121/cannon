@@ -261,7 +261,29 @@ func SiteTwitterCreator(ctx context.Context) (string, error) {
 
 // SiteHeadExtra returns additional head markup configured by an administrator.
 func SiteHeadExtra(ctx context.Context) (string, error) {
-	return globalStringWithLegacy(ctx, "site_head_extra")
+	raw, err := globalStringWithLegacy(ctx, "site_head_extra")
+	if err != nil {
+		return "", err
+	}
+	return SanitizeSiteHeadExtra(raw), nil
+}
+
+// HTMLContentPolicy returns the site rich-text sanitization policy (strict, standard, trusted).
+func HTMLContentPolicy(ctx context.Context) (string, error) {
+	raw, err := GlobalString(ctx, SectionGeneral, "html_content_policy")
+	if err != nil {
+		return "standard", err
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "standard", nil
+	}
+	return raw, nil
+}
+
+// HTMLIframeAllowHosts returns configured iframe embed hostnames (may be empty).
+func HTMLIframeAllowHosts(ctx context.Context) ([]string, error) {
+	return GlobalStringSlice(ctx, SectionGeneral, "html_iframe_hosts")
 }
 
 func globalStringWithLegacy(ctx context.Context, key string) (string, error) {

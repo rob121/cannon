@@ -967,7 +967,7 @@ func (m *Manager) buildWireRequest(r *http.Request, userCtx map[string]any) (*Wi
 	return &WireRequest{
 		Method:   r.Method,
 		URL:      r.URL.String(),
-		Header:   r.Header,
+		Header:   FilterWireHeaders(r.Header),
 		Body:     body,
 		User:     userCtx,
 		CSRF:     csrfToken,
@@ -1015,8 +1015,11 @@ func (m *Manager) applyWireRequest(base *http.Request, wire *WireRequest) *http.
 			clone.URL = u.URL
 		}
 	}
-	if wire.Header != nil {
-		clone.Header = wire.Header
+	if filtered := FilterWireHeaderMap(wire.Header); filtered != nil {
+		clone.Header = make(http.Header)
+		for key, vals := range filtered {
+			clone.Header[key] = append([]string(nil), vals...)
+		}
 	}
 	if wire.Body != "" {
 		clone.Body = io.NopCloser(strings.NewReader(wire.Body))

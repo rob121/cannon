@@ -107,8 +107,8 @@ func saveFrontendItem(ctx *controllers.Context, item *models.Item, isNew, canPub
 		return err
 	}
 	item.Title = strings.TrimSpace(ctx.Request.FormValue("title"))
-	item.Intro = ctx.Request.FormValue("intro")
-	item.Body = ctx.Request.FormValue("body")
+	item.Intro = cms.SanitizeStoredRichText(ctx.GoContext(), ctx.Request.FormValue("intro"))
+	item.Body = cms.SanitizeStoredRichText(ctx.GoContext(), ctx.Request.FormValue("body"))
 	item.Slug = strings.TrimSpace(ctx.Request.FormValue("slug"))
 	if item.Slug == "" {
 		slug, err := cms.UniqueItemSlug(ctx.GoContext(), item.Title, item.ItemID)

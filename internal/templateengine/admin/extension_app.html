@@ -1,4 +1,9 @@
 {{template "page_header" .}}
 <div class="admin-extension-app">
-  {{.Content}}
+  <iframe
+    class="admin-extension-app-frame"
+    title="Extension admin interface"
+    sandbox="allow-scripts allow-forms allow-popups"
+    srcdoc="{{.ContentSrcdoc}}"
+  ></iframe>
 </div>

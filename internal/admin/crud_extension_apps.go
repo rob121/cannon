@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"html/template"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,18 +64,23 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 	}
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 {
 		if loc := http.Header(resp.Header).Get("Location"); loc != "" {
-			http.Redirect(w, r, loc, resp.StatusCode)
+			if safe, ok := SafeExtensionAdminRedirectLocation(name, loc, r); ok {
+				http.Redirect(w, r, safe, resp.StatusCode)
+				return
+			}
+			http.Error(w, "extension redirect blocked", http.StatusBadGateway)
 			return
 		}
 	}
 	html := resp.Body
+	w.Header().Set("Content-Security-Policy", extensionAdminCSP)
 	db, _ := sites.DB(r.Context())
 	title := extensionMenuLabel(name, extensionMenuNames(db))
 	h.render(w, r, title, "admin/extension_app.html", map[string]any{
-		"ActiveNav": "extension_app:" + name,
-		"Subtitle":  "Extension admin interface.",
-		"Extension": name,
-		"Content":   template.HTML(html),
+		"ActiveNav":     "extension_app:" + name,
+		"Subtitle":      "Extension admin interface.",
+		"Extension":     name,
+		"ContentSrcdoc": html,
 	})
 }
 

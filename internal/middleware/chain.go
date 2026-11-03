@@ -247,6 +247,7 @@ func (c *Chain) Session(next http.Handler) http.Handler {
 				MaxAge:   store.MaxAge(),
 				HttpOnly: true,
 				SameSite: http.SameSiteLaxMode,
+				Secure:   store.CookieSecureForRequest(r),
 			})
 		}
 

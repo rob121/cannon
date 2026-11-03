@@ -1,6 +1,7 @@
 package templateengine
 
 import (
+	"context"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -125,7 +126,7 @@ func ItemHasDate(item models.Item) bool {
 
 // Excerpt renders rich text as a plain-text teaser truncated to maxLen runes.
 func Excerpt(src string, maxLen int) string {
-	html, err := content.RichTextToHTML(src)
+	html, err := content.RichTextToHTML(context.Background(), src)
 	if err != nil {
 		html = src
 	}

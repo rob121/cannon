@@ -9,12 +9,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rob121/cannon/internal/fetchurl"
 )
 
 // Download saves a release asset to a temp file beside target and returns its path.
 func Download(client *http.Client, assetURL, target string) (string, error) {
+	if _, err := fetchurl.ValidateHTTPURL(assetURL, fetchurl.Options{AllowHTTP: true}); err != nil {
+		return "", err
+	}
 	if client == nil {
-		client = http.DefaultClient
+		client = fetchurl.SafeHTTPClient(0, fetchurl.Options{AllowHTTP: true})
 	}
 	resp, err := client.Get(assetURL)
 	if err != nil {

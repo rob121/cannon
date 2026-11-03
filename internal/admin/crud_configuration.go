@@ -98,6 +98,9 @@ func (h *Handler) configurationGlobal(w http.ResponseWriter, r *http.Request, ex
 		if sectionID == content.SettingsSection {
 			data = content.MergeConfigurationAuthorProfileFormData(data, r)
 		}
+		if sectionID == settings.SectionSEO {
+			settings.SanitizeSEOFormData(data)
+		}
 		if err := settings.Save(r.Context(), store, settings.ScopeGlobal, sectionID, data); err != nil {
 			h.renderConfigurationError(w, r, extMgr, "global", sectionID, def.Title, "", err.Error())
 			return

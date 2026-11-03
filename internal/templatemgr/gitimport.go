@@ -17,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/storage/memory"
 	"github.com/rob121/cannon/internal/content"
+	"github.com/rob121/cannon/internal/fetchurl"
 	"github.com/rob121/cannon/internal/templatemeta"
 	"github.com/rob121/cannon/internal/themes"
 )
@@ -278,29 +279,7 @@ func copyFile(src, dest string, mode fs.FileMode) error {
 
 // NormalizeGitURL validates and normalizes a git remote URL.
 func NormalizeGitURL(raw string) (string, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return "", fmt.Errorf("repository URL is required")
-	}
-	if strings.HasPrefix(raw, "git@") {
-		if !strings.Contains(raw, ":") {
-			return "", fmt.Errorf("invalid git SSH URL")
-		}
-		return raw, nil
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		return "", fmt.Errorf("invalid repository URL")
-	}
-	switch strings.ToLower(parsed.Scheme) {
-	case "http", "https":
-		if strings.TrimSpace(parsed.Host) == "" {
-			return "", fmt.Errorf("invalid repository URL")
-		}
-		return parsed.String(), nil
-	default:
-		return "", fmt.Errorf("repository URL must use http, https, or git@host:path")
-	}
+	return fetchurl.ValidateGitRemoteURL(raw)
 }
 
 // ThemeNameFromRepoURL derives a theme folder name from a git remote URL.

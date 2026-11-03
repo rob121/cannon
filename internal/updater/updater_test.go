@@ -50,8 +50,11 @@ func TestClientFetchManifest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{HTTP: server.Client(), Manifest: "cannon.json"}
-	info, err := client.LatestInfo(server.URL, "cannon")
+	client := &Client{
+		HTTP:     &http.Client{Timeout: time.Second, Transport: rewriteHostTransport{base: server.URL}},
+		Manifest: "cannon.json",
+	}
+	info, err := client.LatestInfo("http://example.com", "cannon")
 	if err != nil {
 		t.Fatal(err)
 	}

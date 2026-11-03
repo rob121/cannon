@@ -13,7 +13,7 @@ import (
 // requests read at the same time instead of queueing on one handle.
 // The cap stays small so Cannon and extension processes do not open a
 // large pile of connections against the same file.
-const SQLiteMaxOpenConns = 4
+const SQLiteMaxOpenConns = 6
 
 // sqliteMaxIdleConns keeps a couple of handles warm without pinning the
 // whole pool in every idle extension process.

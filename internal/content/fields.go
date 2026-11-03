@@ -1,6 +1,7 @@
 package content
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -116,7 +117,7 @@ func splitMultiValue(value string) []string {
 }
 
 // FormatFieldDisplayHTML renders a stored value for frontend output.
-func FormatFieldDisplayHTML(field models.ContentField, value string) string {
+func FormatFieldDisplayHTML(ctx context.Context, field models.ContentField, value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return ""
@@ -141,13 +142,13 @@ func FormatFieldDisplayHTML(field models.ContentField, value string) string {
 		}
 		return `<a href="` + html.EscapeString(value) + `" download>` + label + `</a>`
 	case "rich_text":
-		out, err := RichTextToHTML(value)
+		out, err := RichTextToHTML(ctx, value)
 		if err != nil {
 			return html.EscapeString(value)
 		}
 		return out
 	case "textarea":
-		out, err := RichTextToHTML(value)
+		out, err := RichTextToHTML(ctx, value)
 		if err != nil {
 			return html.EscapeString(value)
 		}
@@ -203,8 +204,12 @@ func FieldValueContains(value, part string) bool {
 
 // SaveItemFieldValues: saves custom field values from a form submission.
 func SaveItemFieldValues(db *gorm.DB, itemID uint, fields []models.ContentField, r *http.Request) error {
+	ctx := r.Context()
 	for _, field := range fields {
 		value := CustomFieldFormValue(field, r)
+		if field.Type == "rich_text" || field.Type == "textarea" {
+			value = SanitizeStoredRichText(ctx, value)
+		}
 		var existing models.ItemFieldValue
 		err := db.Where("item_id = ? AND field_id = ?", itemID, field.FieldID).First(&existing).Error
 		if errors.Is(err, gorm.ErrRecordNotFound) {

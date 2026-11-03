@@ -201,7 +201,7 @@ func frontendFuncMap(opts frontendFuncOpts) template.FuncMap {
 			return templateengine.PublicSettingBool(r.Context(), section, key)
 		},
 		"richText": func(src string) template.HTML {
-			html, err := cms.RichTextToHTML(src)
+			html, err := cms.RichTextToHTML(r.Context(), src)
 			if err != nil {
 				return template.HTML("")
 			}

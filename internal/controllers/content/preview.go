@@ -34,8 +34,8 @@ func (c *Controller) handlePreview(ctx *controllers.Context) controllers.Result 
 	}
 	fieldDisplays, _ := cms.ItemFieldDisplays(ctx.GoContext(), item)
 	settings, _ := cms.LoadSettings(ctx.GoContext())
-	bodyHTML, _ := cms.RichTextToHTML(item.Body)
-	introHTML, _ := cms.RichTextToHTML(item.Intro)
+	bodyHTML, _ := cms.RichTextToHTML(ctx.GoContext(), item.Body)
+	introHTML, _ := cms.RichTextToHTML(ctx.GoContext(), item.Intro)
 	gallery := cms.ParseGalleryJSON(item.GalleryJSON)
 	embeds := cms.ParseEmbedsJSON(item.EmbedJSON)
 	attachments := cms.ParseAttachmentsJSON(item.AttachmentsJSON)
