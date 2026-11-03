@@ -10,8 +10,45 @@ import (
 	"time"
 
 	"github.com/rob121/cannon/internal/config"
+	"github.com/rob121/cannon/internal/fetchurl"
 	"github.com/rob121/cannon/internal/version"
 )
+
+const appUpdateTestHost = "example.com"
+
+type rewriteHostTransport struct {
+	base string
+}
+
+func (rt rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	target := rt.base + req.URL.RequestURI()
+	rewritten, err := http.NewRequest(req.Method, target, req.Body)
+	if err != nil {
+		return nil, err
+	}
+	rewritten.Header = req.Header.Clone()
+	return http.DefaultTransport.RoundTrip(rewritten)
+}
+
+func appUpdateTestClient(server *httptest.Server) *http.Client {
+	return &http.Client{
+		Transport: rewriteHostTransport{base: server.URL},
+		Timeout:   2 * time.Minute,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return http.ErrUseLastResponse
+			}
+			if _, err := fetchurl.ValidateHTTPURL(req.URL.String(), fetchurl.Options{AllowHTTP: true}); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+func appUpdateTestURLBase() string {
+	return "http://" + appUpdateTestHost
+}
 
 func TestCheckStoresLatestVersion(t *testing.T) {
 	root := t.TempDir()
@@ -24,7 +61,7 @@ func TestCheckStoresLatestVersion(t *testing.T) {
 				"version": "v9.9.9",
 				"assets": {
 					"` + platform + `": {
-						"url": "http://example.test/cannon-binary",
+						"url": "http://` + appUpdateTestHost + `/cannon-binary",
 						"sha256": "abc123"
 					}
 				}
@@ -36,9 +73,9 @@ func TestCheckStoresLatestVersion(t *testing.T) {
 	defer server.Close()
 
 	version.Version = "v0.1.0"
-	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}}
+	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: appUpdateTestURLBase()}}
 	mgr := New(cfg)
-	mgr.client.HTTP = server.Client()
+	mgr.client.HTTP = appUpdateTestClient(server)
 	mgr.SetBinaryPath(filepath.Join(root, "cannon"))
 
 	if err := mgr.Check(); err != nil {
@@ -51,7 +88,7 @@ func TestCheckStoresLatestVersion(t *testing.T) {
 	if !state.UpdateAvailable || state.LatestVersion != "v9.9.9" {
 		t.Fatalf("state = %+v", state)
 	}
-	if state.UpdateAssetURL != "http://example.test/cannon-binary" || state.UpdateAssetSHA256 != "abc123" {
+	if state.UpdateAssetURL != "http://"+appUpdateTestHost+"/cannon-binary" || state.UpdateAssetSHA256 != "abc123" {
 		t.Fatalf("asset = %+v", state)
 	}
 }
@@ -64,13 +101,10 @@ func TestApplyStagesLatestWithoutReplacingLive(t *testing.T) {
 	}
 
 	var downloaded bool
-	downloadURL := ""
+	downloadURL := "http://" + appUpdateTestHost + "/cannon-binary"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/latest/download/cannon.json" {
 			platform := runtime.GOOS + "_" + runtime.GOARCH
-			if downloadURL == "" {
-				downloadURL = "http://" + r.Host + "/cannon-binary"
-			}
 			_, _ = w.Write([]byte(`{
 				"name": "cannon",
 				"version": "v1.0.0",
@@ -93,9 +127,9 @@ func TestApplyStagesLatestWithoutReplacingLive(t *testing.T) {
 	defer server.Close()
 
 	version.Version = "v0.1.0"
-	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}}
+	cfg := &config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: appUpdateTestURLBase()}}
 	mgr := New(cfg)
-	mgr.client.HTTP = server.Client()
+	mgr.client.HTTP = appUpdateTestClient(server)
 	mgr.SetBinaryPath(target)
 
 	if err := mgr.Apply(); err != nil {
@@ -229,13 +263,10 @@ func TestApplyFromPreviousExecutableNameStagesCannonLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	downloadURL := ""
+	downloadURL := "http://" + appUpdateTestHost + "/cannon-binary"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/latest/download/cannon.json" {
 			platform := runtime.GOOS + "_" + runtime.GOARCH
-			if downloadURL == "" {
-				downloadURL = "http://" + r.Host + "/cannon-binary"
-			}
 			_, _ = w.Write([]byte(`{
 				"name": "cannon",
 				"version": "v2.0.0",
@@ -252,8 +283,8 @@ func TestApplyFromPreviousExecutableNameStagesCannonLatest(t *testing.T) {
 	defer server.Close()
 
 	version.Version = "v1.0.0"
-	mgr := New(&config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: server.URL}})
-	mgr.client.HTTP = server.Client()
+	mgr := New(&config.App{DataRoot: root, Update: config.UpdateConfig{URLBase: appUpdateTestURLBase()}})
+	mgr.client.HTTP = appUpdateTestClient(server)
 	// Simulate Linux after swap: Executable() points at the renamed inode.
 	mgr.SetBinaryPath(prev)
 
