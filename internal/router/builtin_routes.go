@@ -98,6 +98,9 @@ func normalizeReservedPath(path string) string {
 	if path == "" {
 		return ""
 	}
+	if i := strings.Index(path, "?"); i >= 0 {
+		path = path[:i]
+	}
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}

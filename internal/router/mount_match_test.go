@@ -12,13 +12,13 @@ func TestMatchExtensionMount(t *testing.T) {
 		ExtensionPageID: "",
 		Path:            "/jobs",
 	}
-	if _, _, ok := matchRoutePath(route, "/jobs/comm-coordinator"); !ok {
+	if _, _, ok := matchRoutePath(route, "/jobs/comm-coordinator", ""); !ok {
 		t.Fatal("expected mount to match subpath")
 	}
-	if _, _, ok := matchRoutePath(route, "/jobs"); !ok {
+	if _, _, ok := matchRoutePath(route, "/jobs", ""); !ok {
 		t.Fatal("expected mount to match index path")
 	}
-	if _, _, ok := matchRoutePath(route, "/jobs-other"); ok {
+	if _, _, ok := matchRoutePath(route, "/jobs-other", ""); ok {
 		t.Fatal("expected prefix mismatch")
 	}
 }

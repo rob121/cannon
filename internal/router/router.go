@@ -96,7 +96,7 @@ func (d *Dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	route, ok, err := d.match(ctx, db, r.URL.Path)
+	route, ok, err := d.match(ctx, db, r.URL.Path, r.URL.RawQuery)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -286,7 +286,7 @@ func shouldVerifyExtensionFormCaptcha(r *http.Request) bool {
 	return ok
 }
 
-func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path string) (models.Route, bool, error) {
+func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path, rawQuery string) (models.Route, bool, error) {
 	viewerGroups, err := groups.ViewerGroupIDs(ctx)
 	if err != nil {
 		return models.Route{}, false, err
@@ -302,7 +302,7 @@ func (d *Dispatcher) match(ctx context.Context, db *gorm.DB, path string) (model
 		if !groups.CanView(viewerGroups, route.Groups) {
 			continue
 		}
-		kind, score, ok := matchRoutePath(route, path)
+		kind, score, ok := matchRoutePath(route, path, rawQuery)
 		if !ok {
 			continue
 		}
@@ -422,11 +422,30 @@ func (d *Dispatcher) renderNoRoutes(w http.ResponseWriter, r *http.Request, stat
 	}
 }
 
-func matchRoutePath(route models.Route, path string) (matchKind, int, bool) {
-	if route.Type == models.RouteTypeExtension && strings.TrimSpace(route.ExtensionPageID) == "" {
-		return matchExtensionMount(route.Path, path)
+func matchRoutePath(route models.Route, path, rawQuery string) (matchKind, int, bool) {
+	patternPath, patternQuery := splitRoutePattern(route.Path)
+	if patternQuery != "" && !queriesMatchExact(patternQuery, rawQuery) {
+		return kindExact, 0, false
 	}
-	return matchPath(route.Path, path)
+	effectivePattern := route.Path
+	if patternQuery != "" {
+		effectivePattern = patternPath
+	}
+	var kind matchKind
+	var score int
+	var ok bool
+	if route.Type == models.RouteTypeExtension && strings.TrimSpace(route.ExtensionPageID) == "" {
+		kind, score, ok = matchExtensionMount(effectivePattern, path)
+	} else {
+		kind, score, ok = matchPath(effectivePattern, path)
+	}
+	if !ok {
+		return kindExact, 0, false
+	}
+	if patternQuery != "" {
+		score += queryMatchScoreBoost
+	}
+	return kind, score, ok
 }
 
 func matchExtensionMount(pattern, path string) (matchKind, int, bool) {

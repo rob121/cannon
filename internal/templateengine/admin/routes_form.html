@@ -22,7 +22,7 @@
         <div class="col-md-6">
           <label class="admin-form-label">Path</label>
           <input class="admin-form-control" name="path" value="{{.Row.Path}}" required>
-          <p class="admin-form-help">Exact path, wildcard suffix <code class="admin-code">/*</code>, or regex pattern.</p>
+          <p class="admin-form-help">Exact path, wildcard suffix <code class="admin-code">/*</code>, or regex pattern. Append <code class="admin-code">?name=value</code> to match a specific query string (useful for URL redirects).</p>
         </div>
         <div class="col-md-6">
           <label class="admin-form-label">Type</label>
