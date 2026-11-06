@@ -45,9 +45,9 @@
         <div class="col-md-6">
           <label class="admin-form-label">Parent Item</label>
           <select class="admin-form-control" name="parent_id" id="menu-item-parent"{{if not .IsNew}} data-menu-id="{{.Row.MenuID}}"{{end}}>
-            <option value="">— Top level —</option>
+            <option value="0" data-menu-id="{{.Row.MenuID}}">— Top level —</option>
             {{range .ParentOptions}}
-            <option value="{{.MenuItemID}}" data-menu-id="{{.MenuID}}" {{if uintPtrEq $.Row.ParentID .MenuItemID}}selected{{end}}>{{.Label}}</option>
+            <option value="{{.MenuItemID}}" data-menu-id="{{.MenuID}}" {{if uintPtrEqOrZero $.Row.ParentID .MenuItemID}}selected{{end}}>{{.Label}}</option>
             {{end}}
           </select>
           <p class="admin-form-help">Optional. Nest this item under another item in the same menu.</p>
@@ -55,11 +55,11 @@
         <div class="col-md-6">
           <label class="admin-form-label">Route</label>
           <select class="admin-form-control" name="route_id">
-            <option value="">— None —</option>
+            <option value="0">— None —</option>
             {{range .RouteGroups}}
             <optgroup label="{{.Label}}">
               {{range .Routes}}
-              <option value="{{.RouteID}}" {{if uintPtrEq $.Row.RouteID .RouteID}}selected{{end}}>{{.Name}} ({{.Path}})</option>
+              <option value="{{.RouteID}}" {{if uintPtrEqOrZero $.Row.RouteID .RouteID}}selected{{end}}>{{.Name}} ({{.Path}})</option>
               {{end}}
             </optgroup>
             {{end}}

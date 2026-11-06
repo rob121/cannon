@@ -240,6 +240,7 @@ func (h *Handler) engine(r *http.Request, listExtra url.Values) (*templateengine
 			"fieldValueContains": content.FieldValueContains,
 			"providerName":       displayProviderName,
 			"uintPtrEq":          uintPtrEq,
+			"uintPtrEqOrZero":    uintPtrEqOrZero,
 			"siteURL":            siteFrontendURL,
 			"siteAdminURL":       siteAdminURL,
 			"siteHostLabel":      siteHostLabel,

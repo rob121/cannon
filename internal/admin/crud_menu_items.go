@@ -190,7 +190,12 @@ func (h *Handler) menuItemForm(w http.ResponseWriter, r *http.Request, id uint) 
 			}
 			saveErr = db.Create(&row).Error
 		} else {
-			saveErr = db.Save(&row).Error
+			// Drop preloaded associations so GORM does not re-sync FK columns from stale
+			// Parent/Route models when clearing parent_id or route_id to nil.
+			row.Parent = nil
+			row.Children = nil
+			row.Route = nil
+			saveErr = db.Session(&gorm.Session{FullSaveAssociations: false}).Save(&row).Error
 		}
 		if saveErr != nil {
 			h.renderMenuItemForm(w, r, row, allGroups, isNew, saveErr.Error())

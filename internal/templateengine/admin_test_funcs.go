@@ -19,6 +19,7 @@ func TestAdminFuncs() template.FuncMap {
 		"containsString":         func(list []string, value string) bool { return false },
 		"providerName":           func(name string) string { return name },
 		"uintPtrEq":              func(a *uint, b uint) bool { return a != nil && *a == b },
+		"uintPtrEqOrZero":        func(a *uint, b uint) bool { if a == nil || *a == 0 { return b == 0 }; return *a == b },
 		"groupName":              func(name string) string { return name },
 		"roleName":               func(name string) string { return name },
 		"categoryLabel":          func(category string) string { return category },

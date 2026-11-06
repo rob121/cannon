@@ -200,6 +200,7 @@ When a list page sets a space filter, extra query parameters (for example `space
 |----------|-----------|-------------|
 | `containsUint` | `containsUint .SelectedIDs 3` | Returns whether `uint` slice contains the id. |
 | `uintPtrEq` | `uintPtrEq .ParentID 5` | Compares a `*uint` to a `uint`. |
+| `uintPtrEqOrZero` | `uintPtrEqOrZero .ParentID 0` | Like `uintPtrEq`, but `nil` or `0` matches only `0` (sentinel for “no parent” selects). |
 | `joinRoleNames` | `joinRoleNames .Roles` | Comma-separated role names from a `[]models.Role`. |
 | `joinGroupNames` | `joinGroupNames .Groups` | Comma-separated group display names. |
 | `groupName` | `groupName .Name` | Admin label for a group (`Public` for the public group). |

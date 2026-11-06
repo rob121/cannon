@@ -89,14 +89,14 @@
                 <input class="admin-form-control" type="text" name="gallery_url" value="{{.URL}}" placeholder="Image URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="gallery_alt" value="{{.Alt}}" placeholder="Alt text">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="gallery">
                 <input class="admin-form-control" type="text" name="gallery_url" value="" placeholder="Image URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="gallery_alt" value="" placeholder="Alt text">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-gallery-picker-open><i class="bi bi-images"></i></button>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{end}}
             </div>
@@ -116,7 +116,7 @@
                   <option value="video" {{if eq .Kind "video"}}selected{{end}}>Video</option>
                   <option value="audio" {{if eq .Kind "audio"}}selected{{end}}>Audio</option>
                 </select>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="embed">
@@ -127,7 +127,7 @@
                   <option value="video">Video</option>
                   <option value="audio">Audio</option>
                 </select>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{end}}
             </div>
@@ -143,14 +143,14 @@
                 <input class="admin-form-control" type="text" name="attachment_url" value="{{.URL}}" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="{{.Label}}" placeholder="Label">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-attachment-picker-open title="Choose from media"><i class="bi bi-folder2-open"></i></button>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{else}}
               <div class="admin-repeat-row" data-repeat-row="attachment">
                 <input class="admin-form-control" type="text" name="attachment_url" value="" placeholder="File URL" inputmode="url" autocomplete="off">
                 <input class="admin-form-control" type="text" name="attachment_label" value="" placeholder="Label">
                 <button type="button" class="btn-admin-outline btn-admin-sm" data-attachment-picker-open title="Choose from media"><i class="bi bi-folder2-open"></i></button>
-                <button type="button" class="btn-admin-ghost btn-admin-sm" data-repeat-remove>Remove</button>
+                <button type="button" class="btn-admin-outline btn-admin-sm btn-admin-danger" data-repeat-remove>Remove</button>
               </div>
               {{end}}
             </div>

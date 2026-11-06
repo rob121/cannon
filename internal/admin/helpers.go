@@ -349,6 +349,15 @@ func uintPtrEq(ptr *uint, id uint) bool {
 	return ptr != nil && *ptr == id
 }
 
+// uintPtrEqOrZero compares *uint to id; when ptr is nil or *ptr is 0, it matches only id==0.
+// Use for select options where the sentinel "no value" is value="0" (submitted as parent_id=0).
+func uintPtrEqOrZero(ptr *uint, id uint) bool {
+	if ptr == nil || *ptr == 0 {
+		return id == 0
+	}
+	return *ptr == id
+}
+
 func usersNavOpen(nav string) bool {
 	switch nav {
 	case "accounts", "authenticators", "profiles", "groups", "roles", "permissions":

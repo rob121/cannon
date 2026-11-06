@@ -622,9 +622,15 @@
         option.disabled = !matches;
       });
       if (parentSelect.selectedOptions.length && parentSelect.selectedOptions[0].disabled) {
-        parentSelect.value = '';
+        parentSelect.value = '0';
       }
-      parentSelect.disabled = !menuID;
+      // Disabled <select> fields are not submitted; omitting parent_id would clear the parent on save.
+      // Only lock the parent picker until a menu is chosen when creating an item (menu_id field present).
+      if (menuSelect) {
+        parentSelect.disabled = !menuID;
+      } else {
+        parentSelect.disabled = false;
+      }
     }
 
     if (menuSelect && !menuSelect.dataset.parentBound) {
