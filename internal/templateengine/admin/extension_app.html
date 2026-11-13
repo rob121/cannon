@@ -1,9 +1,9 @@
 {{template "page_header" .}}
-<div class="admin-extension-app">
+<div class="admin-extension-app{{if eq .Extension "cannon-ext-ssh"}} admin-extension-app--terminal{{end}}">
   <iframe
-    class="admin-extension-app-frame"
+    class="{{if .ExtensionFrameClass}}{{.ExtensionFrameClass}}{{else}}admin-extension-app-frame{{end}}"
     title="Extension admin interface"
-    sandbox="allow-scripts allow-forms allow-popups"
+    sandbox="{{if .IframeSandbox}}{{.IframeSandbox}}{{else}}allow-scripts allow-forms allow-popups{{end}}"
     srcdoc="{{.ContentSrcdoc}}"
   ></iframe>
 </div>

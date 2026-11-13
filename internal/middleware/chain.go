@@ -141,7 +141,7 @@ func (c *Chain) Site(next http.Handler) http.Handler {
 		}
 
 		// WebSocket upgrades must reach the origin ResponseWriter (Hijacker).
-		if isWebSocketUpgrade(r) {
+		if IsWebSocketUpgrade(r) {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -215,7 +215,8 @@ func writeNoSitesConfigured(w http.ResponseWriter) {
 </html>`)
 }
 
-func isWebSocketUpgrade(r *http.Request) bool {
+// IsWebSocketUpgrade reports whether the request is a WebSocket upgrade.
+func IsWebSocketUpgrade(r *http.Request) bool {
 	return strings.Contains(strings.ToLower(r.Header.Get("Connection")), "upgrade") &&
 		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }

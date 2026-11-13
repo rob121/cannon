@@ -15,6 +15,9 @@ var wireHeaderAllowlist = map[string]struct{}{
 	"cache-control":     {},
 	"if-none-match":     {},
 	"if-modified-since": {},
+	"host":              {},
+	"x-forwarded-host":  {},
+	"x-forwarded-proto": {},
 }
 
 // FilterWireHeaders copies only safe request headers for extension IPC.

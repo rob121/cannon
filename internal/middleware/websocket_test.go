@@ -90,7 +90,7 @@ func TestIsWebSocketUpgrade(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Connection", "keep-alive, Upgrade")
 	req.Header.Set("Upgrade", "websocket")
-	if !isWebSocketUpgrade(req) {
+	if !IsWebSocketUpgrade(req) {
 		t.Fatal("expected websocket upgrade detection")
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/rob121/cannon/internal/extensions"
+	"github.com/rob121/cannon/internal/middleware"
 	"github.com/rob121/cannon/internal/models"
 	"github.com/rob121/cannon/internal/security"
 	"github.com/rob121/cannon/internal/sites"
@@ -57,6 +59,21 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if middleware.IsWebSocketUpgrade(r) && suffixPath == extensions.AdminWebSocketSuffix() {
+		svc, svcErr := user.FromContext(r.Context())
+		if svcErr != nil {
+			h.forbidden(w, r)
+			return
+		}
+		if _, ok := svc.CurrentID(); !ok {
+			h.forbidden(w, r)
+			return
+		}
+		if err := extMgr.ProxyAdminWebSocket(r.Context(), name, extensions.DefaultExtensionTerminalWSPath, w, r, userCtx); err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+		}
+		return
+	}
 	resp, err := extMgr.RenderAdmin(r.Context(), name, suffixPath, r, userCtx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
@@ -76,11 +93,19 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 	w.Header().Set("Content-Security-Policy", extensionAdminCSP)
 	db, _ := sites.DB(r.Context())
 	title := extensionMenuLabel(name, extensionMenuNames(db))
+	sandbox := "allow-scripts allow-forms allow-popups"
+	frameClass := "admin-extension-app-frame"
+	if name == "cannon-ext-ssh" {
+		sandbox += " allow-same-origin"
+		frameClass += " admin-extension-app-frame--terminal"
+	}
 	h.render(w, r, title, "admin/extension_app.html", map[string]any{
-		"ActiveNav":     "extension_app:" + name,
-		"Subtitle":      "Extension admin interface.",
-		"Extension":     name,
-		"ContentSrcdoc": html,
+		"ActiveNav":       "extension_app:" + name,
+		"Subtitle":        "Extension admin interface.",
+		"Extension":       name,
+		"ContentSrcdoc":   html,
+		"IframeSandbox":   sandbox,
+		"ExtensionFrameClass": frameClass,
 	})
 }
 
