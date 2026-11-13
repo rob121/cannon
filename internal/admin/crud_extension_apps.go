@@ -90,7 +90,8 @@ func (h *Handler) extensionAppProxy(w http.ResponseWriter, r *http.Request, name
 		}
 	}
 	html := resp.Body
-	w.Header().Set("Content-Security-Policy", extensionAdminCSP)
+	// Extension markup runs in a sandboxed iframe; do not set extensionAdminCSP on this
+	// response — it would apply to the whole admin page and block Bootstrap, Turbo, and fonts.
 	db, _ := sites.DB(r.Context())
 	title := extensionMenuLabel(name, extensionMenuNames(db))
 	sandbox := "allow-scripts allow-forms allow-popups"
